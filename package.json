@@ -1,0 +1,42 @@
+{
+  "name": "flashspace-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node-dev --respawn src/app.ts",
+    "build": "tsc -p tsconfig.json",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adarshXpal/flashspace-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/adarshXpal/flashspace-server/issues"
+  },
+  "homepage": "https://github.com/adarshXpal/flashspace-server#readme",
+  "dependencies": {
+    "@typegoose/typegoose": "^12.19.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "mongoose": "^8.18.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^5.0.3",
+    "@types/helmet": "^0.0.48",
+    "@types/mongoose": "^5.11.96",
+    "@types/node": "^24.3.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
