@@ -27,8 +27,8 @@ export class contactForm{
     @prop({required:true})
     public companyName!:string;
 
-    @prop({type:()=>(Array),required:true,enum:VirtualOfficeSolutions})
-    public serviceInterest!:VirtualOfficeSolutions;
+    @prop({type:()=>[String],required:true,enum:VirtualOfficeSolutions})
+    public serviceInterest!:VirtualOfficeSolutions[];
 
     @prop()
     public message?: string;

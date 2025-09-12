@@ -1,9 +1,12 @@
-import {Router} from "express";
-import {contactFormRoutes} from "./flashspaceWeb/contactFormModule/contactForm.routes"
+import { Router } from "express";
+import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes"
+import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 
-export const mainRoutes=Router();
+export const mainRoutes = Router();
 
-mainRoutes.use("/contactForm",contactFormRoutes);
-// mainRoutes.use("/spacePartners",spacePartnersRoutes);
+// /api/contactForm
+mainRoutes.use("/contactForm", contactFormRoutes);
+// /api/spaceProvider
+mainRoutes.use("/spaceProvider", spaceProviderRoutes);
 
 

@@ -1,38 +1,35 @@
 import { Request, Response } from "express";
 import { Types } from "mongoose";
-import { ContactFormModel } from "./contactForm.model";
-
-export const createContactForm = async (req: Request, res: Response) => {
+import { SpaceProviderModel } from "./spaceProvider.model";
+export const createSpaceProvider = async (req: Request, res: Response) => {
     try {
         let {
+            spaceName,
+            spaceType,
+            city,
+            capacity,
+            fullAddress,
+            pricePerMonth,
+            amenities,
+            description,
             fullName,
             email,
-            phoneNumber,
-            companyName,
-            serviceInterest,
-            message
+            phone
         } = req.body;
-        // const user = await ContactFormModel.findOne({
-        //     email,
-        //     phoneNumber
-        // })
-        // if (user) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: "User Already Exist in database",
-        //         data: {},
-        //         error: "User Already Exist in database",
-        //     });
-        // }
-        const createdContact = await ContactFormModel.create({
+        const createdSpace = await SpaceProviderModel.create({
+            spaceName,
+            spaceType,
+            city,
+            capacity,
+            fullAddress,
+            pricePerMonth,
+            amenities,
+            description,
             fullName,
             email,
-            phoneNumber,
-            companyName,
-            serviceInterest,
-            message
+            phone
         });
-        if (!createdContact) {
+        if (!createdSpace) {
             return res.status(400).json({
                 success: false,
                 message: "Issue with database",
@@ -43,8 +40,8 @@ export const createContactForm = async (req: Request, res: Response) => {
 
         res.status(201).json({
             success: true,
-            message: "Contact created successfully",
-            data: createdContact,
+            message: "Space created successfully",
+            data: createdSpace,
             error: {},
         });
 
@@ -58,11 +55,11 @@ export const createContactForm = async (req: Request, res: Response) => {
     }
 }
 
-export const getAllContactForm = async (req: Request, res: Response) => {
+export const getAllSpaceProvider = async (req: Request, res: Response) => {
     try {
         let query: any = { isDeleted: false };
-        const allContacts = await ContactFormModel.find(query).sort({ createdAt: -1 });
-        if (allContacts.length === 0) {
+        const allSpaceProviders = await SpaceProviderModel.find(query).sort({ createdAt: -1 });
+        if (allSpaceProviders.length === 0) {
             return res.status(500).json({
                 success: false,
                 message: "Can't retrieve data !!",
@@ -72,8 +69,8 @@ export const getAllContactForm = async (req: Request, res: Response) => {
         }
         res.status(201).json({
             success: true,
-            message: "Contact retrieved successfully",
-            data: allContacts,
+            message: "Space retrieved successfully",
+            data: allSpaceProviders,
             error: {},
         });
     } catch (err) {
@@ -86,37 +83,37 @@ export const getAllContactForm = async (req: Request, res: Response) => {
     }
 }
 
-export const getContactFormById = async (req: Request, res: Response) => {
+export const getSpaceProviderById= async (req: Request, res: Response) => {
     try {
-        const { contactId } = req.params;
+        const { spaceProviderId } = req.params;
 
-        if (!Types.ObjectId.isValid(contactId)) {
+        if (!Types.ObjectId.isValid(spaceProviderId)) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid contact ID format",
+                message: "Invalid spaceProvider ID format",
                 data: {},
                 error: "Invalid ObjectId",
             });
         }
 
-        const contact = await ContactFormModel.findOne({
-            _id: contactId,
+        const spaceProvider = await SpaceProviderModel.findOne({
+            _id: spaceProviderId,
             isDeleted: false
         });
 
-        if (!contact) {
+        if (!spaceProvider) {
             return res.status(404).json({
                 success: false,
-                message: "Contact not found",
+                message: "Space not found",
                 data: {},
-                error: "Contact not found",
+                error: "Space not found",
             });
         }
 
         res.status(200).json({
             success: true,
-            message: "Contact retrieved successfully",
-            data: contact,
+            message: "Space retrieved successfully",
+            data: spaceProvider,
             error: {},
         });
 
@@ -130,20 +127,24 @@ export const getContactFormById = async (req: Request, res: Response) => {
     }
 }
 
-export const updateContactForm = async (req: Request, res: Response) => {
+export const updateSpaceProvider = async (req: Request, res: Response) => {
     try {
-        const { contactId } = req.params;
+        const { spaceProviderId } = req.params;
         const {
+            spaceName,
+            spaceType,
+            city,
+            capacity,
+            fullAddress,
+            pricePerMonth,
+            amenities,
+            description,
             fullName,
             email,
-            phoneNumber,
-            companyName,
-            serviceInterest,
-            message,
-            isActive
+            phone
         } = req.body;
 
-        if (!Types.ObjectId.isValid(contactId)) {
+        if (!Types.ObjectId.isValid(spaceProviderId)) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid contact ID format",
@@ -152,33 +153,37 @@ export const updateContactForm = async (req: Request, res: Response) => {
             });
         }
 
-        const updatedContact = await ContactFormModel.findOneAndUpdate(
-            { _id: contactId, isDeleted: false },
+        const updatedSpace = await SpaceProviderModel.findOneAndUpdate(
+            { _id: spaceProviderId, isDeleted: false },
             {
+                ...(spaceName && { spaceName }),
+                ...(spaceType && { spaceType }),
+                ...(city && { city }),
+                ...(capacity && { capacity }),
+                ...(fullAddress && { fullAddress }),
+                ...(pricePerMonth && { pricePerMonth }),
+                ...(amenities && { amenities }),
+                ...(description && { description }),
                 ...(fullName && { fullName }),
                 ...(email && { email }),
-                ...(phoneNumber && { phoneNumber }),
-                ...(companyName && { companyName }),
-                ...(serviceInterest && { serviceInterest }),
-                ...(message !== undefined && { message }),
-                ...(isActive !== undefined && { isActive })
+                ...(phone && { phone })
             },
             { new: true, runValidators: true }
         );
 
-        if (!updatedContact) {
+        if (!updatedSpace) {
             return res.status(404).json({
                 success: false,
-                message: "Contact not found",
+                message: "Space not found",
                 data: {},
-                error: "Contact not found",
+                error: "Space not found",
             });
         }
 
         res.status(200).json({
             success: true,
-            message: "Contact updated successfully",
-            data: updatedContact,
+            message: "Space updated successfully",
+            data: updatedSpace,
             error: {},
         });
 
@@ -192,11 +197,11 @@ export const updateContactForm = async (req: Request, res: Response) => {
     }
 }
 
-export const deleteContactForm = async (req: Request, res: Response) => {
+export const deleteSpaceProvider = async (req: Request, res: Response) => {
     try {
-        const { contactId } = req.params;
+        const { spaceProviderId } = req.params;
 
-        if (!Types.ObjectId.isValid(contactId)) {
+        if (!Types.ObjectId.isValid(spaceProviderId)) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid contact ID format",
@@ -205,8 +210,8 @@ export const deleteContactForm = async (req: Request, res: Response) => {
             });
         }
 
-        const deletedContact = await ContactFormModel.findOneAndUpdate(
-            { _id: contactId, isDeleted: false },
+        const deletedSpace = await SpaceProviderModel.findOneAndUpdate(
+            { _id: spaceProviderId, isDeleted: false },
             {
                 isDeleted: true,
                 isActive: false
@@ -214,19 +219,19 @@ export const deleteContactForm = async (req: Request, res: Response) => {
             { new: true }
         );
 
-        if (!deletedContact) {
+        if (!deletedSpace) {
             return res.status(404).json({
                 success: false,
-                message: "Contact not found",
+                message: "Space not found",
                 data: {},
-                error: "Contact not found",
+                error: "Space not found",
             });
         }
 
         res.status(200).json({
             success: true,
-            message: "Contact deleted successfully",
-            data: deletedContact,
+            message: "Space deleted successfully",
+            data: deletedSpace,
             error: {},
         });
 
