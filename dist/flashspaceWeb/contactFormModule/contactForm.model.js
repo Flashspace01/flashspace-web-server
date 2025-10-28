@@ -39,8 +39,8 @@ __decorate([
     __metadata("design:type", String)
 ], contactForm.prototype, "companyName", void 0);
 __decorate([
-    (0, typegoose_1.prop)({ required: true, enum: VirtualOfficeSolutions }),
-    __metadata("design:type", String)
+    (0, typegoose_1.prop)({ type: () => [String], required: true, enum: VirtualOfficeSolutions }),
+    __metadata("design:type", Array)
 ], contactForm.prototype, "serviceInterest", void 0);
 __decorate([
     (0, typegoose_1.prop)(),

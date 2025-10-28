@@ -2,11 +2,12 @@
   "name": "flashspace-server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "start": "ts-node-dev --respawn src/app.ts",
     "build": "tsc -p tsconfig.json",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts"
+    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
+    "seed": "ts-node src/scripts/seedData.ts"
   },
   "repository": {
     "type": "git",
@@ -26,7 +27,8 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "mongoose": "^8.18.1"
+    "mongoose": "^8.18.1",
+    "ts-node-dev": "^2.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
