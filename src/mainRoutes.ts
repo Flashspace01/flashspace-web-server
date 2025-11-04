@@ -3,9 +3,12 @@ import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm
 import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtualOffice.routes";
 import { coworkingSpaceRoutes } from "./flashspaceWeb/coworkingSpaceModule/coworkingSpace.routes";
+import { authRoutes } from "./flashspaceWeb/authModule/routes/auth.routes";
 
 export const mainRoutes = Router();
 
+// /api/auth
+mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/spaceProvider
