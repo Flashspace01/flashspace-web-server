@@ -28,7 +28,21 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-app.use(cors(corsOptions));
+const allowedOrigins = [
+  'https://flash-space-web-client.vercel.app',
+  'https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app'
+];
+
+app.use(cors({
+  ...corsOptions,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, origin);
+    } else {
+      callback(new Error("CORS not allowed"), false);
+    }
+  }
+}));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
 
 // Middleware
