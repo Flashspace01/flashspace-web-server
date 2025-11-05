@@ -31,7 +31,8 @@ const corsOptions = {
 const allowedOrigins = [
   'https://flash-space-web-client.vercel.app',
   'https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app',
-  'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app' // <-- add this
+  'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app', // <-- add this
+  'http://localhost:5173'
 ];
 
 app.use(cors({
