@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import { mainRoutes } from "./mainRoutes";
 import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
+import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ const app: Application = express();
 
 // Initialize email service
 EmailUtil.initialize();
+
+// Initialize Google OAuth
+GoogleUtil.initialize();
 
 // CORS configuration with credentials support (MUST be FIRST) 
 // Updated to fix wildcard CORS issue
@@ -31,16 +35,26 @@ const corsOptions = {
 const allowedOrigins = [
   'https://flash-space-web-client.vercel.app',
   'https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app',
-  'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app', // <-- add this
-  'http://localhost:5173'
+  'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174'
 ];
 
 app.use(cors({
   ...corsOptions,
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
       callback(null, origin);
     } else {
+      console.error('CORS blocked origin:', origin);
       callback(new Error("CORS not allowed"), false);
     }
   }

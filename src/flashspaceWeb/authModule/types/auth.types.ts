@@ -38,9 +38,19 @@ export interface JwtPayload {
 export interface GoogleProfile {
   id: string;
   displayName: string;
-  emails: Array<{ value: string }>;
+  emails: Array<{ value: string; verified?: boolean }>;
   photos: Array<{ value: string }>;
   provider: string;
+  _json?: {
+    sub?: string;
+    email?: string;
+    email_verified?: boolean;
+    name?: string;
+    picture?: string;
+    given_name?: string;
+    family_name?: string;
+    locale?: string;
+  };
 }
 
 export interface ForgotPasswordRequest {

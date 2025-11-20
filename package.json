@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
     "seed": "ts-node src/scripts/seedData.ts",
+    "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
     "test:otp": "ts-node src/scripts/test-otp-system.ts"
   },
@@ -35,6 +36,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "google-auth-library": "^10.5.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.1",

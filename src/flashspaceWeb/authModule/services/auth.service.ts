@@ -195,6 +195,32 @@ export class AuthService {
     }
   }
 
+  async googleAuthWithToken(idToken: string): Promise<AuthResponse> {
+    try {
+      // Import GoogleUtil
+      const { GoogleUtil } = await import('../utils/google.util');
+      
+      // Verify the token with Google
+      const profile = await GoogleUtil.verifyIdToken(idToken);
+      
+      if (!profile) {
+        return {
+          success: false,
+          message: 'Invalid Google token'
+        };
+      }
+
+      // Continue with existing Google auth logic
+      return await this.googleAuth(profile);
+    } catch (error) {
+      console.error('Google token auth error:', error);
+      return {
+        success: false,
+        message: 'Failed to authenticate with Google'
+      };
+    }
+  }
+
   async googleAuth(profile: GoogleProfile): Promise<AuthResponse> {
     try {
       const email = profile.emails[0].value;

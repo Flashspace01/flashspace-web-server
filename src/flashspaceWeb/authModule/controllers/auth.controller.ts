@@ -463,19 +463,41 @@ export class AuthController {
   checkAuth = async (req: Request, res: Response): Promise<void> => {
     try {
       if (req.user) {
-        res.status(200).json({
-          success: true,
-          message: 'User is authenticated',
-          data: {
-            isAuthenticated: true,
-            user: {
-              id: req.user.id,
-              email: req.user.email,
-              role: req.user.role
-            }
-          },
-          error: {}
-        });
+        // Fetch full user details
+        const user = await this.authService.getUserProfile(req.user.id);
+        
+        if (user) {
+          res.status(200).json({
+            success: true,
+            message: 'User is authenticated',
+            data: {
+              isAuthenticated: true,
+              user: {
+                id: user._id.toString(),
+                email: user.email,
+                fullName: user.fullName,
+                phoneNumber: user.phoneNumber,
+                profilePicture: user.profilePicture,
+                role: user.role,
+                authProvider: user.authProvider,
+                isEmailVerified: user.isEmailVerified,
+                lastLogin: user.lastLogin,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+              }
+            },
+            error: {}
+          });
+        } else {
+          res.status(200).json({
+            success: true,
+            message: 'User is not authenticated',
+            data: {
+              isAuthenticated: false
+            },
+            error: {}
+          });
+        }
       } else {
         res.status(200).json({
           success: true,
@@ -594,6 +616,104 @@ export class AuthController {
       }
     } catch (error) {
       console.error('Resend OTP controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        data: {},
+        error: 'Internal server error'
+      });
+    }
+  };
+
+  // Google OAuth - Verify ID token from frontend
+  googleAuth = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { idToken } = req.body;
+
+      if (!idToken) {
+        res.status(400).json({
+          success: false,
+          message: 'Google ID token is required',
+          data: {},
+          error: 'Missing ID token'
+        });
+        return;
+      }
+
+      // Verify token with Google and authenticate user
+      const result = await this.authService.googleAuthWithToken(idToken);
+
+      if (result.success && result.tokens) {
+        // Set secure cookies
+        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            user: result.user,
+            tokens: result.tokens
+          },
+          error: {}
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          message: result.message,
+          data: {},
+          error: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Google auth controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        data: {},
+        error: 'Internal server error'
+      });
+    }
+  };
+
+  // Google OAuth callback (alternative method for server-side flow)
+  googleCallback = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { idToken } = req.body;
+
+      if (!idToken) {
+        res.status(400).json({
+          success: false,
+          message: 'Google ID token is required',
+          data: {},
+          error: 'Missing ID token'
+        });
+        return;
+      }
+
+      const result = await this.authService.googleAuthWithToken(idToken);
+
+      if (result.success && result.tokens) {
+        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            user: result.user,
+            tokens: result.tokens
+          },
+          error: {}
+        });
+      } else {
+        res.status(401).json({
+          success: false,
+          message: result.message,
+          data: {},
+          error: result.message
+        });
+      }
+    } catch (error) {
+      console.error('Google callback controller error:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

@@ -42,6 +42,10 @@ router.post('/reset-password',
 
 router.post('/refresh-token', authController.refreshToken);
 
+// Google OAuth routes
+router.post('/google', authController.googleAuth);
+router.post('/google/callback', authController.googleCallback);
+
 // Semi-protected routes (optional authentication)
 router.get('/check-auth', 
   AuthMiddleware.optionalAuth, 
