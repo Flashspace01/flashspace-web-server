@@ -310,9 +310,7 @@ export class AuthController {
         res.status(200).json({
           success: true,
           message: result.message,
-          data: {
-            tokens: result.tokens
-          },
+          data: {},
           error: {}
         });
       } else {
@@ -556,8 +554,7 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {
-            user: result.user,
-            tokens: result.tokens
+            user: result.user
           },
           error: {}
         });
@@ -651,8 +648,7 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {
-            user: result.user,
-            tokens: result.tokens
+            user: result.user
           },
           error: {}
         });
@@ -699,8 +695,7 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {
-            user: result.user,
-            tokens: result.tokens
+            user: result.user
           },
           error: {}
         });

@@ -1,4 +1,4 @@
-import { prop, modelOptions,getModelForClass} from "@typegoose/typegoose";
+import { prop, modelOptions,getModelForClass,index} from "@typegoose/typegoose";
 
 export enum VirtualOfficeSolutions {
   BusinessRegistration = "Business Registration",
@@ -13,7 +13,10 @@ export enum VirtualOfficeSolutions {
         timestamps:true
     }
 })
-
+@index({ email: 1 }) // Quick email lookups
+@index({ isDeleted: 1, isActive: 1 }) // Filter active submissions
+@index({ createdAt: -1 }) // Recent submissions sorting
+@index({ serviceInterest: 1 }) // Filter by service type
 export class contactForm{
     @prop({required:true,trim:true})
     public fullName!:string;

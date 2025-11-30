@@ -1,4 +1,4 @@
-import { prop,getModelForClass,modelOptions } from "@typegoose/typegoose";
+import { prop,getModelForClass,modelOptions,index } from "@typegoose/typegoose";
 
 enum OfficeType {
   VirtualOffice = "Virtual Office",
@@ -14,7 +14,10 @@ enum OfficeType {
         timestamps:true
     }
 })
-
+@index({ email: 1 }) // Quick email lookups
+@index({ city: 1, spaceType: 1 }) // Location + type searches
+@index({ isDeleted: 1, isActive: 1 }) // Filter active providers
+@index({ createdAt: -1 }) // Recent submissions
 export class spaceProvider{
     @prop({required:true,trim:true})
     public spaceName!:string;

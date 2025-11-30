@@ -2,8 +2,22 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { JwtPayload } from '../types/auth.types';
 
 export class JwtUtil {
-  private static readonly ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your-access-secret';
-  private static readonly REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret';
+  private static readonly ACCESS_TOKEN_SECRET = (() => {
+    const secret = process.env.JWT_ACCESS_SECRET;
+    if (!secret) {
+      throw new Error('JWT_ACCESS_SECRET environment variable is required but not set');
+    }
+    return secret;
+  })();
+  
+  private static readonly REFRESH_TOKEN_SECRET = (() => {
+    const secret = process.env.JWT_REFRESH_SECRET;
+    if (!secret) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is required but not set');
+    }
+    return secret;
+  })();
+  
   private static readonly ACCESS_TOKEN_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
   private static readonly REFRESH_TOKEN_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 

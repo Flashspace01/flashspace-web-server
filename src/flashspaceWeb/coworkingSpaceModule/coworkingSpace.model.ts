@@ -1,4 +1,4 @@
-import { prop, getModelForClass, modelOptions } from "@typegoose/typegoose";
+import { prop, getModelForClass, modelOptions, index } from "@typegoose/typegoose";
 
 enum DeskType {
     HotDesk = "Hot Desk",
@@ -12,7 +12,12 @@ enum DeskType {
         timestamps: true
     }
 })
-
+@index({ city: 1, area: 1 }) // Location-based searches
+@index({ isDeleted: 1, isActive: 1 }) // Filter active spaces
+@index({ type: 1, city: 1 }) // Desk type + location queries
+@index({ popular: 1, rating: -1 }) // Featured/popular spaces
+@index({ "coordinates.lat": 1, "coordinates.lng": 1 }) // Geospatial queries
+@index({ price: 1 }) // Price-based filtering
 export class CoworkingSpace {
     @prop({ required: true, trim: true })
     public name!: string;

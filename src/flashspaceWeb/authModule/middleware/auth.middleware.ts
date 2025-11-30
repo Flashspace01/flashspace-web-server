@@ -22,17 +22,24 @@ export class AuthMiddleware {
   // Verify JWT token and attach user to request
   static async authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authHeader = req.headers.authorization;
+      // Extract token from cookies (primary method)
+      let token = req.cookies?.accessToken;
       
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Fallback to Authorization header for backward compatibility (optional)
+      if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          token = authHeader.substring(7);
+        }
+      }
+      
+      if (!token) {
         res.status(401).json({
           success: false,
           message: 'Access token required'
         });
         return;
       }
-
-      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
       try {
         const decoded = JwtUtil.verifyAccessToken(token);
@@ -75,14 +82,21 @@ export class AuthMiddleware {
   // Optional authentication - doesn't fail if no token
   static async optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const authHeader = req.headers.authorization;
+      // Extract token from cookies (primary method)
+      let token = req.cookies?.accessToken;
       
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Fallback to Authorization header
+      if (!token) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          token = authHeader.substring(7);
+        }
+      }
+      
+      if (!token) {
         next();
         return;
       }
-
-      const token = authHeader.substring(7);
 
       try {
         const decoded = JwtUtil.verifyAccessToken(token);
@@ -206,26 +220,38 @@ export class AuthMiddleware {
   static setTokenCookies(res: Response, accessToken: string, refreshToken: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
     
+    // Cookie configuration for cross-origin requests
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction, // Only true in production (requires HTTPS)
+      sameSite: isProduction ? ('none' as const) : ('lax' as const), // 'none' for production cross-origin, 'lax' for dev
+      path: '/',
+    };
+    
     // Set access token cookie (shorter expiry)
     res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
     // Set refresh token cookie (longer expiry)
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'strict',
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
   }
 
   // Clear authentication cookies
   static clearTokenCookies(res: Response): void {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+    };
+    
+    res.clearCookie('accessToken', cookieOptions);
+    res.clearCookie('refreshToken', cookieOptions);
   }
 }

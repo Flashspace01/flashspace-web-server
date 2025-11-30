@@ -34,6 +34,12 @@ export enum UserRole {
 })
 @index({ email: 1 }, { unique: true })
 @index({ googleId: 1 }, { sparse: true, unique: true })
+@index({ isDeleted: 1, isActive: 1 }) // Filter active users efficiently
+@index({ role: 1 }) // Role-based access queries
+@index({ authProvider: 1 }) // Provider-specific queries
+@index({ lastLogin: -1 }) // Recent activity tracking
+@index({ emailVerificationOTPExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired OTPs
+@index({ resetPasswordExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired reset tokens
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
   

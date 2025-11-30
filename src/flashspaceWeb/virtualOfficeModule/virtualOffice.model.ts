@@ -1,11 +1,15 @@
-import { prop, getModelForClass, modelOptions } from "@typegoose/typegoose";
+import { prop, getModelForClass, modelOptions, index } from "@typegoose/typegoose";
 
 @modelOptions({
     schemaOptions: {
         timestamps: true
     }
 })
-
+@index({ city: 1, area: 1 }) // Location-based searches
+@index({ isDeleted: 1, isActive: 1 }) // Filter active offices
+@index({ popular: 1, rating: -1 }) // Featured/popular offices
+@index({ "coordinates.lat": 1, "coordinates.lng": 1 }) // Geospatial queries
+@index({ price: 1 }) // Price-based filtering
 export class VirtualOffice {
     @prop({ required: true, trim: true })
     public name!: string;
