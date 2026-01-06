@@ -1,6 +1,6 @@
 # FlashSpace API Documentation
 
-**Base URL:** `http://YOUR_SERVER_IP:5000/api`
+**Base URL:** `http://72.60.219.115:5000/api`
 
 ---
 

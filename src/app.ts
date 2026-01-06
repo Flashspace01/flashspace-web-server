@@ -43,7 +43,9 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   'https://flashspace.ai',
-  'https://www.flashspace.ai'
+  'https://www.flashspace.ai',
+  'http://72.60.219.115:8080',
+  'http://72.60.219.115'
 ];
 
 app.use(cors({
