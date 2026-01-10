@@ -45,7 +45,7 @@ export class AuthMiddleware {
         const decoded = JwtUtil.verifyAccessToken(token);
         
         // Verify user still exists and is active
-        const user = await this.userRepository.findById(decoded.userId);
+        const user = await AuthMiddleware.userRepository.findById(decoded.userId);
         if (!user) {
           res.status(401).json({
             success: false,
@@ -79,28 +79,71 @@ export class AuthMiddleware {
     }
   }
 
-  // Optional authentication - doesn't fail if no token
+  // Optional authentication with auto-refresh - doesn't fail if no token
+  // But will try to refresh expired access token using refresh token
   static async optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Extract token from cookies (primary method)
-      let token = req.cookies?.accessToken;
+      // DEBUG: Log all cookies received
+      console.log('🍪 Cookies received:', Object.keys(req.cookies || {}));
+      
+      // Extract access token from cookies (primary method)
+      let accessToken = req.cookies?.accessToken;
       
       // Fallback to Authorization header
-      if (!token) {
+      if (!accessToken) {
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
-          token = authHeader.substring(7);
+          accessToken = authHeader.substring(7);
         }
       }
       
-      if (!token) {
+      console.log('🔑 Access token present:', !!accessToken);
+      console.log('🔄 Refresh token present:', !!req.cookies?.refreshToken);
+      
+      // Case 1: No access token at all
+      if (!accessToken) {
+        // Try to use refresh token to get new access token
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken) {
+          try {
+            const decoded = JwtUtil.verifyRefreshToken(refreshToken);
+            const user = await AuthMiddleware.userRepository.findById(decoded.userId);
+            
+            if (user) {
+              // Generate new tokens
+              const newTokens = JwtUtil.generateTokenPair({
+                userId: user._id.toString(),
+                email: user.email,
+                role: user.role
+              });
+              
+              // Set new cookies
+              AuthMiddleware.setTokenCookies(res, newTokens.accessToken, newTokens.refreshToken);
+              
+              // Attach user to request
+              req.user = {
+                id: user._id.toString(),
+                email: user.email,
+                role: user.role
+              };
+              console.log('✅ Auto-refreshed tokens for user:', user.email);
+            }
+          } catch (refreshError) {
+            // Refresh token also invalid, continue without auth
+            console.log('⚠️ Refresh token invalid, user not authenticated');
+          }
+        } else {
+          console.log('⚠️ No tokens found in cookies');
+        }
         next();
         return;
       }
 
+      // Case 2: Access token exists, try to verify it
       try {
-        const decoded = JwtUtil.verifyAccessToken(token);
-        const user = await this.userRepository.findById(decoded.userId);
+        const decoded = JwtUtil.verifyAccessToken(accessToken);
+        console.log('✅ Access token valid for userId:', decoded.userId);
+        const user = await AuthMiddleware.userRepository.findById(decoded.userId);
         
         if (user) {
           req.user = {
@@ -108,9 +151,48 @@ export class AuthMiddleware {
             email: user.email,
             role: user.role
           };
+          console.log('✅ User authenticated:', user.email);
+        } else {
+          console.log('⚠️ User not found in database for userId:', decoded.userId);
         }
-      } catch (tokenError) {
-        // Ignore token errors in optional auth
+      } catch (tokenError: any) {
+        console.log('⚠️ Access token verification failed:', tokenError.message);
+        // Access token expired/invalid, try refresh token
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken) {
+          try {
+            const decoded = JwtUtil.verifyRefreshToken(refreshToken);
+            console.log('✅ Refresh token valid for userId:', decoded.userId);
+            const user = await AuthMiddleware.userRepository.findById(decoded.userId);
+            
+            if (user) {
+              // Generate new tokens
+              const newTokens = JwtUtil.generateTokenPair({
+                userId: user._id.toString(),
+                email: user.email,
+                role: user.role
+              });
+              
+              // Set new cookies
+              AuthMiddleware.setTokenCookies(res, newTokens.accessToken, newTokens.refreshToken);
+              
+              // Attach user to request
+              req.user = {
+                id: user._id.toString(),
+                email: user.email,
+                role: user.role
+              };
+              console.log('✅ Auto-refreshed expired access token for user:', user.email);
+            } else {
+              console.log('⚠️ User not found for refresh token userId:', decoded.userId);
+            }
+          } catch (refreshError: any) {
+            // Both tokens invalid, continue without auth
+            console.log('⚠️ Refresh token verification failed:', refreshError.message);
+          }
+        } else {
+          console.log('⚠️ No refresh token available');
+        }
       }
 
       next();

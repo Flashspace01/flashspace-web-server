@@ -5,6 +5,7 @@ import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtual
 import { coworkingSpaceRoutes } from "./flashspaceWeb/coworkingSpaceModule/coworkingSpace.routes";
 import { authRoutes } from "./flashspaceWeb/authModule/routes/auth.routes";
 import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partnerInquiry.routes";
+import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 
 export const mainRoutes = Router();
 
@@ -20,5 +21,7 @@ mainRoutes.use("/virtualOffice", virtualOfficeRoutes);
 mainRoutes.use("/coworkingSpace", coworkingSpaceRoutes);
 // /api/partnerInquiry
 mainRoutes.use("/partnerInquiry", partnerInquiryRoutes);
+// /api/payment
+mainRoutes.use("/payment", paymentRoutes);
 
 
