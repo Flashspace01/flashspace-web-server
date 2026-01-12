@@ -2,12 +2,162 @@ import { Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { PaymentModel, PaymentStatus, PaymentType } from "./payment.model";
+import { BookingModel } from "../userDashboardModule/models/booking.model";
+import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
+import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
+import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
+import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || "",
   key_secret: process.env.RAZORPAY_KEY_SECRET || "",
 });
+
+// Helper function to create booking and invoice after payment
+async function createBookingAndInvoice(payment: any) {
+  try {
+    // Generate booking number
+    const bookingCount = await BookingModel.countDocuments();
+    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+
+    // Get space details for snapshot
+    let spaceSnapshot: any = {
+      _id: payment.spaceId,
+      name: payment.spaceName,
+    };
+
+    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+      const space = await VirtualOfficeModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.image,
+          coordinates: space.coordinates,
+        };
+      }
+    } else {
+      const space = await CoworkingSpaceModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.image,
+          coordinates: space.coordinates,
+        };
+      }
+    }
+
+    // Calculate dates
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + (payment.tenure * 12)); // tenure in years
+
+    // Create booking
+    const booking = await BookingModel.create({
+      bookingNumber,
+      user: payment.userId,
+      type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : "coworking_space",
+      spaceId: payment.spaceId,
+      spaceSnapshot,
+      plan: {
+        name: payment.planName,
+        price: payment.totalAmount,
+        originalPrice: payment.yearlyPrice * payment.tenure,
+        discount: payment.discountAmount || 0,
+        tenure: payment.tenure * 12,
+        tenureUnit: "months",
+      },
+      paymentId: payment._id?.toString(),
+      razorpayOrderId: payment.razorpayOrderId,
+      razorpayPaymentId: payment.razorpayPaymentId,
+      status: "pending_kyc",
+      kycStatus: "not_started",
+      timeline: [
+        {
+          status: "payment_received",
+          date: new Date(),
+          note: `Payment of ₹${payment.totalAmount} received`,
+          by: "System",
+        },
+      ],
+      documents: [],
+      startDate,
+      endDate,
+      autoRenew: false,
+      features: ["Business Address", "Mail Handling", "GST Registration Support"],
+    });
+
+    // Generate invoice number
+    const invoiceCount = await InvoiceModel.countDocuments();
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+
+    // Calculate tax (18% GST)
+    const subtotal = payment.totalAmount;
+    const taxRate = 18;
+    const taxAmount = Math.round((subtotal * taxRate) / 118); // Extract GST from inclusive price
+    const baseAmount = subtotal - taxAmount;
+
+    // Create invoice
+    await InvoiceModel.create({
+      invoiceNumber,
+      user: payment.userId,
+      bookingId: booking._id?.toString(),
+      bookingNumber,
+      paymentId: payment._id?.toString(),
+      description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
+      lineItems: [
+        {
+          description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
+          quantity: 1,
+          rate: baseAmount,
+          amount: baseAmount,
+        },
+      ],
+      subtotal: baseAmount,
+      taxRate,
+      taxAmount,
+      total: subtotal,
+      status: "paid",
+      paidAt: new Date(),
+      billingAddress: {
+        name: payment.userName,
+        company: "",
+        address: "",
+        city: spaceSnapshot.city || "",
+      },
+    });
+
+    // Create/update KYC record
+    let kyc = await KYCDocumentModel.findOne({ user: payment.userId });
+    if (!kyc) {
+      kyc = await KYCDocumentModel.create({
+        user: payment.userId,
+        bookingId: booking._id?.toString(),
+        personalInfo: {
+          fullName: payment.userName,
+          email: payment.userEmail,
+          phone: payment.userPhone,
+          verified: true,
+        },
+        overallStatus: "not_started",
+        progress: 25,
+      });
+    }
+
+    return { booking, invoiceNumber };
+  } catch (error) {
+    console.error("Error creating booking/invoice:", error);
+    throw error;
+  }
+}
 
 /**
  * Create a new Razorpay order
@@ -132,6 +282,14 @@ export const verifyPayment = async (req: Request, res: Response) => {
         });
       }
 
+      // Create booking and invoice
+      let bookingData = null;
+      try {
+        bookingData = await createBookingAndInvoice(payment);
+      } catch (err) {
+        console.error("Failed to create booking:", err);
+      }
+
       return res.status(200).json({
         success: true,
         message: "Payment verified successfully (DEV MODE)",
@@ -143,6 +301,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
           planName: payment.planName,
           tenure: payment.tenure,
           totalAmount: payment.totalAmount,
+          bookingNumber: bookingData?.booking?.bookingNumber,
+          invoiceNumber: bookingData?.invoiceNumber,
           devMode: true,
         },
       });
@@ -200,6 +360,14 @@ export const verifyPayment = async (req: Request, res: Response) => {
       });
     }
 
+    // Create booking and invoice
+    let bookingData = null;
+    try {
+      bookingData = await createBookingAndInvoice(payment);
+    } catch (err) {
+      console.error("Failed to create booking:", err);
+    }
+
     res.status(200).json({
       success: true,
       message: "Payment verified successfully",
@@ -211,6 +379,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
         planName: payment.planName,
         tenure: payment.tenure,
         totalAmount: payment.totalAmount,
+        bookingNumber: bookingData?.booking?.bookingNumber,
+        invoiceNumber: bookingData?.invoiceNumber,
       },
     });
   } catch (error: any) {
