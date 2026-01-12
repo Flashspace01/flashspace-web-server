@@ -41,6 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.1",
     "nodemailer": "^7.0.10",
+    "razorpay": "^2.9.6",
     "ts-node-dev": "^2.0.0"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
+// import sgMail from '@sendgrid/mail'; // COMMENTED OUT - SendGrid temporarily disabled
 import crypto from 'crypto';
 
 export interface EmailOptions {
@@ -16,16 +16,18 @@ export class EmailUtil {
   static initialize() {
     const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
-    if (service === 'sendgrid') {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      if (!apiKey) {
-        console.warn('⚠️ SENDGRID_API_KEY not configured');
-        return;
-      }
-      sgMail.setApiKey(apiKey);
-      console.log('✅ SendGrid email service initialized');
-      this.isInitialized = true;
-    } else if (service === 'gmail') {
+    // COMMENTED OUT - SendGrid temporarily disabled
+    // if (service === 'sendgrid') {
+    //   const apiKey = process.env.SENDGRID_API_KEY;
+    //   if (!apiKey) {
+    //     console.warn('⚠️ SENDGRID_API_KEY not configured');
+    //     return;
+    //   }
+    //   sgMail.setApiKey(apiKey);
+    //   console.log('✅ SendGrid email service initialized');
+    //   this.isInitialized = true;
+    // } else 
+    if (service === 'gmail') {
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -36,7 +38,8 @@ export class EmailUtil {
       console.log('✅ Gmail email service initialized');
       this.isInitialized = true;
     } else {
-      console.warn('⚠️ No email service configured. Set EMAIL_SERVICE in .env');
+      console.log('📧 Email service disabled - emails will be logged only');
+      this.isInitialized = true; // Mark as initialized to prevent repeated attempts
     }
   }
 
@@ -48,19 +51,21 @@ export class EmailUtil {
         this.initialize();
       }
 
-      if (service === 'sendgrid') {
-        const msg = {
-          to: options.to,
-          from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
-          subject: options.subject,
-          text: options.text || options.html.replace(/<[^>]*>/g, ''),
-          html: options.html,
-        };
+      // COMMENTED OUT - SendGrid temporarily disabled
+      // if (service === 'sendgrid') {
+      //   const msg = {
+      //     to: options.to,
+      //     from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
+      //     subject: options.subject,
+      //     text: options.text || options.html.replace(/<[^>]*>/g, ''),
+      //     html: options.html,
+      //   };
 
-        const result = await sgMail.send(msg);
-        console.log('✅ Email sent successfully via SendGrid to:', options.to);
-        return;
-      } else if (service === 'gmail') {
+      //   const result = await sgMail.send(msg);
+      //   console.log('✅ Email sent successfully via SendGrid to:', options.to);
+      //   return;
+      // } else 
+      if (service === 'gmail') {
         if (!this.transporter) {
           throw new Error('Gmail transporter not initialized');
         }
@@ -74,18 +79,21 @@ export class EmailUtil {
         });
         console.log('✅ Email sent successfully via Gmail');
       } else {
-        console.log('📧 Email would be sent (no service configured):', options.subject);
+        // Log email instead of sending (for development/when no service configured)
+        console.log('📧 Email logged (sending disabled):');
+        console.log('   To:', options.to);
+        console.log('   Subject:', options.subject);
       }
     } catch (error: any) {
       console.error('❌ Error sending email:', error);
       
-      // Log detailed error for SendGrid
-      if (service === 'sendgrid' && error.response?.body) {
-        console.error('📝 SendGrid Error Details:', JSON.stringify(error.response.body, null, 2));
-      }
+      // COMMENTED OUT - SendGrid error logging
+      // if (service === 'sendgrid' && error.response?.body) {
+      //   console.error('📝 SendGrid Error Details:', JSON.stringify(error.response.body, null, 2));
+      // }
       
-      // Re-throw the original error with more context
-      throw error;
+      // Don't throw error - just log it so app continues working
+      console.log('⚠️ Email sending failed but continuing...');
     }
   }
 

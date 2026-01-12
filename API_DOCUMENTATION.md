@@ -1,6 +1,6 @@
 # FlashSpace API Documentation
 
-**Base URL:** `http://YOUR_SERVER_IP:5000/api`
+**Base URL:** `http://72.60.219.115:5000/api`
 
 ---
 
@@ -11,6 +11,12 @@
 3. [Virtual Office](#3-virtual-office)
 4. [Coworking Space](#4-coworking-space)
 5. [Partner Inquiry](#5-partner-inquiry)
+6. [User Dashboard](#6-user-dashboard)
+   - [Dashboard Overview](#61-dashboard-overview)
+   - [Bookings](#62-bookings)
+   - [KYC](#63-kyc-verification)
+   - [Invoices](#64-invoices)
+   - [Support Tickets](#65-support-tickets)
 
 ---
 
@@ -1048,8 +1054,481 @@ FlashSpace API
 │   ├── Get By ID
 │   ├── Update
 │   └── Delete
+├── User Dashboard
+│   ├── Get Dashboard Overview
+│   ├── Get All Bookings
+│   ├── Get Booking By ID
+│   ├── Toggle Auto-Renew
+│   ├── Get KYC Status
+│   ├── Update Business Info
+│   ├── Upload KYC Document
+│   ├── Get All Invoices
+│   ├── Get Invoice By ID
+│   ├── Get All Tickets
+│   ├── Create Ticket
+│   ├── Get Ticket By ID
+│   └── Reply to Ticket
 └── Partner Inquiry
     ├── Submit
     ├── Get All
     └── Update Status
 ```
+
+---
+
+## 6. User Dashboard
+
+Base Path: `/api/user`
+
+**Authentication Required:** All endpoints require Bearer token in Authorization header.
+
+### 6.1 Dashboard Overview
+
+**GET** `/api/user/dashboard`
+
+Get dashboard stats for logged-in user.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "activeServices": 2,
+    "pendingInvoices": 3200,
+    "nextBookingDate": "2026-02-05T00:00:00.000Z",
+    "kycStatus": "verified",
+    "recentActivity": [
+      {
+        "type": "booking",
+        "message": "Premium Virtual Office - Andheri - active",
+        "date": "2026-01-08T10:00:00.000Z"
+      }
+    ],
+    "usageBreakdown": {
+      "virtualOffice": 65,
+      "coworkingSpace": 35
+    },
+    "monthlyBookings": [
+      { "month": "Aug", "count": 4 },
+      { "month": "Sep", "count": 6 },
+      { "month": "Oct", "count": 7 }
+    ]
+  }
+}
+```
+
+---
+
+### 6.2 Bookings
+
+#### Get All Bookings
+
+**GET** `/api/user/bookings`
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `type` | string | Filter by `virtual_office` or `coworking_space` |
+| `status` | string | Filter by `pending_kyc`, `active`, `expired`, `cancelled` |
+| `page` | number | Page number (default: 1) |
+| `limit` | number | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "booking_id",
+      "bookingNumber": "FS-2026-00042",
+      "type": "virtual_office",
+      "status": "active",
+      "spaceSnapshot": {
+        "name": "Premium Virtual Office - Andheri",
+        "address": "123, Business Park, Andheri East, Mumbai",
+        "city": "Mumbai",
+        "image": "https://..."
+      },
+      "plan": {
+        "name": "GST Registration Plan",
+        "price": 15000,
+        "tenure": 12,
+        "tenureUnit": "months"
+      },
+      "startDate": "2026-01-10T00:00:00.000Z",
+      "endDate": "2027-01-10T00:00:00.000Z",
+      "daysRemaining": 365,
+      "createdAt": "2026-01-08T10:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 5,
+    "page": 1,
+    "pages": 1
+  }
+}
+```
+
+---
+
+#### Get Booking By ID
+
+**GET** `/api/user/bookings/:bookingId`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "booking_id",
+    "bookingNumber": "FS-2026-00042",
+    "type": "virtual_office",
+    "status": "active",
+    "spaceSnapshot": { ... },
+    "plan": { ... },
+    "timeline": [
+      { "status": "payment_received", "date": "2026-01-08", "note": "Payment confirmed" },
+      { "status": "kyc_approved", "date": "2026-01-09", "note": "Verified by Admin" },
+      { "status": "active", "date": "2026-01-10", "note": "Service activated" }
+    ],
+    "documents": [
+      { "name": "Client Agreement", "type": "agreement", "url": "https://..." },
+      { "name": "NOC Certificate", "type": "noc", "url": "https://..." }
+    ],
+    "startDate": "2026-01-10T00:00:00.000Z",
+    "endDate": "2027-01-10T00:00:00.000Z",
+    "autoRenew": true
+  }
+}
+```
+
+---
+
+#### Toggle Auto-Renew
+
+**PATCH** `/api/user/bookings/:bookingId/auto-renew`
+
+**Request Body:**
+```json
+{
+  "autoRenew": false
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Auto-renewal disabled"
+}
+```
+
+---
+
+### 6.3 KYC Verification
+
+#### Get KYC Status
+
+**GET** `/api/user/kyc`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "overallStatus": "pending",
+    "progress": 65,
+    "personalInfo": {
+      "fullName": "Anshu Prasad",
+      "email": "anshu@example.com",
+      "phone": "+91-9899223359",
+      "verified": true
+    },
+    "businessInfo": {
+      "companyName": "Talenode Analytics Pvt Ltd",
+      "companyType": "Private Limited",
+      "gstNumber": "27AABCT1234F1ZH",
+      "panNumber": "AABCT1234F",
+      "cinNumber": "U78300DL2024PTC432593",
+      "verified": false
+    },
+    "documents": [
+      {
+        "type": "pan_card",
+        "name": "PAN Card",
+        "status": "approved",
+        "uploadedAt": "2026-01-08T10:00:00.000Z"
+      },
+      {
+        "type": "gst_certificate",
+        "name": "GST Certificate",
+        "status": "pending",
+        "uploadedAt": "2026-01-08T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### Update Business Info
+
+**PUT** `/api/user/kyc/business-info`
+
+**Request Body:**
+```json
+{
+  "companyName": "Talenode Analytics Pvt Ltd",
+  "companyType": "Private Limited",
+  "gstNumber": "27AABCT1234F1ZH",
+  "panNumber": "AABCT1234F",
+  "cinNumber": "U78300DL2024PTC432593",
+  "registeredAddress": "123, ABC Building, Mumbai - 400001"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Business information updated"
+}
+```
+
+---
+
+#### Upload KYC Document
+
+**POST** `/api/user/kyc/upload`
+
+**Request Body:**
+```json
+{
+  "documentType": "pan_card",
+  "fileUrl": "https://storage.example.com/pan-card.pdf",
+  "name": "PAN Card"
+}
+```
+
+**Document Types:**
+- `pan_card`
+- `aadhaar_card`
+- `gst_certificate`
+- `coi` (Certificate of Incorporation)
+- `address_proof`
+- `bank_statement`
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Document uploaded successfully",
+  "data": {
+    "type": "pan_card",
+    "status": "pending",
+    "uploadedAt": "2026-01-10T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 6.4 Invoices
+
+#### Get All Invoices
+
+**GET** `/api/user/invoices`
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `status` | string | Filter by `paid`, `pending`, `overdue` |
+| `fromDate` | string | Start date (YYYY-MM-DD) |
+| `toDate` | string | End date (YYYY-MM-DD) |
+| `page` | number | Page number |
+| `limit` | number | Items per page |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "totalPaid": 45000,
+      "totalPending": 3200,
+      "totalInvoices": 5
+    },
+    "invoices": [
+      {
+        "_id": "invoice_id",
+        "invoiceNumber": "INV-2026-0042",
+        "bookingNumber": "FS-2026-00042",
+        "description": "Virtual Office - GST Plan (Andheri)",
+        "subtotal": 12712,
+        "taxRate": 18,
+        "taxAmount": 2288,
+        "total": 15000,
+        "status": "paid",
+        "paidAt": "2026-01-08T10:00:00.000Z"
+      }
+    ]
+  },
+  "pagination": { "total": 5, "page": 1, "pages": 1 }
+}
+```
+
+---
+
+#### Get Invoice By ID
+
+**GET** `/api/user/invoices/:invoiceId`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "invoice_id",
+    "invoiceNumber": "INV-2026-0042",
+    "description": "Virtual Office - GST Plan",
+    "lineItems": [
+      { "description": "GST Registration Plan - 1 Year", "quantity": 1, "rate": 12712, "amount": 12712 }
+    ],
+    "subtotal": 12712,
+    "taxRate": 18,
+    "taxAmount": 2288,
+    "total": 15000,
+    "status": "paid",
+    "billingAddress": {
+      "name": "Anshu Prasad",
+      "company": "Talenode Analytics",
+      "gstNumber": "27AABCT1234F1ZH"
+    }
+  }
+}
+```
+
+---
+
+### 6.5 Support Tickets
+
+#### Get All Tickets
+
+**GET** `/api/user/support/tickets`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "ticket_id",
+      "ticketNumber": "TKT-2026-0042",
+      "subject": "GST Certificate not reflecting",
+      "category": "kyc",
+      "status": "in_progress",
+      "priority": "high",
+      "createdAt": "2026-01-08T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+#### Create Support Ticket
+
+**POST** `/api/user/support/tickets`
+
+**Request Body:**
+```json
+{
+  "subject": "Unable to download NOC document",
+  "category": "virtual_office",
+  "priority": "medium",
+  "description": "When I click on download NOC, I get an error.",
+  "bookingId": "booking_id"
+}
+```
+
+**Categories:** `virtual_office`, `coworking`, `billing`, `kyc`, `technical`, `other`
+
+**Priority:** `low`, `medium`, `high`, `urgent`
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Support ticket created",
+  "data": {
+    "_id": "ticket_id",
+    "ticketNumber": "TKT-2026-0043",
+    "status": "open"
+  }
+}
+```
+
+---
+
+#### Get Ticket By ID
+
+**GET** `/api/user/support/tickets/:ticketId`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "ticket_id",
+    "ticketNumber": "TKT-2026-0042",
+    "subject": "GST Certificate not reflecting",
+    "category": "kyc",
+    "status": "in_progress",
+    "messages": [
+      {
+        "sender": "user",
+        "senderName": "Anshu Prasad",
+        "message": "My GST certificate was approved but not showing.",
+        "createdAt": "2026-01-08T10:00:00.000Z"
+      },
+      {
+        "sender": "support",
+        "senderName": "Ramit (Support)",
+        "message": "Hi, we are looking into this.",
+        "createdAt": "2026-01-08T14:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### Reply to Ticket
+
+**POST** `/api/user/support/tickets/:ticketId/reply`
+
+**Request Body:**
+```json
+{
+  "message": "Thank you, please let me know once resolved."
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Reply sent"
+}
