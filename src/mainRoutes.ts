@@ -7,6 +7,7 @@ import { authRoutes } from "./flashspaceWeb/authModule/routes/auth.routes";
 import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partnerInquiry.routes";
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
+import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 
 export const mainRoutes = Router();
 
@@ -26,5 +27,7 @@ mainRoutes.use("/partnerInquiry", partnerInquiryRoutes);
 mainRoutes.use("/payment", paymentRoutes);
 // /api/user (Dashboard APIs)
 mainRoutes.use("/user", userDashboardRoutes);
+// /api/admin (Admin Dashboard APIs)
+mainRoutes.use("/admin", adminRoutes);
 
 

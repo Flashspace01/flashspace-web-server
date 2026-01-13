@@ -84,3 +84,10 @@ export interface OTPResponse {
   requiresNewOTP?: boolean;
   retryAfter?: number;
 }
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
+  error?: string;
+}
