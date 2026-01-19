@@ -70,13 +70,19 @@ export class KYCDocument {
   user!: Ref<User>;
 
   @prop()
-  bookingId?: string;
+  profileName?: string; // e.g., "TechCorp Pvt Ltd" or "John Doe (Personal)"
+
+  @prop({ type: () => [String], default: [] })
+  linkedBookings?: string[]; // Array of booking IDs using this profile
 
   @prop({ type: () => PersonalInfo })
   personalInfo?: PersonalInfo;
 
   @prop({ type: () => BusinessInfo })
   businessInfo?: BusinessInfo;
+
+  @prop({ enum: ["individual", "business"], default: "individual" })
+  kycType?: string;
 
   @prop({ type: () => [KYCDocumentItem], default: [] })
   documents?: KYCDocumentItem[];

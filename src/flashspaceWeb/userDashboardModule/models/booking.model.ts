@@ -108,6 +108,9 @@ export class Booking {
   })
   status!: string;
 
+  @prop()
+  kycProfileId?: string; // Reference to the KYC profile used for this booking
+
   @prop({ enum: ["not_started", "pending", "approved", "rejected"], default: "not_started" })
   kycStatus?: string;
 

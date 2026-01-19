@@ -140,4 +140,89 @@ export class AdminService {
             };
         }
     }
+
+    // Approve KYC profile
+    async approveKYC(profileId: string, adminId: string): Promise<ApiResponse<any>> {
+        try {
+            // Find the KYC profile
+            const kycProfile = await KYCDocumentModel.findById(profileId).populate('user');
+
+            if (!kycProfile) {
+                return {
+                    success: false,
+                    message: "KYC profile not found"
+                };
+            }
+
+            // Update profile status
+            kycProfile.overallStatus = "approved";
+            kycProfile.updatedAt = new Date();
+
+            // Mark all documents as approved
+            if (kycProfile.documents) {
+                kycProfile.documents.forEach((doc: any) => {
+                    doc.status = "approved";
+                    doc.verifiedAt = new Date();
+                    doc.verifiedBy = adminId;
+                });
+            }
+
+            await kycProfile.save();
+
+            // Update user's kycVerified flag
+            const userId = typeof kycProfile.user === 'object' ? (kycProfile.user as any)._id : kycProfile.user;
+            await UserModel.findByIdAndUpdate(userId, { kycVerified: true });
+
+            // Find and auto-link any pending bookings for this user
+            const pendingBookings = await BookingModel.find({
+                user: userId,
+                status: "pending_kyc",
+                isDeleted: false
+            });
+
+            // Link all pending bookings to this approved profile
+            for (const booking of pendingBookings) {
+                booking.kycProfileId = profileId;
+                booking.kycStatus = "approved";
+                booking.status = "active";
+
+                // Set start and end dates if not already set
+                if (!booking.startDate) {
+                    booking.startDate = new Date();
+                }
+                if (!booking.endDate) {
+                    const endDate = new Date(booking.startDate);
+                    endDate.setMonth(endDate.getMonth() + (booking.plan?.tenure || 12));
+                    booking.endDate = endDate;
+                }
+
+                await booking.save();
+
+                // Add booking to profile's linkedBookings
+                if (!kycProfile.linkedBookings?.includes(booking._id.toString())) {
+                    kycProfile.linkedBookings = kycProfile.linkedBookings || [];
+                    kycProfile.linkedBookings.push(booking._id.toString());
+                }
+            }
+
+            // Save profile with linked bookings
+            await kycProfile.save();
+
+            return {
+                success: true,
+                message: `KYC profile approved successfully. ${pendingBookings.length} booking(s) activated.`,
+                data: {
+                    profile: kycProfile,
+                    linkedBookings: pendingBookings.length
+                }
+            };
+        } catch (error: any) {
+            console.error("Error approving KYC:", error);
+            return {
+                success: false,
+                message: "Failed to approve KYC",
+                error: error.message
+            };
+        }
+    }
 }
