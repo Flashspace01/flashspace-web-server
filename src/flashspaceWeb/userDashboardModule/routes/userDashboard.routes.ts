@@ -14,6 +14,8 @@ import {
   createTicket,
   getTicketById,
   replyToTicket,
+  getCredits,
+  redeemReward,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
@@ -42,5 +44,9 @@ router.get("/support/tickets", getAllTickets);
 router.post("/support/tickets", createTicket);
 router.get("/support/tickets/:ticketId", getTicketById);
 router.post("/support/tickets/:ticketId/reply", replyToTicket);
+
+// ============ CREDITS & REWARDS ============
+router.get("/credits", getCredits);
+router.post("/credits/redeem", redeemReward);
 
 export default router;

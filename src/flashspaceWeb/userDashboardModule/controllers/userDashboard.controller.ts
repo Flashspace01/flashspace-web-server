@@ -3,6 +3,8 @@ import { BookingModel } from "../models/booking.model";
 import { KYCDocumentModel } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
+import { UserModel } from "../../authModule/models/user.model";
+import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 
 // ============ DASHBOARD ============
 
@@ -576,5 +578,106 @@ export const replyToTicket = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Reply to ticket error:", error);
     res.status(500).json({ success: false, message: "Failed to send reply" });
+  }
+};
+
+// ============ CREDITS & REWARDS ============
+
+export const getCredits = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    // Get User for current balance
+    const user = await UserModel.findById(userId);
+
+    // Get Credit History
+    const history = await CreditLedgerModel.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // Calculate total earned (optional, or just use history)
+    const totalEarned = await CreditLedgerModel.aggregate([
+      { $match: { user: userId, source: CreditSource.BOOKING } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        balance: user?.credits || 0,
+        totalEarned: totalEarned[0]?.total || 0,
+        history,
+        rewardThreshold: 5000,
+        canRedeem: (user?.credits || 0) >= 5000
+      }
+    });
+  } catch (error) {
+    console.error("Get credits error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch credits" });
+  }
+};
+
+export const redeemReward = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { spaceId, spaceName, date, timeSlot } = req.body; // Expecting meeting details
+
+    const user = await UserModel.findById(userId);
+    if (!user || (user.credits || 0) < 5000) {
+      return res.status(400).json({ success: false, message: "Insufficient credits" });
+    }
+
+    // Deduct ALL Credits
+    const currentCredits = user.credits || 0;
+    await UserModel.findByIdAndUpdate(userId, {
+      $set: { credits: 0 } // Reset to zero using $set
+    });
+
+    // Create Booking (Free)
+    const bookingCount = await BookingModel.countDocuments();
+    const bookingNumber = `FS-RW-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+
+    const booking = await BookingModel.create({
+      bookingNumber,
+      user: userId,
+      type: "meeting_room",
+      spaceId: spaceId || "REWARD_REDEMPTION", // Fallback if not provided
+      spaceSnapshot: { name: spaceName || "Free Meeting Room Reward" },
+      plan: {
+        name: "1 Hour Free Meeting Room",
+        price: 0,
+        tenure: 1,
+        tenureUnit: "hours"
+      },
+      status: "active",
+      timeline: [{
+        status: "redeemed",
+        date: new Date(),
+        note: `Redeemed ${currentCredits} credits for free meeting room`,
+        by: "User"
+      }],
+      startDate: new Date(date || Date.now()),
+      endDate: new Date(new Date(date || Date.now()).getTime() + 60 * 60 * 1000) // 1 Hour
+    });
+
+    // Ledger Entry
+    await CreditLedgerModel.create({
+      user: userId,
+      amount: -currentCredits, // Deduct everything
+      source: CreditSource.REDEEM,
+      description: `Redeemed ${currentCredits} credits for 1 Hour Free Meeting Room`,
+      referenceId: booking._id?.toString(),
+      balanceAfter: 0
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Reward redeemed successfully! Meeting room booked.",
+      data: booking
+    });
+
+  } catch (error) {
+    console.error("Redeem reward error:", error);
+    res.status(500).json({ success: false, message: "Failed to redeem reward" });
   }
 };

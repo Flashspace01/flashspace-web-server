@@ -10,7 +10,14 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
+            gstPlanPrice,
+            gstPlanPriceYearly,
+            mailingPlanPrice,
+            mailingPlanPriceYearly,
+            brPlanPrice,
+            brPlanPriceYearly,
             rating,
             reviews,
             features,
@@ -26,7 +33,14 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
+            gstPlanPrice,
+            gstPlanPriceYearly,
+            mailingPlanPrice,
+            mailingPlanPriceYearly,
+            brPlanPrice,
+            brPlanPriceYearly,
             rating,
             reviews,
             features,
@@ -64,7 +78,8 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
 
 export const getAllVirtualOffices = async (req: Request, res: Response) => {
     try {
-        const query: any = { isDeleted: false };
+        const { deleted } = req.query;
+        const query: any = String(deleted) === 'true' ? { isDeleted: true } : { isDeleted: false };
         const allOffices = await VirtualOfficeModel.find(query).sort({ createdAt: -1 });
 
         if (allOffices.length === 0) {
@@ -171,6 +186,7 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     }
 };
 
+// Updates an existing virtual office including new yearly pricing fields
 export const updateVirtualOffice = async (req: Request, res: Response) => {
     try {
         const { virtualOfficeId } = req.params;
@@ -180,7 +196,14 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
+            gstPlanPrice,
+            gstPlanPriceYearly,
+            mailingPlanPrice,
+            mailingPlanPriceYearly,
+            brPlanPrice,
+            brPlanPriceYearly,
             rating,
             reviews,
             features,
@@ -207,7 +230,14 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
                 ...(city && { city }),
                 ...(area && { area }),
                 ...(price && { price }),
+                ...(priceYearly && { priceYearly }),
                 ...(originalPrice && { originalPrice }),
+                ...(gstPlanPrice && { gstPlanPrice }),
+                ...(gstPlanPriceYearly && { gstPlanPriceYearly }),
+                ...(mailingPlanPrice && { mailingPlanPrice }),
+                ...(mailingPlanPriceYearly && { mailingPlanPriceYearly }),
+                ...(brPlanPrice && { brPlanPrice }),
+                ...(brPlanPriceYearly && { brPlanPriceYearly }),
                 ...(rating !== undefined && { rating }),
                 ...(reviews !== undefined && { reviews }),
                 ...(features && { features }),
@@ -248,6 +278,7 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
 export const deleteVirtualOffice = async (req: Request, res: Response) => {
     try {
         const { virtualOfficeId } = req.params;
+        const { restore } = req.query;
 
         if (!Types.ObjectId.isValid(virtualOfficeId)) {
             return res.status(400).json({
@@ -258,16 +289,18 @@ export const deleteVirtualOffice = async (req: Request, res: Response) => {
             });
         }
 
-        const deletedOffice = await VirtualOfficeModel.findOneAndUpdate(
-            { _id: virtualOfficeId, isDeleted: false },
+        const isRestoring = String(restore) === 'true';
+
+        const updatedOffice = await VirtualOfficeModel.findOneAndUpdate(
+            { _id: virtualOfficeId },
             {
-                isDeleted: true,
-                isActive: false
+                isDeleted: !isRestoring,
+                isActive: isRestoring
             },
             { new: true }
         );
 
-        if (!deletedOffice) {
+        if (!updatedOffice) {
             return res.status(404).json({
                 success: false,
                 message: "Virtual office not found",
@@ -278,8 +311,8 @@ export const deleteVirtualOffice = async (req: Request, res: Response) => {
 
         res.status(200).json({
             success: true,
-            message: "Virtual office deleted successfully",
-            data: deletedOffice,
+            message: isRestoring ? "Virtual office restored successfully" : "Virtual office deleted successfully",
+            data: updatedOffice,
             error: {},
         });
 

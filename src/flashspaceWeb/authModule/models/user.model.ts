@@ -19,7 +19,7 @@ export enum UserRole {
     collection: "users",
     toJSON: {
       virtuals: true,
-      transform: function(doc, ret) {
+      transform: function (doc, ret) {
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
@@ -42,7 +42,7 @@ export enum UserRole {
 @index({ resetPasswordExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired reset tokens
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
-  
+
   @prop({ required: true, trim: true, lowercase: true })
   public email!: string;
 
@@ -99,6 +99,9 @@ export class User extends TimeStamps {
 
   @prop({ default: true })
   public isActive!: boolean;
+
+  @prop({ default: 0 })
+  public credits!: number;
 
   @prop({ default: false })
   public isDeleted!: boolean;

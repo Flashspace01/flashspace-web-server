@@ -55,7 +55,7 @@ app.use(cors({
     if (!origin) {
       return callback(null, true);
     }
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, origin);
     } else {
@@ -80,6 +80,17 @@ app.use(helmet({
 dbConnection()
   .then(() => {
     console.log("Database connection established successfully.");
+
+    // Start server with feedback and explicit host binding
+    const HOST = process.env.HOST || '0.0.0.0';
+    app
+      .listen(Number(PORT), HOST, () => {
+        const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
+        console.log(`API server started at http://${hostLabel}:${PORT}`);
+      })
+      .on('error', (err: any) => {
+        console.error('Failed to start HTTP server:', err?.message || err);
+      });
   })
   .catch((error: unknown) => {
     console.error("Database connection failed:", error);
@@ -88,14 +99,3 @@ dbConnection()
 
 // Main API routes
 app.use("/api", mainRoutes);
-
-// Start server with feedback and explicit host binding
-const HOST = process.env.HOST || '0.0.0.0';
-app
-  .listen(Number(PORT), HOST, () => {
-    const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
-    console.log(`API server started at http://${hostLabel}:${PORT}`);
-  })
-  .on('error', (err: any) => {
-    console.error('Failed to start HTTP server:', err?.message || err);
-  });

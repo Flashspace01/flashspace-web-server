@@ -11,7 +11,8 @@ export enum PaymentStatus {
 
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
-  COWORKING_SPACE = "coworking_space"
+  COWORKING_SPACE = "coworking_space",
+  MEETING_ROOM = "meeting_room"
 }
 
 @modelOptions({

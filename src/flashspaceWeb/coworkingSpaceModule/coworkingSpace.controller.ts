@@ -10,6 +10,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
             rating,
             reviews,
@@ -27,6 +28,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
             rating,
             reviews,
@@ -66,7 +68,8 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
 
 export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
     try {
-        const query: any = { isDeleted: false };
+        const { deleted } = req.query;
+        const query: any = String(deleted) === 'true' ? { isDeleted: true } : { isDeleted: false };
         const allSpaces = await CoworkingSpaceModel.find(query).sort({ createdAt: -1 });
 
         if (allSpaces.length === 0) {
@@ -182,6 +185,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
             city,
             area,
             price,
+            priceYearly,
             originalPrice,
             rating,
             reviews,
@@ -210,6 +214,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
                 ...(city && { city }),
                 ...(area && { area }),
                 ...(price && { price }),
+                ...(priceYearly && { priceYearly }),
                 ...(originalPrice && { originalPrice }),
                 ...(rating !== undefined && { rating }),
                 ...(reviews !== undefined && { reviews }),
@@ -252,6 +257,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
 export const deleteCoworkingSpace = async (req: Request, res: Response) => {
     try {
         const { coworkingSpaceId } = req.params;
+        const { restore } = req.query;
 
         if (!Types.ObjectId.isValid(coworkingSpaceId)) {
             return res.status(400).json({
@@ -262,16 +268,18 @@ export const deleteCoworkingSpace = async (req: Request, res: Response) => {
             });
         }
 
-        const deletedSpace = await CoworkingSpaceModel.findOneAndUpdate(
-            { _id: coworkingSpaceId, isDeleted: false },
+        const isRestoring = String(restore) === 'true';
+
+        const updatedSpace = await CoworkingSpaceModel.findOneAndUpdate(
+            { _id: coworkingSpaceId },
             {
-                isDeleted: true,
-                isActive: false
+                isDeleted: !isRestoring,
+                isActive: isRestoring
             },
             { new: true }
         );
 
-        if (!deletedSpace) {
+        if (!updatedSpace) {
             return res.status(404).json({
                 success: false,
                 message: "Coworking space not found",
@@ -282,8 +290,8 @@ export const deleteCoworkingSpace = async (req: Request, res: Response) => {
 
         res.status(200).json({
             success: true,
-            message: "Coworking space deleted successfully",
-            data: deletedSpace,
+            message: isRestoring ? "Coworking space restored successfully" : "Coworking space deleted successfully",
+            data: updatedSpace,
             error: {},
         });
 

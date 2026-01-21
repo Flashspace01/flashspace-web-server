@@ -25,11 +25,9 @@ export class AdminService {
             const activeListings = virtualOfficesCount + coworkingSpacesCount;
 
             // 4. Total Revenue (Aggregation)
-            // Summing up 'total' from paid invoices would be ideal, but for now we can sum booking prices if invoices aren't strictly linked yet
-            // Or if we have an InvoiceModel, use that. Let's assume we estimate from active bookings for now or just return mocked/calculated 0 if no invoices.
-            // Let's rely on BookingModel price for now as a rough estimate or 0.
+            // Sum revenue from both 'active' and 'pending_kyc' bookings to match the active bookings count
             const revenueAggregation = await BookingModel.aggregate([
-                { $match: { status: 'active', isDeleted: false } },
+                { $match: { status: { $in: ['active', 'pending_kyc'] }, isDeleted: false } },
                 {
                     $group: {
                         _id: null,
@@ -75,10 +73,10 @@ export class AdminService {
     }
 
     // Get all users with pagination
-    async getUsers(page: number = 1, limit: number = 10, search?: string): Promise<ApiResponse<any>> {
+    async getUsers(page: number = 1, limit: number = 10, search?: string, deleted: boolean = false): Promise<ApiResponse<any>> {
         try {
             const skip = (page - 1) * limit;
-            const query: any = { isDeleted: false };
+            const query: any = { isDeleted: deleted };
 
             if (search) {
                 query.$or = [
@@ -136,6 +134,134 @@ export class AdminService {
             return {
                 success: false,
                 message: "Failed to fetch KYC requests",
+                error: error.message
+            };
+        }
+    }
+
+    // Delete / Restore user
+    async deleteUser(userId: string, restore: boolean = false): Promise<ApiResponse<any>> {
+        try {
+            // Validate ObjectId format
+            const mongoose = require('mongoose');
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
+                return {
+                    success: false,
+                    message: "Invalid user ID format"
+                };
+            }
+
+            const user = await UserModel.findByIdAndUpdate(
+                userId,
+                {
+                    isDeleted: !restore,
+                    isActive: restore
+                },
+                { new: true }
+            );
+
+            if (!user) {
+                return {
+                    success: false,
+                    message: "User not found"
+                };
+            }
+
+            return {
+                success: true,
+                message: restore ? "User restored successfully" : "User moved to trash successfully"
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to update user status",
+                error: error.message
+            };
+        }
+    }
+
+    // Get all bookings with user and space details
+    async getAllBookings(page: number = 1, limit: number = 50): Promise<ApiResponse<any>> {
+        try {
+            const skip = (page - 1) * limit;
+
+            const bookings = await BookingModel.find({ isDeleted: false })
+                .populate('user', 'fullName email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit);
+
+            const total = await BookingModel.countDocuments({ isDeleted: false });
+
+            return {
+                success: true,
+                message: "Bookings fetched successfully",
+                data: {
+                    bookings,
+                    pagination: {
+                        total,
+                        page,
+                        pages: Math.ceil(total / limit)
+                    }
+                }
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to fetch bookings",
+                error: error.message
+            };
+        }
+    }
+
+    // Review KYC document (approve/reject)
+    async reviewKYC(kycId: string, action: 'approve' | 'reject', rejectionReason?: string): Promise<ApiResponse<any>> {
+        try {
+            const kyc = await KYCDocumentModel.findById(kycId);
+
+            if (!kyc) {
+                return {
+                    success: false,
+                    message: "KYC document not found"
+                };
+            }
+
+            // Update overall status
+            kyc.overallStatus = action === 'approve' ? 'approved' : 'rejected';
+
+            // Update all individual documents
+            if (kyc.documents) {
+                kyc.documents.forEach(doc => {
+                    doc.status = action === 'approve' ? 'approved' : 'rejected';
+                    if (action === 'reject' && rejectionReason) {
+                        doc.rejectionReason = rejectionReason;
+                    }
+                    doc.verifiedAt = new Date();
+                });
+            }
+
+            // Update progress
+            kyc.progress = action === 'approve' ? 100 : 0;
+            kyc.updatedAt = new Date();
+
+            await kyc.save();
+
+            // If approved, update the related booking's KYC status
+            if (action === 'approve' && kyc.bookingId) {
+                await BookingModel.findByIdAndUpdate(kyc.bookingId, {
+                    kycStatus: 'approved',
+                    status: 'active' // Move booking to active status
+                });
+            }
+
+            return {
+                success: true,
+                message: `KYC ${action}ed successfully`
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to review KYC",
                 error: error.message
             };
         }
