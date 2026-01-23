@@ -1,4 +1,4 @@
-import { UserModel } from "../../authModule/models/user.model";
+﻿import { UserModel } from "../../authModule/models/user.model";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
@@ -246,12 +246,14 @@ export class AdminService {
 
             await kyc.save();
 
-            // If approved, update the related booking's KYC status
-            if (action === 'approve' && kyc.bookingId) {
-                await BookingModel.findByIdAndUpdate(kyc.bookingId, {
-                    kycStatus: 'approved',
-                    status: 'active' // Move booking to active status
-                });
+            // If approved, update the related bookings' KYC status
+            if (action === 'approve' && kyc.linkedBookings && kyc.linkedBookings.length > 0) {
+                for (const bookingId of kyc.linkedBookings) {
+                    await BookingModel.findByIdAndUpdate(bookingId, {
+                        kycStatus: 'approved',
+                        status: 'active' // Move booking to active status
+                    });
+                }
             }
 
             return {

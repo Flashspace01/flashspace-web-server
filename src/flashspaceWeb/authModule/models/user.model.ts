@@ -75,6 +75,10 @@ export class User extends TimeStamps {
   @prop({ default: false })
   public isEmailVerified!: boolean;
 
+  @prop({ default: false })
+  public kycVerified!: boolean;
+
+
   @prop()
   public emailVerificationToken?: string;
 

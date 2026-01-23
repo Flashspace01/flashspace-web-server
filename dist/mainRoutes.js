@@ -13,6 +13,7 @@ const auth_routes_1 = require("./flashspaceWeb/authModule/routes/auth.routes");
 const partnerInquiry_routes_1 = require("./flashspaceWeb/partnerInquiryModule/partnerInquiry.routes");
 const payment_routes_1 = require("./flashspaceWeb/paymentModule/payment.routes");
 const userDashboard_routes_1 = __importDefault(require("./flashspaceWeb/userDashboardModule/routes/userDashboard.routes"));
+const admin_routes_1 = require("./flashspaceWeb/adminModule/routes/admin.routes");
 exports.mainRoutes = (0, express_1.Router)();
 // /api/auth
 exports.mainRoutes.use("/auth", auth_routes_1.authRoutes);
@@ -30,3 +31,5 @@ exports.mainRoutes.use("/partnerInquiry", partnerInquiry_routes_1.partnerInquiry
 exports.mainRoutes.use("/payment", payment_routes_1.paymentRoutes);
 // /api/user (Dashboard APIs)
 exports.mainRoutes.use("/user", userDashboard_routes_1.default);
+// /api/admin (Admin Dashboard APIs)
+exports.mainRoutes.use("/admin", admin_routes_1.adminRoutes);
