@@ -80,7 +80,7 @@ export class Booking {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop({ required: true, enum: ["virtual_office", "coworking_space"] })
+  @prop({ required: true, enum: ["virtual_office", "coworking_space", "meeting_room"] })
   type!: string;
 
   @prop({ required: true })

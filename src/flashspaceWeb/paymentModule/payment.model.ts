@@ -11,7 +11,8 @@ export enum PaymentStatus {
 
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
-  COWORKING_SPACE = "coworking_space"
+  COWORKING_SPACE = "coworking_space",
+  MEETING_ROOM = "meeting_room"
 }
 
 @modelOptions({
@@ -19,7 +20,6 @@ export enum PaymentType {
     timestamps: true
   }
 })
-@index({ razorpayOrderId: 1 })
 @index({ razorpayPaymentId: 1 })
 @index({ userId: 1 })
 @index({ status: 1 })

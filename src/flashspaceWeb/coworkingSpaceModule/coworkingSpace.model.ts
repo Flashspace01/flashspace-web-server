@@ -34,16 +34,20 @@ export class CoworkingSpace {
     @prop({ required: true })
     public price!: string;
 
+    @prop({ required: false })
+    public priceYearly?: string;
+
+
     @prop({ required: true })
     public originalPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
     public gstPlanPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
     public mailingPlanPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
     public brPlanPrice!: string;
 
     @prop({ required: true, default: 4.0 })
@@ -81,3 +85,4 @@ export class CoworkingSpace {
 }
 
 export const CoworkingSpaceModel = getModelForClass(CoworkingSpace);
+// Schema Updated

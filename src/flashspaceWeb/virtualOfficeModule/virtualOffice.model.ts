@@ -26,17 +26,29 @@ export class VirtualOffice {
     @prop({ required: true })
     public price!: string;
 
+    @prop({ required: false })
+    public priceYearly?: string;
+
     @prop({ required: true })
     public originalPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
     public gstPlanPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
+    public gstPlanPriceYearly?: string;
+
+    @prop({ required: false })
     public mailingPlanPrice!: string;
 
-    @prop({ required: true })
+    @prop({ required: false })
+    public mailingPlanPriceYearly?: string;
+
+    @prop({ required: false })
     public brPlanPrice!: string;
+
+    @prop({ required: false })
+    public brPlanPriceYearly?: string;
 
     @prop({ required: true, default: 4.0 })
     public rating!: number;
@@ -70,3 +82,4 @@ export class VirtualOffice {
 }
 
 export const VirtualOfficeModel = getModelForClass(VirtualOffice);
+// Schema Updated

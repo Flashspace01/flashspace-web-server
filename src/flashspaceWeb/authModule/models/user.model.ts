@@ -60,7 +60,7 @@ export class User extends TimeStamps {
   public password?: string;
 
   // Google OAuth
-  @prop({ sparse: true })
+  @prop()
   public googleId?: string;
 
   // Auth provider
@@ -103,6 +103,9 @@ export class User extends TimeStamps {
 
   @prop({ default: true })
   public isActive!: boolean;
+
+  @prop({ default: 0 })
+  public credits!: number;
 
   @prop({ default: false })
   public isDeleted!: boolean;

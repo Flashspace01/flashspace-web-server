@@ -7,6 +7,8 @@ import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
+import { UserModel } from "../authModule/models/user.model";
+import { CreditLedgerModel, CreditSource } from "../userDashboardModule/models/creditLedger.model";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -40,7 +42,7 @@ async function createBookingAndInvoice(payment: any) {
           coordinates: space.coordinates,
         };
       }
-    } else {
+    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
       const space = await CoworkingSpaceModel.findById(payment.spaceId);
       if (space) {
         spaceSnapshot = {
@@ -54,6 +56,8 @@ async function createBookingAndInvoice(payment: any) {
         };
       }
     }
+    // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
+    // or we could add specific MeetingRoomModel lookup later.
 
     // Calculate dates
     const startDate = new Date();
@@ -64,7 +68,7 @@ async function createBookingAndInvoice(payment: any) {
     const booking = await BookingModel.create({
       bookingNumber,
       user: payment.userId,
-      type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : "coworking_space",
+      type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : payment.paymentType === PaymentType.MEETING_ROOM ? "meeting_room" : "coworking_space",
       spaceId: payment.spaceId,
       spaceSnapshot,
       plan: {
@@ -152,6 +156,34 @@ async function createBookingAndInvoice(payment: any) {
       });
     }
 
+    // Credits & Rewards Logic (Only for Meeting Rooms)
+    if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const creditPercentage = 0.5; // 50%
+      const creditsEarned = Math.floor(payment.totalAmount * creditPercentage); // totalAmount is in INR (not paise here, wait. Payment model says totalAmount is in paise? No. Payment model says amount is in paise, totalAmount is number. let's check creating order.
+      // In createOrder: amount: totalAmount * 100. payment.totalAmount is raw amount.
+      // So if 1200 INR, totalAmount is 1200.
+
+      if (creditsEarned > 0) {
+        // Update User
+        await UserModel.findByIdAndUpdate(payment.userId, {
+          $inc: { credits: creditsEarned }
+        });
+
+        // Get updated user to get new balance
+        const user = await UserModel.findById(payment.userId);
+
+        // Create Ledger Entry
+        await CreditLedgerModel.create({
+          user: payment.userId,
+          amount: creditsEarned,
+          source: CreditSource.BOOKING,
+          description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
+          referenceId: booking._id?.toString(),
+          balanceAfter: user?.credits || 0
+        });
+      }
+    }
+
     return { booking, invoiceNumber };
   } catch (error) {
     console.error("Error creating booking/invoice:", error);
@@ -191,20 +223,41 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
-    // Create Razorpay order (receipt max 40 chars)
-    const receiptId = `ord_${Date.now().toString(36)}`;
-    const razorpayOrder = await razorpay.orders.create({
-      amount: totalAmount * 100, // Convert to paise
-      currency: "INR",
-      receipt: receiptId,
-      notes: {
-        spaceId,
-        spaceName,
-        planName,
-        tenure: tenure.toString(),
-        userId,
-      },
-    });
+    // Check Razorpay Keys
+    let razorpayOrder;
+
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.warn("Razorpay keys missing - Switching to DEV MODE (Mock Order)");
+      razorpayOrder = {
+        id: `order_mock_${Date.now()}`,
+        amount: Math.round(totalAmount * 100),
+        currency: "INR"
+      };
+    } else {
+      // Create Razorpay order (receipt max 40 chars)
+      const receiptId = `ord_${Date.now().toString(36)}`;
+      try {
+        razorpayOrder = await razorpay.orders.create({
+          amount: Math.round(totalAmount * 100), // Convert to paise and ensure integer
+          currency: "INR",
+          receipt: receiptId,
+          notes: {
+            spaceId,
+            spaceName: spaceName.substring(0, 40), // Truncate to fit limits if needed
+            planName: planName.substring(0, 40),
+            tenure: tenure.toString(),
+            userId,
+          },
+        });
+      } catch (rzpError: any) {
+        console.error("Razorpay Order Create Error:", rzpError);
+        return res.status(502).json({
+          success: false,
+          message: "Payment Gateway Error",
+          error: rzpError.error?.description || rzpError.message,
+        });
+      }
+    }
 
     // Save order to database
     const payment = await PaymentModel.create({
@@ -213,7 +266,7 @@ export const createOrder = async (req: Request, res: Response) => {
       userName: userName || "Guest",
       userPhone,
       razorpayOrderId: razorpayOrder.id,
-      amount: totalAmount * 100,
+      amount: razorpayOrder.amount, // matches created amount
       currency: "INR",
       status: PaymentStatus.PENDING,
       paymentType,
@@ -330,7 +383,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       // Update payment status to failed
       await PaymentModel.findOneAndUpdate(
         { razorpayOrderId: razorpay_order_id },
-        { 
+        {
           status: PaymentStatus.FAILED,
           errorMessage: "Signature verification failed"
         }

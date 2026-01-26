@@ -59,6 +59,13 @@ exports.contactForm = contactForm = __decorate([
         schemaOptions: {
             timestamps: true
         }
-    })
+    }),
+    (0, typegoose_1.index)({ email: 1 }) // Quick email lookups
+    ,
+    (0, typegoose_1.index)({ isDeleted: 1, isActive: 1 }) // Filter active submissions
+    ,
+    (0, typegoose_1.index)({ createdAt: -1 }) // Recent submissions sorting
+    ,
+    (0, typegoose_1.index)({ serviceInterest: 1 }) // Filter by service type
 ], contactForm);
 exports.ContactFormModel = (0, typegoose_1.getModelForClass)(contactForm);

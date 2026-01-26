@@ -1,4 +1,4 @@
-import { UserModel } from "../../authModule/models/user.model";
+﻿import { UserModel } from "../../authModule/models/user.model";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
@@ -25,11 +25,9 @@ export class AdminService {
             const activeListings = virtualOfficesCount + coworkingSpacesCount;
 
             // 4. Total Revenue (Aggregation)
-            // Summing up 'total' from paid invoices would be ideal, but for now we can sum booking prices if invoices aren't strictly linked yet
-            // Or if we have an InvoiceModel, use that. Let's assume we estimate from active bookings for now or just return mocked/calculated 0 if no invoices.
-            // Let's rely on BookingModel price for now as a rough estimate or 0.
+            // Sum revenue from both 'active' and 'pending_kyc' bookings to match the active bookings count
             const revenueAggregation = await BookingModel.aggregate([
-                { $match: { status: 'active', isDeleted: false } },
+                { $match: { status: { $in: ['active', 'pending_kyc'] }, isDeleted: false } },
                 {
                     $group: {
                         _id: null,
@@ -75,10 +73,10 @@ export class AdminService {
     }
 
     // Get all users with pagination
-    async getUsers(page: number = 1, limit: number = 10, search?: string): Promise<ApiResponse<any>> {
+    async getUsers(page: number = 1, limit: number = 10, search?: string, deleted: boolean = false): Promise<ApiResponse<any>> {
         try {
             const skip = (page - 1) * limit;
-            const query: any = { isDeleted: false };
+            const query: any = { isDeleted: deleted };
 
             if (search) {
                 query.$or = [
@@ -141,86 +139,131 @@ export class AdminService {
         }
     }
 
-    // Approve KYC profile
-    async approveKYC(profileId: string, adminId: string): Promise<ApiResponse<any>> {
+    // Delete / Restore user
+    async deleteUser(userId: string, restore: boolean = false): Promise<ApiResponse<any>> {
         try {
-            // Find the KYC profile
-            const kycProfile = await KYCDocumentModel.findById(profileId).populate('user');
-
-            if (!kycProfile) {
+            // Validate ObjectId format
+            const mongoose = require('mongoose');
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
                 return {
                     success: false,
-                    message: "KYC profile not found"
+                    message: "Invalid user ID format"
                 };
             }
 
-            // Update profile status
-            kycProfile.overallStatus = "approved";
-            kycProfile.updatedAt = new Date();
+            const user = await UserModel.findByIdAndUpdate(
+                userId,
+                {
+                    isDeleted: !restore,
+                    isActive: restore
+                },
+                { new: true }
+            );
 
-            // Mark all documents as approved
-            if (kycProfile.documents) {
-                kycProfile.documents.forEach((doc: any) => {
-                    doc.status = "approved";
-                    doc.verifiedAt = new Date();
-                    doc.verifiedBy = adminId;
-                });
+            if (!user) {
+                return {
+                    success: false,
+                    message: "User not found"
+                };
             }
-
-            await kycProfile.save();
-
-            // Update user's kycVerified flag
-            const userId = typeof kycProfile.user === 'object' ? (kycProfile.user as any)._id : kycProfile.user;
-            await UserModel.findByIdAndUpdate(userId, { kycVerified: true });
-
-            // Find and auto-link any pending bookings for this user
-            const pendingBookings = await BookingModel.find({
-                user: userId,
-                status: "pending_kyc",
-                isDeleted: false
-            });
-
-            // Link all pending bookings to this approved profile
-            for (const booking of pendingBookings) {
-                booking.kycProfileId = profileId;
-                booking.kycStatus = "approved";
-                booking.status = "active";
-
-                // Set start and end dates if not already set
-                if (!booking.startDate) {
-                    booking.startDate = new Date();
-                }
-                if (!booking.endDate) {
-                    const endDate = new Date(booking.startDate);
-                    endDate.setMonth(endDate.getMonth() + (booking.plan?.tenure || 12));
-                    booking.endDate = endDate;
-                }
-
-                await booking.save();
-
-                // Add booking to profile's linkedBookings
-                if (!kycProfile.linkedBookings?.includes(booking._id.toString())) {
-                    kycProfile.linkedBookings = kycProfile.linkedBookings || [];
-                    kycProfile.linkedBookings.push(booking._id.toString());
-                }
-            }
-
-            // Save profile with linked bookings
-            await kycProfile.save();
 
             return {
                 success: true,
-                message: `KYC profile approved successfully. ${pendingBookings.length} booking(s) activated.`,
+                message: restore ? "User restored successfully" : "User moved to trash successfully"
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to update user status",
+                error: error.message
+            };
+        }
+    }
+
+    // Get all bookings with user and space details
+    async getAllBookings(page: number = 1, limit: number = 50): Promise<ApiResponse<any>> {
+        try {
+            const skip = (page - 1) * limit;
+
+            const bookings = await BookingModel.find({ isDeleted: false })
+                .populate('user', 'fullName email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit);
+
+            const total = await BookingModel.countDocuments({ isDeleted: false });
+
+            return {
+                success: true,
+                message: "Bookings fetched successfully",
                 data: {
-                    profile: kycProfile,
-                    linkedBookings: pendingBookings.length
+                    bookings,
+                    pagination: {
+                        total,
+                        page,
+                        pages: Math.ceil(total / limit)
+                    }
                 }
             };
         } catch (error: any) {
-            console.error("Error approving KYC:", error);
             return {
                 success: false,
-                message: "Failed to approve KYC",
+                message: "Failed to fetch bookings",
+                error: error.message
+            };
+        }
+    }
+
+    // Review KYC document (approve/reject)
+    async reviewKYC(kycId: string, action: 'approve' | 'reject', rejectionReason?: string): Promise<ApiResponse<any>> {
+        try {
+            const kyc = await KYCDocumentModel.findById(kycId);
+
+            if (!kyc) {
+                return {
+                    success: false,
+                    message: "KYC document not found"
+                };
+            }
+
+            // Update overall status
+            kyc.overallStatus = action === 'approve' ? 'approved' : 'rejected';
+
+            // Update all individual documents
+            if (kyc.documents) {
+                kyc.documents.forEach(doc => {
+                    doc.status = action === 'approve' ? 'approved' : 'rejected';
+                    if (action === 'reject' && rejectionReason) {
+                        doc.rejectionReason = rejectionReason;
+                    }
+                    doc.verifiedAt = new Date();
+                });
+            }
+
+            // Update progress
+            kyc.progress = action === 'approve' ? 100 : 0;
+            kyc.updatedAt = new Date();
+
+            await kyc.save();
+
+            // If approved, update the related bookings' KYC status
+            if (action === 'approve' && kyc.linkedBookings && kyc.linkedBookings.length > 0) {
+                for (const bookingId of kyc.linkedBookings) {
+                    await BookingModel.findByIdAndUpdate(bookingId, {
+                        kycStatus: 'approved',
+                        status: 'active' // Move booking to active status
+                    });
+                }
+            }
+
+            return {
+                success: true,
+                message: `KYC ${action}ed successfully`
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to review KYC",
                 error: error.message
             };
         }

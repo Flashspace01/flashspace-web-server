@@ -13,6 +13,15 @@ class PersonalInfo {
 
   @prop({ default: false })
   verified?: boolean;
+
+  @prop()
+  dateOfBirth?: Date;
+
+  @prop()
+  aadhaarNumber?: string;
+
+  @prop()
+  panNumber?: string;
 }
 
 class BusinessInfo {
@@ -36,6 +45,9 @@ class BusinessInfo {
 
   @prop({ default: false })
   verified?: boolean;
+
+  @prop({ type: () => [String], default: [] })
+  partners?: string[]; // Array of KYCDocument IDs (Individual profiles)
 }
 
 class KYCDocumentItem {

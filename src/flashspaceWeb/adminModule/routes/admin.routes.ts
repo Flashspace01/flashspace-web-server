@@ -13,6 +13,11 @@ adminRoutes.get("/dashboard", AdminController.getDashboardStats);
 
 // User Management Routes
 adminRoutes.get("/users", AdminController.getUsers);
+adminRoutes.delete("/users/:id", AdminController.deleteUser);
+
+// Bookings Routes
+adminRoutes.get("/bookings", AdminController.getAllBookings);
 
 // KYC Management Routes
 adminRoutes.get("/kyc/pending", AdminController.getPendingKYC);
+adminRoutes.put("/kyc/:id/review", AdminController.reviewKYC);
