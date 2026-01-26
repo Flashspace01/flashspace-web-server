@@ -24,7 +24,7 @@ export class AuthMiddleware {
     try {
       // Extract token from cookies (primary method)
       let token = req.cookies?.accessToken;
-      
+
       // Fallback to Authorization header for backward compatibility (optional)
       if (!token) {
         const authHeader = req.headers.authorization;
@@ -32,7 +32,7 @@ export class AuthMiddleware {
           token = authHeader.substring(7);
         }
       }
-      
+
       if (!token) {
         res.status(401).json({
           success: false,
@@ -43,7 +43,7 @@ export class AuthMiddleware {
 
       try {
         const decoded = JwtUtil.verifyAccessToken(token);
-        
+
         // Verify user still exists and is active
         const user = await AuthMiddleware.userRepository.findById(decoded.userId);
         if (!user) {
@@ -70,10 +70,10 @@ export class AuthMiddleware {
         return;
       }
     } catch (error) {
-      console.error('Authentication middleware error:', error);
+      console.error('Authentication middleware CRITICAL error:', error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error'
+        message: 'Internal server error in auth'
       });
       return;
     }
@@ -85,10 +85,10 @@ export class AuthMiddleware {
     try {
       // DEBUG: Log all cookies received
       console.log('🍪 Cookies received:', Object.keys(req.cookies || {}));
-      
+
       // Extract access token from cookies (primary method)
       let accessToken = req.cookies?.accessToken;
-      
+
       // Fallback to Authorization header
       if (!accessToken) {
         const authHeader = req.headers.authorization;
@@ -96,10 +96,10 @@ export class AuthMiddleware {
           accessToken = authHeader.substring(7);
         }
       }
-      
+
       console.log('🔑 Access token present:', !!accessToken);
       console.log('🔄 Refresh token present:', !!req.cookies?.refreshToken);
-      
+
       // Case 1: No access token at all
       if (!accessToken) {
         // Try to use refresh token to get new access token
@@ -108,7 +108,7 @@ export class AuthMiddleware {
           try {
             const decoded = JwtUtil.verifyRefreshToken(refreshToken);
             const user = await AuthMiddleware.userRepository.findById(decoded.userId);
-            
+
             if (user) {
               // Generate new tokens
               const newTokens = JwtUtil.generateTokenPair({
@@ -116,10 +116,10 @@ export class AuthMiddleware {
                 email: user.email,
                 role: user.role
               });
-              
+
               // Set new cookies
               AuthMiddleware.setTokenCookies(res, newTokens.accessToken, newTokens.refreshToken);
-              
+
               // Attach user to request
               req.user = {
                 id: user._id.toString(),
@@ -144,7 +144,7 @@ export class AuthMiddleware {
         const decoded = JwtUtil.verifyAccessToken(accessToken);
         console.log('✅ Access token valid for userId:', decoded.userId);
         const user = await AuthMiddleware.userRepository.findById(decoded.userId);
-        
+
         if (user) {
           req.user = {
             id: user._id.toString(),
@@ -164,7 +164,7 @@ export class AuthMiddleware {
             const decoded = JwtUtil.verifyRefreshToken(refreshToken);
             console.log('✅ Refresh token valid for userId:', decoded.userId);
             const user = await AuthMiddleware.userRepository.findById(decoded.userId);
-            
+
             if (user) {
               // Generate new tokens
               const newTokens = JwtUtil.generateTokenPair({
@@ -172,10 +172,10 @@ export class AuthMiddleware {
                 email: user.email,
                 role: user.role
               });
-              
+
               // Set new cookies
               AuthMiddleware.setTokenCookies(res, newTokens.accessToken, newTokens.refreshToken);
-              
+
               // Attach user to request
               req.user = {
                 id: user._id.toString(),
@@ -269,15 +269,15 @@ export class AuthMiddleware {
     return (req: Request, res: Response, next: NextFunction): void => {
       const key = req.ip || 'unknown';
       const now = Date.now();
-      
+
       const userAttempts = this.rateLimitMap.get(key) || { attempts: 0, resetTime: now + windowMs };
-      
+
       if (now > userAttempts.resetTime) {
         // Reset the window
         userAttempts.attempts = 0;
         userAttempts.resetTime = now + windowMs;
       }
-      
+
       if (userAttempts.attempts >= maxAttempts) {
         res.status(429).json({
           success: false,
@@ -285,10 +285,10 @@ export class AuthMiddleware {
         });
         return;
       }
-      
+
       userAttempts.attempts++;
       this.rateLimitMap.set(key, userAttempts);
-      
+
       next();
     };
   }
@@ -301,7 +301,7 @@ export class AuthMiddleware {
   // Set secure cookies
   static setTokenCookies(res: Response, accessToken: string, refreshToken: string): void {
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // Cookie configuration for cross-origin requests
     const cookieOptions = {
       httpOnly: true,
@@ -309,7 +309,7 @@ export class AuthMiddleware {
       sameSite: isProduction ? ('none' as const) : ('lax' as const), // 'none' for production cross-origin, 'lax' for dev
       path: '/',
     };
-    
+
     // Set access token cookie (shorter expiry)
     res.cookie('accessToken', accessToken, {
       ...cookieOptions,
@@ -332,7 +332,7 @@ export class AuthMiddleware {
       sameSite: isProduction ? ('none' as const) : ('lax' as const),
       path: '/',
     };
-    
+
     res.clearCookie('accessToken', cookieOptions);
     res.clearCookie('refreshToken', cookieOptions);
   }

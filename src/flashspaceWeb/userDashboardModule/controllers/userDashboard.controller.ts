@@ -8,6 +8,7 @@ import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
+import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 
 // ============ DASHBOARD ============
 
@@ -312,7 +313,12 @@ export const getKYCStatus = async (req: Request, res: Response) => {
 export const updateBusinessInfo = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { companyName, companyType, gstNumber, panNumber, cinNumber, registeredAddress, profileId, profileName, kycType } = req.body;
+    const {
+      companyName, companyType, gstNumber, panNumber, cinNumber, registeredAddress,
+      profileId, profileName, kycType, partners,
+      // Personal Info Fields
+      personalPhone, personalDob, personalAadhaar, personalPan, personalFullName
+    } = req.body;
     console.log(`[updateBusinessInfo] User: ${userId}, ProfileId: ${profileId}, Type: ${kycType}`);
 
     let kyc;
@@ -326,24 +332,50 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     } else {
       // Create new profile
       console.log("[updateBusinessInfo] Creating NEW profile");
+      const user = await UserModel.findById(userId);
       kyc = new KYCDocumentModel({
         user: userId,
         profileName: profileName || (kycType === "business" ? companyName : "Personal Profile"),
-        kycType: kycType || "individual"
+        kycType: kycType || "individual",
+        personalInfo: {
+          fullName: personalFullName || user?.fullName, // Allow custom name or default to user
+          email: user?.email,
+          phone: user?.phoneNumber
+        }
       });
     }
 
     // Update business info if provided
-    if (companyName || gstNumber) {
+    if (companyName || gstNumber || partners) {
       kyc.businessInfo = {
-        companyName,
-        companyType,
-        gstNumber,
-        panNumber,
-        cinNumber,
-        registeredAddress,
+        companyName: companyName || kyc.businessInfo?.companyName,
+        companyType: companyType || kyc.businessInfo?.companyType,
+        gstNumber: gstNumber || kyc.businessInfo?.gstNumber,
+        panNumber: panNumber || kyc.businessInfo?.panNumber,
+        cinNumber: cinNumber || kyc.businessInfo?.cinNumber,
+        registeredAddress: registeredAddress || kyc.businessInfo?.registeredAddress,
+        partners: partners || kyc.businessInfo?.partners || [],
         verified: false,
       };
+    }
+
+    // Update personal info if provided
+    if (personalPhone || personalDob || personalAadhaar || personalPan || personalFullName) {
+      if (!kyc.personalInfo) {
+        // Initialize if empty, preserving existing user data if any
+        const user = await UserModel.findById(userId);
+        kyc.personalInfo = {
+          fullName: user?.fullName,
+          email: user?.email,
+          phone: user?.phoneNumber
+        };
+      }
+
+      if (personalPhone) kyc.personalInfo.phone = personalPhone;
+      if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
+      if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
+      if (personalPan) kyc.personalInfo.panNumber = personalPan;
+      if (personalFullName) kyc.personalInfo.fullName = personalFullName;
     }
 
     if (kycType && !kyc.kycType) {
@@ -373,42 +405,50 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
 };
 
 export const uploadKYCDocument = async (req: Request, res: Response) => {
+  console.log("==== UPLOAD KYC DOCUMENT START ====");
   try {
     const userId = req.user?.id;
     const { documentType, profileId } = req.body;
     const file = req.file;
 
-    console.log(`[uploadKYCDocument] User: ${userId}, ProfileId: ${profileId}, DocType: ${documentType}, File: ${file?.filename}`);
+    console.log(`[STEP 1] User: ${userId}, ProfileId: ${profileId}, DocType: ${documentType}, File: ${file?.filename}`);
 
     if (!documentType) {
+      console.log("[STEP 1a] FAIL: No documentType");
       return res.status(400).json({ success: false, message: "Document type required" });
     }
 
     if (!file) {
-      console.log("[uploadKYCDocument] Check failed: No file received");
+      console.log("[STEP 1b] FAIL: No file received");
       return res.status(400).json({ success: false, message: "No file uploaded (check size/type)" });
     }
 
     if (!profileId) {
+      console.log("[STEP 1c] FAIL: No profileId");
       return res.status(400).json({ success: false, message: "Profile ID required" });
     }
 
+    console.log("[STEP 2] Validating profileId format...");
     if (!mongoose.Types.ObjectId.isValid(profileId)) {
+      console.log("[STEP 2a] FAIL: Invalid profileId format");
       return res.status(400).json({ success: false, message: "Invalid Profile ID format" });
     }
 
+    console.log("[STEP 3] Finding KYC profile in database...");
     let kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
 
     if (!kyc) {
-      console.log("[uploadKYCDocument] Profile not found for upload:", profileId);
+      console.log("[STEP 3a] FAIL: Profile not found for:", profileId);
       return res.status(404).json({ success: false, message: "Profile not found" });
     }
 
-    // Generate file URL
-    const fileUrl = `/uploads/kyc-documents/${file.filename}`;
+    console.log("[STEP 4] Profile found. Building document entry...");
+    // Generate file URL using the updated helper
+    const fileUrl = getMulterFileUrl(file.filename, documentType);
 
     // Check if document type already exists
     const existingIndex = kyc.documents?.findIndex((d) => d.type === documentType) ?? -1;
+    console.log("[STEP 4a] Existing doc index:", existingIndex);
 
     const docEntry = {
       type: documentType,
@@ -417,6 +457,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
       status: "pending" as const,
       uploadedAt: new Date(),
     };
+    console.log("[STEP 4b] Doc entry created:", docEntry);
 
     if (existingIndex >= 0) {
       // Delete old file if exists
@@ -425,12 +466,14 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
         try {
           const oldFilename = oldDoc.fileUrl.split('/').pop();
           if (oldFilename) {
-            const uploadsDir = path.join(__dirname, '../../../../uploads/kyc-documents');
+            // Determine directory based on document type
+            const subDir = oldDoc.type === 'video_kyc' ? 'video-kyc' : 'kyc-documents';
+            const uploadsDir = path.join(__dirname, '../../../../uploads', subDir);
             const oldFilePath = path.join(uploadsDir, oldFilename);
             if (fs.existsSync(oldFilePath)) {
               fs.unlink(oldFilePath, (err) => {
                 if (err) console.error("[Delete Old File] Error:", err);
-                else console.log("[Delete Old File] Success:", oldFilename);
+                else console.log("[Delete Old File] Success:", oldFilename, "from", subDir);
               });
             }
           }
@@ -457,9 +500,12 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
       message: "Document uploaded successfully",
       data: docEntry,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Upload KYC doc error:", error);
-    res.status(500).json({ success: false, message: "Failed to upload document" });
+    console.error("Error name:", error?.name);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    res.status(500).json({ success: false, message: "Failed to upload document", error: error?.message });
   }
 };
 
@@ -487,9 +533,19 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
 
-    // Check if approved (prevent deletion if approved)
-    if (kyc.documents![docIndex].status === "approved") {
-      return res.status(400).json({ success: false, message: "Cannot delete approved document" });
+    // Delete file from disk if exists
+    const docToDelete = kyc.documents![docIndex];
+    if (docToDelete.fileUrl) {
+      const filename = docToDelete.fileUrl.split('/').pop();
+      if (filename) {
+        const subDir = docToDelete.type === 'video_kyc' ? 'video-kyc' : 'kyc-documents';
+        const filePath = path.join(__dirname, '../../../../uploads', subDir, filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error("[Delete File] Error:", err);
+          });
+        }
+      }
     }
 
     // Remove document
@@ -511,18 +567,33 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
 
 function calculateKYCProgress(kyc: any): number {
   let progress = 0;
-  const totalSteps = 4; // personal, business, documents, review
+  const isBusiness = kyc.kycType === "business";
 
-  if (kyc.personalInfo?.fullName && kyc.personalInfo?.email) progress += 25;
-  if (kyc.businessInfo?.companyName && kyc.businessInfo?.panNumber) progress += 25;
+  // Weights based on type
+  // Individual: Personal(30), Docs(50), Status(20)
+  // Business: Personal(25), Business(25), Docs(40), Status(10)
 
-  const requiredDocs = ["pan_card", "aadhaar_card"];
-  const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
-  const hasAllDocs = requiredDocs.every((d) => uploadedDocs.includes(d));
-  if (hasAllDocs) progress += 25;
+  if (isBusiness) {
+    if (kyc.personalInfo?.fullName) progress += 25;
+    if (kyc.businessInfo?.companyName) progress += 25;
 
-  const allApproved = kyc.documents?.every((d: any) => d.status === "approved");
-  if (allApproved && kyc.documents?.length >= 2) progress += 25;
+    const requiredDocs = ["pan_card", "gst_certificate", "address_proof", "video_kyc"];
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 40);
+
+    if (kyc.overallStatus === "approved") progress += 10;
+  } else {
+    // Individual
+    if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 30;
+
+    const requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 50);
+
+    if (kyc.overallStatus === "approved") progress += 20;
+  }
 
   return Math.min(progress, 100);
 }

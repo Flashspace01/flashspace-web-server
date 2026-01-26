@@ -60,7 +60,7 @@ export class User extends TimeStamps {
   public password?: string;
 
   // Google OAuth
-  @prop({ sparse: true })
+  @prop()
   public googleId?: string;
 
   // Auth provider
