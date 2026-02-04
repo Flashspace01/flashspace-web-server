@@ -105,4 +105,17 @@ export class AdminController {
             res.status(400).json(result);
         }
     }
+    // PUT /api/admin/users/:id
+    static async updateUser(req: Request, res: Response) {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const result = await adminService.updateUser(id, updates);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode = result.message === "User not found" ? 404 : 500;
+            res.status(statusCode).json(result);
+        }
+    }
 }

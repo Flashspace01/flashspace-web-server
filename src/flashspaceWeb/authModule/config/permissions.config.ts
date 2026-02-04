@@ -44,13 +44,7 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.MANAGE_SPACE_MANAGERS,
         Permission.VIEW_FINANCIALS // Only their own, logic handled in service
     ],
-    [UserRole.SPACE_MANAGER]: [
-        Permission.VIEW_OWN_BOOKINGS,
-        // Can manage availability/operations but not edit core space details usually to the extent of pricing
-        // We might need granular space permissions later, but 'MANAGE_OWN_SPACES' with service-level restrictions is okay for now
-        // or a new permission 'OPERATE_OWN_SPACES'
-        Permission.MANAGE_OWN_SPACES
-    ],
+    
     [UserRole.SALES]: [
         Permission.VIEW_ALL_SPACES, // Read-only
         Permission.VIEW_ALL_BOOKINGS,
@@ -59,5 +53,5 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.VIEW_LEADS
     ],
     [UserRole.USER]: [], // Basic user permissions (booking, etc.) are public/authenticated scope
-    [UserRole.VENDOR]: [] // Legacy?
+
 };

@@ -4,6 +4,7 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 
+console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
 
 // 1. Authenticate all users
@@ -29,6 +30,21 @@ adminRoutes.post("/users",
     RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
     AdminController.createUser
 );
+adminRoutes.put("/users/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+// Alias for PATCH
+adminRoutes.patch("/users/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+// Alias for explicit update path
+adminRoutes.put("/users/update/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+
 adminRoutes.delete("/users/:id",
     RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
     AdminController.deleteUser

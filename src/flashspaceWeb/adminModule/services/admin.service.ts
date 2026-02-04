@@ -408,4 +408,41 @@ export class AdminService {
             return { success: false, message: "Failed to create user", error: error.message };
         }
     }
+    // Update user details
+    async updateUser(userId: string, updates: any): Promise<ApiResponse<any>> {
+        try {
+            const mongoose = require('mongoose');
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
+                return { success: false, message: "Invalid user ID format" };
+            }
+
+            const allowedUpdates: any = {};
+            if (updates.fullName) allowedUpdates.fullName = updates.fullName;
+            if (updates.role) allowedUpdates.role = updates.role;
+            if (updates.email) allowedUpdates.email = updates.email.toLowerCase();
+
+            const user = await UserModel.findByIdAndUpdate(
+                userId,
+                { $set: allowedUpdates },
+                { new: true, runValidators: true }
+            ).select('-password');
+
+            if (!user) {
+                return { success: false, message: "User not found" };
+            }
+
+            return {
+                success: true,
+                message: "User updated successfully",
+                data: user
+            };
+        } catch (error: any) {
+            console.error("Update user error:", error);
+            // Handle duplicate email error
+            if (error.code === 11000) {
+                return { success: false, message: "Email already in use" };
+            }
+            return { success: false, message: "Failed to update user", error: error.message };
+        }
+    }
 }
