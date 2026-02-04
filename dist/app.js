@@ -69,26 +69,37 @@ app.use((0, cookie_parser_1.default)());
 app.use((0, helmet_1.default)({
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false
+    crossOriginOpenerPolicy: false,
+    xFrameOptions: false,
+    contentSecurityPolicy: false
 }));
+// Request Logger
+app.use((req, res, next) => {
+    console.log(`[REQUEST] ${req.method} ${req.url}`);
+    next();
+});
 // Database connection with feedback
 (0, db_config_1.dbConnection)()
     .then(() => {
     console.log("Database connection established successfully.");
+    // Start server with feedback and explicit host binding
+    const HOST = process.env.HOST || '0.0.0.0';
+    app
+        .listen(Number(PORT), HOST, () => {
+        const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
+        console.log(`API server started at http://${hostLabel}:${PORT}`);
+    })
+        .on('error', (err) => {
+        console.error('Failed to start HTTP server:', err?.message || err);
+    });
 })
     .catch((error) => {
     console.error("Database connection failed:", error);
     process.exit(1);
 });
+// Serve uploaded files statically
+// Serve uploaded files statically
+const path_1 = __importDefault(require("path"));
+app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 // Main API routes
 app.use("/api", mainRoutes_1.mainRoutes);
-// Start server with feedback and explicit host binding
-const HOST = process.env.HOST || '0.0.0.0';
-app
-    .listen(Number(PORT), HOST, () => {
-    const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
-    console.log(`API server started at http://${hostLabel}:${PORT}`);
-})
-    .on('error', (err) => {
-    console.error('Failed to start HTTP server:', err?.message || err);
-});

@@ -13,6 +13,15 @@ class PersonalInfo {
 
   @prop({ default: false })
   verified?: boolean;
+
+  @prop()
+  dateOfBirth?: Date;
+
+  @prop()
+  aadhaarNumber?: string;
+
+  @prop()
+  panNumber?: string;
 }
 
 class BusinessInfo {
@@ -36,6 +45,9 @@ class BusinessInfo {
 
   @prop({ default: false })
   verified?: boolean;
+
+  @prop({ type: () => [String], default: [] })
+  partners?: string[]; // Array of KYCDocument IDs (Individual profiles)
 }
 
 class KYCDocumentItem {
@@ -70,13 +82,19 @@ export class KYCDocument {
   user!: Ref<User>;
 
   @prop()
-  bookingId?: string;
+  profileName?: string; // e.g., "TechCorp Pvt Ltd" or "John Doe (Personal)"
+
+  @prop({ type: () => [String], default: [] })
+  linkedBookings?: string[]; // Array of booking IDs using this profile
 
   @prop({ type: () => PersonalInfo })
   personalInfo?: PersonalInfo;
 
   @prop({ type: () => BusinessInfo })
   businessInfo?: BusinessInfo;
+
+  @prop({ enum: ["individual", "business"], default: "individual" })
+  kycType?: string;
 
   @prop({ type: () => [KYCDocumentItem], default: [] })
   documents?: KYCDocumentItem[];

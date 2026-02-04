@@ -61,7 +61,7 @@ export class User extends TimeStamps {
   public password?: string;
 
   // Google OAuth
-  @prop({ sparse: true })
+  @prop()
   public googleId?: string;
 
   // Auth provider
@@ -75,6 +75,10 @@ export class User extends TimeStamps {
   // Account status
   @prop({ default: false })
   public isEmailVerified!: boolean;
+
+  @prop({ default: false })
+  public kycVerified!: boolean;
+
 
   @prop()
   public emailVerificationToken?: string;

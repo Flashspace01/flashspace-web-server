@@ -1,10 +1,14 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
 import { BookingModel } from "../models/booking.model";
 import { KYCDocumentModel } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
+import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 
 // ============ DASHBOARD ============
 
@@ -216,24 +220,90 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
   }
 };
 
+// Link booking to KYC profile
+export const linkBookingToProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { bookingId } = req.params;
+    const { profileId } = req.body;
+
+    if (!profileId) {
+      return res.status(400).json({ success: false, message: "Profile ID required" });
+    }
+
+    // Verify profile exists and belongs to user
+    const profile = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: "Profile not found" });
+    }
+
+    // Check if profile is approved
+    if (profile.overallStatus !== "approved") {
+      return res.status(400).json({ success: false, message: "Profile must be approved before linking" });
+    }
+
+    // Verify booking exists and belongs to user
+    const booking = await BookingModel.findOne({ _id: bookingId, user: userId });
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    // Link profile to booking
+    booking.kycProfileId = profileId;
+    booking.kycStatus = "approved";
+    booking.status = "active";
+
+    // Set start and end dates if not already set
+    if (!booking.startDate) {
+      booking.startDate = new Date();
+    }
+    if (!booking.endDate) {
+      const endDate = new Date(booking.startDate);
+      endDate.setMonth(endDate.getMonth() + (booking.plan?.tenure || 12));
+      booking.endDate = endDate;
+    }
+
+    await booking.save();
+
+    // Add booking to profile's linkedBookings if not already there
+    if (!profile.linkedBookings?.includes(bookingId)) {
+      profile.linkedBookings = profile.linkedBookings || [];
+      profile.linkedBookings.push(bookingId);
+      await profile.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Booking linked to profile successfully",
+      data: booking
+    });
+  } catch (error) {
+    console.error("Link booking error:", error);
+    res.status(500).json({ success: false, message: "Failed to link booking" });
+  }
+};
+
 // ============ KYC ============
 
 export const getKYCStatus = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    const { profileId } = req.query;
+    console.log(`[getKYCStatus] User: ${userId}, ProfileId: ${profileId}`);
 
-    let kyc = await KYCDocumentModel.findOne({ user: userId });
-
-    if (!kyc) {
-      // Create empty KYC record
-      kyc = await KYCDocumentModel.create({
-        user: userId,
-        overallStatus: "not_started",
-        progress: 0,
-      });
+    if (profileId) {
+      // Get specific profile
+      const kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+      if (!kyc) {
+        console.log("[getKYCStatus] Profile not found for ID:", profileId);
+        return res.status(404).json({ success: false, message: "Profile not found" });
+      }
+      return res.status(200).json({ success: true, data: kyc });
     }
 
-    res.status(200).json({ success: true, data: kyc });
+    // Get all user's KYC profiles
+    const profiles = await KYCDocumentModel.find({ user: userId, isDeleted: false });
+    res.status(200).json({ success: true, data: profiles });
   } catch (error) {
     console.error("Get KYC error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch KYC status" });
@@ -243,23 +313,78 @@ export const getKYCStatus = async (req: Request, res: Response) => {
 export const updateBusinessInfo = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { companyName, companyType, gstNumber, panNumber, cinNumber, registeredAddress } = req.body;
+    const {
+      companyName, companyType, gstNumber, panNumber, cinNumber, registeredAddress,
+      profileId, profileName, kycType, partners,
+      // Personal Info Fields
+      personalPhone, personalDob, personalAadhaar, personalPan, personalFullName
+    } = req.body;
+    console.log(`[updateBusinessInfo] User: ${userId}, ProfileId: ${profileId}, Type: ${kycType}`);
 
-    let kyc = await KYCDocumentModel.findOne({ user: userId });
-
-    if (!kyc) {
-      kyc = new KYCDocumentModel({ user: userId });
+    let kyc;
+    if (profileId && profileId !== "new") {
+      // Update existing profile
+      kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+      if (!kyc) {
+        console.log("[updateBusinessInfo] Profile not found for update:", profileId);
+        return res.status(404).json({ success: false, message: "Profile not found" });
+      }
+    } else {
+      // Create new profile
+      console.log("[updateBusinessInfo] Creating NEW profile");
+      const user = await UserModel.findById(userId);
+      kyc = new KYCDocumentModel({
+        user: userId,
+        profileName: profileName || (kycType === "business" ? companyName : "Personal Profile"),
+        kycType: kycType || "individual",
+        personalInfo: {
+          fullName: personalFullName || user?.fullName, // Allow custom name or default to user
+          email: user?.email,
+          phone: user?.phoneNumber
+        }
+      });
     }
 
-    kyc.businessInfo = {
-      companyName,
-      companyType,
-      gstNumber,
-      panNumber,
-      cinNumber,
-      registeredAddress,
-      verified: false,
-    };
+    // Update business info if provided
+    if (companyName || gstNumber || partners) {
+      kyc.businessInfo = {
+        companyName: companyName || kyc.businessInfo?.companyName,
+        companyType: companyType || kyc.businessInfo?.companyType,
+        gstNumber: gstNumber || kyc.businessInfo?.gstNumber,
+        panNumber: panNumber || kyc.businessInfo?.panNumber,
+        cinNumber: cinNumber || kyc.businessInfo?.cinNumber,
+        registeredAddress: registeredAddress || kyc.businessInfo?.registeredAddress,
+        partners: partners || kyc.businessInfo?.partners || [],
+        verified: false,
+      };
+    }
+
+    // Update personal info if provided
+    if (personalPhone || personalDob || personalAadhaar || personalPan || personalFullName) {
+      if (!kyc.personalInfo) {
+        // Initialize if empty, preserving existing user data if any
+        const user = await UserModel.findById(userId);
+        kyc.personalInfo = {
+          fullName: user?.fullName,
+          email: user?.email,
+          phone: user?.phoneNumber
+        };
+      }
+
+      if (personalPhone) kyc.personalInfo.phone = personalPhone;
+      if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
+      if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
+      if (personalPan) kyc.personalInfo.panNumber = personalPan;
+      if (personalFullName) kyc.personalInfo.fullName = personalFullName;
+    }
+
+    if (kycType && !kyc.kycType) {
+      kyc.kycType = kycType;
+    }
+
+    if (profileName) {
+      kyc.profileName = profileName;
+    }
 
     // Update progress
     kyc.progress = calculateKYCProgress(kyc);
@@ -270,41 +395,93 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     }
 
     await kyc.save();
+    console.log("[updateBusinessInfo] Saved profile:", kyc._id);
 
-    res.status(200).json({ success: true, message: "Business information updated", data: kyc });
+    res.status(200).json({ success: true, message: "Profile updated", data: kyc });
   } catch (error) {
     console.error("Update business info error:", error);
-    res.status(500).json({ success: false, message: "Failed to update business info" });
+    res.status(500).json({ success: false, message: "Failed to update profile" });
   }
 };
 
 export const uploadKYCDocument = async (req: Request, res: Response) => {
+  console.log("==== UPLOAD KYC DOCUMENT START ====");
   try {
     const userId = req.user?.id;
-    const { documentType, fileUrl, name } = req.body;
+    const { documentType, profileId } = req.body;
+    const file = req.file;
 
-    if (!documentType || !fileUrl) {
-      return res.status(400).json({ success: false, message: "Document type and file URL required" });
+    console.log(`[STEP 1] User: ${userId}, ProfileId: ${profileId}, DocType: ${documentType}, File: ${file?.filename}`);
+
+    if (!documentType) {
+      console.log("[STEP 1a] FAIL: No documentType");
+      return res.status(400).json({ success: false, message: "Document type required" });
     }
 
-    let kyc = await KYCDocumentModel.findOne({ user: userId });
+    if (!file) {
+      console.log("[STEP 1b] FAIL: No file received");
+      return res.status(400).json({ success: false, message: "No file uploaded (check size/type)" });
+    }
+
+    if (!profileId) {
+      console.log("[STEP 1c] FAIL: No profileId");
+      return res.status(400).json({ success: false, message: "Profile ID required" });
+    }
+
+    console.log("[STEP 2] Validating profileId format...");
+    if (!mongoose.Types.ObjectId.isValid(profileId)) {
+      console.log("[STEP 2a] FAIL: Invalid profileId format");
+      return res.status(400).json({ success: false, message: "Invalid Profile ID format" });
+    }
+
+    console.log("[STEP 3] Finding KYC profile in database...");
+    let kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
 
     if (!kyc) {
-      kyc = new KYCDocumentModel({ user: userId, documents: [] });
+      console.log("[STEP 3a] FAIL: Profile not found for:", profileId);
+      return res.status(404).json({ success: false, message: "Profile not found" });
     }
+
+    console.log("[STEP 4] Profile found. Building document entry...");
+    // Generate file URL using the updated helper
+    const fileUrl = getMulterFileUrl(file.filename, documentType);
 
     // Check if document type already exists
     const existingIndex = kyc.documents?.findIndex((d) => d.type === documentType) ?? -1;
+    console.log("[STEP 4a] Existing doc index:", existingIndex);
 
     const docEntry = {
       type: documentType,
-      name: name || documentType.replace(/_/g, " ").toUpperCase(),
+      name: file.originalname,
       fileUrl,
       status: "pending" as const,
       uploadedAt: new Date(),
     };
+    console.log("[STEP 4b] Doc entry created:", docEntry);
 
     if (existingIndex >= 0) {
+      // Delete old file if exists
+      const oldDoc = kyc.documents![existingIndex];
+      if (oldDoc.fileUrl) {
+        try {
+          const oldFilename = oldDoc.fileUrl.split('/').pop();
+          if (oldFilename) {
+            // Determine directory based on document type
+            const subDir = oldDoc.type === 'video_kyc' ? 'video-kyc' : 'kyc-documents';
+            const uploadsDir = path.join(__dirname, '../../../../uploads', subDir);
+            const oldFilePath = path.join(uploadsDir, oldFilename);
+            if (fs.existsSync(oldFilePath)) {
+              fs.unlink(oldFilePath, (err) => {
+                if (err) console.error("[Delete Old File] Error:", err);
+                else console.log("[Delete Old File] Success:", oldFilename, "from", subDir);
+              });
+            }
+          }
+        } catch (err) {
+          console.error("[Delete Old File] Critical Error:", err);
+        }
+      }
+
       kyc.documents![existingIndex] = docEntry;
     } else {
       kyc.documents = kyc.documents || [];
@@ -323,26 +500,100 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
       message: "Document uploaded successfully",
       data: docEntry,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Upload KYC doc error:", error);
-    res.status(500).json({ success: false, message: "Failed to upload document" });
+    console.error("Error name:", error?.name);
+    console.error("Error message:", error?.message);
+    console.error("Error stack:", error?.stack);
+    res.status(500).json({ success: false, message: "Failed to upload document", error: error?.message });
+  }
+};
+
+// Delete KYC document
+export const deleteKYCDocument = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { profileId, documentType } = req.body;
+
+    console.log(`[deleteKYCDocument] User: ${userId}, ProfileId: ${profileId}, DocType: ${documentType}`);
+
+    if (!profileId || !documentType) {
+      return res.status(400).json({ success: false, message: "Profile ID and document type required" });
+    }
+
+    const kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+
+    if (!kyc) {
+      return res.status(404).json({ success: false, message: "Profile not found" });
+    }
+
+    // Check if document exists
+    const docIndex = kyc.documents?.findIndex((d) => d.type === documentType) ?? -1;
+    if (docIndex === -1) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+
+    // Delete file from disk if exists
+    const docToDelete = kyc.documents![docIndex];
+    if (docToDelete.fileUrl) {
+      const filename = docToDelete.fileUrl.split('/').pop();
+      if (filename) {
+        const subDir = docToDelete.type === 'video_kyc' ? 'video-kyc' : 'kyc-documents';
+        const filePath = path.join(__dirname, '../../../../uploads', subDir, filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlink(filePath, (err) => {
+            if (err) console.error("[Delete File] Error:", err);
+          });
+        }
+      }
+    }
+
+    // Remove document
+    kyc.documents!.splice(docIndex, 1);
+
+    // Update progress
+    kyc.progress = calculateKYCProgress(kyc);
+    kyc.overallStatus = "pending"; // Revert to pending if deleting a doc
+    kyc.updatedAt = new Date();
+
+    await kyc.save();
+
+    res.status(200).json({ success: true, message: "Document deleted successfully" });
+  } catch (error) {
+    console.error("Delete KYC doc error:", error);
+    res.status(500).json({ success: false, message: "Failed to delete document" });
   }
 };
 
 function calculateKYCProgress(kyc: any): number {
   let progress = 0;
-  const totalSteps = 4; // personal, business, documents, review
+  const isBusiness = kyc.kycType === "business";
 
-  if (kyc.personalInfo?.fullName && kyc.personalInfo?.email) progress += 25;
-  if (kyc.businessInfo?.companyName && kyc.businessInfo?.panNumber) progress += 25;
+  // Weights based on type
+  // Individual: Personal(30), Docs(50), Status(20)
+  // Business: Personal(25), Business(25), Docs(40), Status(10)
 
-  const requiredDocs = ["pan_card", "aadhaar_card"];
-  const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
-  const hasAllDocs = requiredDocs.every((d) => uploadedDocs.includes(d));
-  if (hasAllDocs) progress += 25;
+  if (isBusiness) {
+    if (kyc.personalInfo?.fullName) progress += 25;
+    if (kyc.businessInfo?.companyName) progress += 25;
 
-  const allApproved = kyc.documents?.every((d: any) => d.status === "approved");
-  if (allApproved && kyc.documents?.length >= 2) progress += 25;
+    const requiredDocs = ["pan_card", "gst_certificate", "address_proof", "video_kyc"];
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 40);
+
+    if (kyc.overallStatus === "approved") progress += 10;
+  } else {
+    // Individual
+    if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 30;
+
+    const requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 50);
+
+    if (kyc.overallStatus === "approved") progress += 20;
+  }
 
   return Math.min(progress, 100);
 }

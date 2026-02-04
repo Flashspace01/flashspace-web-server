@@ -75,8 +75,16 @@ app.use(cookieParser());
 app.use(helmet({
   crossOriginResourcePolicy: false,
   crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: false
+  crossOriginOpenerPolicy: false,
+  xFrameOptions: false,
+  contentSecurityPolicy: false
 }));
+
+// Request Logger
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  next();
+});
 
 // Database connection with feedback
 dbConnection()
@@ -98,6 +106,11 @@ dbConnection()
     console.error("Database connection failed:", error);
     process.exit(1);
   });
+
+// Serve uploaded files statically
+// Serve uploaded files statically
+import path from 'path';
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Main API routes
 app.use("/api", mainRoutes);

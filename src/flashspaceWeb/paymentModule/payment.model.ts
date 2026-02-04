@@ -20,7 +20,6 @@ export enum PaymentType {
     timestamps: true
   }
 })
-@index({ razorpayOrderId: 1 })
 @index({ razorpayPaymentId: 1 })
 @index({ userId: 1 })
 @index({ status: 1 })
