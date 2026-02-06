@@ -1403,7 +1403,7 @@ Authorization: Bearer <access_token>
     "invoiceNumber": "INV-2026-0042",
     "description": "Virtual Office - GST Plan",
     "lineItems": [
-      { "description": "GST Registration Plan - 1 Year", "quantity": 1, "rate": 12712, "amount": 12712 }
+      { "description": "GST Registration Plan - 1 Year", "quantity": 1, "rate": 127A12, "amount": 12712 }
     ],
     "subtotal": 12712,
     "taxRate": 18,

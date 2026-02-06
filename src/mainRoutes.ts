@@ -8,6 +8,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+import affiliateDashboardRoutes from "./flashspaceWeb/affiliateDashboardModule/routes/affiliateDashboard.routes";
 
 export const mainRoutes = Router();
 
@@ -30,4 +31,6 @@ mainRoutes.use("/user", userDashboardRoutes);
 // /api/admin (Admin Dashboard APIs)
 mainRoutes.use("/admin", adminRoutes);
 
-
+// /api/booking-management
+// /api/affiliate (Affiliate Dashboard APIs)
+mainRoutes.use("/affiliate", affiliateDashboardRoutes);
