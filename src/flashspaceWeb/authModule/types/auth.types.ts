@@ -4,6 +4,7 @@ export interface SignupRequest {
   confirmPassword: string;
   fullName: string;
   phoneNumber?: string;
+  role?: string;
 }
 
 export interface LoginRequest {

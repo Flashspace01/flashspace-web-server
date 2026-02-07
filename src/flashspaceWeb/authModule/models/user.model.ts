@@ -11,6 +11,7 @@ export enum UserRole {
   USER = "user",
   ADMIN = "admin",
   VENDOR = "vendor",
+  AFFILIATE_PARTNER = "affiliate_partner",
 }
 
 @modelOptions({
