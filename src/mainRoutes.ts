@@ -8,6 +8,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
 
@@ -33,5 +34,7 @@ mainRoutes.use("/user", userDashboardRoutes);
 mainRoutes.use("/admin", adminRoutes);
 // /api/spacePartner
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
+// /api/meetings (Meeting Scheduler APIs)
+mainRoutes.use("/meetings", meetingSchedulerRoutes);
 
 

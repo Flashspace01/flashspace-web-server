@@ -7,10 +7,14 @@
     "start": "ts-node-dev --respawn src/app.ts",
     "build": "tsc -p tsconfig.json",
     "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
+    "test:api": "npx ts-node src/scripts/test-api.ts",
+    "test:watch": "nodemon --exec 'npm run test:api'",
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
-    "test:otp": "ts-node src/scripts/test-otp-system.ts"
+    "test:otp": "ts-node src/scripts/test-otp-system.ts",
+    "test:api": "npx ts-node src/scripts/test-api.ts",
+    "test:watch": "nodemon --exec 'npm run test:api'"
   },
   "repository": {
     "type": "git",
@@ -38,8 +42,11 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "google-auth-library": "^10.5.0",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
+    "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.7.2",
     "mongoose": "^8.18.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.10",
@@ -47,14 +54,17 @@
     "ts-node-dev": "^2.0.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.3",
     "@types/helmet": "^0.0.48",
+    "@types/joi": "^17.2.2",
+    "@types/luxon": "^3.7.1",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^24.3.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }
