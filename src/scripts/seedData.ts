@@ -1,13 +1,59 @@
 console.log("Starting seed script...");
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import fs from "fs";
+import bcrypt from "bcryptjs";
 import { CoworkingSpaceModel } from "../flashspaceWeb/coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../flashspaceWeb/virtualOfficeModule/virtualOffice.model";
 
 dotenv.config();
 
-// Mock data for coworking spaces
+// ============ TEST USERS DATA ============
+const testUsers = [
+  {
+    email: 'test@example.com',
+    fullName: 'Test User',
+    password: 'Test@123',
+    phoneNumber: '+91-9876543210',
+    authProvider: 'local',
+    role: 'user',
+    isEmailVerified: true,  // ✅ PRE-VERIFIED
+    kycVerified: false,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 0,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  },
+  {
+    email: 'admin@flashspace.co',
+    fullName: 'Admin User',
+    password: 'Admin@123',
+    phoneNumber: '+91-9876543211',
+    authProvider: 'local',
+    role: 'admin',
+    isEmailVerified: true,  // ✅ PRE-VERIFIED
+    kycVerified: true,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 years
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 100,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  }
+];
+
+// ... [keep all your existing coworkingSpaces and virtualOffices data] ...
+
+// ============ COWORKING SPACES DATA ============
 const coworkingSpaces = [
   // Ahmedabad
   { name: "Workzone - Ahmedabad", address: "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India", city: "Ahmedabad", price: "₹1,083/month", originalPrice: "₹1,333", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Makarba", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
@@ -52,7 +98,7 @@ const coworkingSpaces = [
   { name: "Kaytech Solutions", address: "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003", city: "Jammu", price: "₹1,500/month", originalPrice: "₹1,833", rating: 4.6, reviews: 112, type: "Private Office", features: ["Airport Proximity", "Premium Amenities", "Parking", "Meeting Rooms"], area: "Satwari", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
 ];
 
-// Mock data for virtual offices
+// ============ VIRTUAL OFFICES DATA ============
 const virtualOffices = [
   // Ahmedabad
   { name: "Workzone - Ahmedabad", address: "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India", city: "Ahmedabad", price: "₹1,083/month", originalPrice: "₹1,333", gstPlanPrice: "₹1,083/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,275/month", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Makarba", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
@@ -97,35 +143,103 @@ const virtualOffices = [
   { name: "Kaytech Solutions", address: "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003", city: "Jammu", price: "₹1,500/month", originalPrice: "₹1,833", gstPlanPrice: "₹1,500/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,767/month", rating: 4.6, reviews: 112, type: "Private Office", features: ["Airport Proximity", "Premium Amenities", "Parking", "Meeting Rooms"], area: "Satwari", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
 ];
 
+
+// ============ USER MODEL ============
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  fullName: { type: String, required: true },
+  phoneNumber: String,
+  password: { type: String, required: true },
+  authProvider: { type: String, default: 'local' },
+  role: { type: String, default: 'user' },
+  isEmailVerified: { type: Boolean, default: false },
+  kycVerified: { type: Boolean, default: false },
+  emailVerificationOTP: String,
+  emailVerificationOTPExpiry: Date,
+  emailVerificationOTPAttempts: { type: Number, default: 0 },
+  lastOTPRequestTime: Date,
+  otpRequestCount: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  credits: { type: Number, default: 0 },
+  isDeleted: { type: Boolean, default: false },
+  refreshTokens: { type: [String], default: [] },
+  isTwoFactorEnabled: { type: Boolean, default: false }
+}, {
+  timestamps: true
+});
+
+const UserModel = mongoose.model('User', userSchema);
+
 async function seedDatabase() {
   try {
-    console.log("Connecting to database...");
+    console.log("📦 Connecting to database...");
     await mongoose.connect(process.env.DB_URI as string);
-    console.log("Connected to database successfully!");
+    console.log("✅ Connected to database successfully!");
 
-    console.log("\nClearing existing data...");
+    console.log("\n🧹 Clearing existing data...");
+    await UserModel.deleteMany({});
     await CoworkingSpaceModel.deleteMany({});
     await VirtualOfficeModel.deleteMany({});
-    console.log("Existing data cleared!");
+    console.log("✅ Existing data cleared!");
 
-    console.log("\nSeeding coworking spaces...");
+    // ============ SEED USERS ============
+    console.log("\n👤 Seeding test users...");
+    const hashedUsers = await Promise.all(
+      testUsers.map(async (user) => {
+        const hashedPassword = await bcrypt.hash(user.password, 12);
+        return {
+          ...user,
+          password: hashedPassword,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      })
+    );
+
+    const insertedUsers = await UserModel.insertMany(hashedUsers);
+    console.log(`✅ ${insertedUsers.length} users inserted!`);
+    
+    console.log("\n🔑 TEST USER CREDENTIALS:");
+    console.log("=".repeat(40));
+    console.log("1. Regular User:");
+    console.log("   Email: test@example.com");
+    console.log("   Password: Test@123");
+    console.log("   Verified: YES (no OTP needed)");
+    console.log("\n2. Admin User:");
+    console.log("   Email: admin@flashspace.co");
+    console.log("   Password: Admin@123");
+    console.log("   Verified: YES (no OTP needed)");
+
+    // ============ SEED COWORKING SPACES ============
+    console.log("\n💼 Seeding coworking spaces...");
     const insertedCoworkingSpaces = await CoworkingSpaceModel.insertMany(coworkingSpaces);
-    console.log(`${insertedCoworkingSpaces.length} coworking spaces inserted!`);
+    console.log(`✅ ${insertedCoworkingSpaces.length} coworking spaces inserted!`);
 
-    console.log("\nSeeding virtual offices...");
+    // ============ SEED VIRTUAL OFFICES ============
+    console.log("\n🏢 Seeding virtual offices...");
     const insertedVirtualOffices = await VirtualOfficeModel.insertMany(virtualOffices);
-    console.log(`${insertedVirtualOffices.length} virtual offices inserted!`);
+    console.log(`✅ ${insertedVirtualOffices.length} virtual offices inserted!`);
 
-    console.log("\n✅ Database seeded successfully!");
+    // ============ FINAL SUMMARY ============
+    console.log("\n" + "=".repeat(50));
+    console.log("🎉 DATABASE SEEDING COMPLETE!");
+    console.log("=".repeat(50));
+    console.log(`👤 Users: ${insertedUsers.length} (ALL PRE-VERIFIED)`);
+    console.log(`💼 Coworking Spaces: ${insertedCoworkingSpaces.length}`);
+    console.log(`🏢 Virtual Offices: ${insertedVirtualOffices.length}`);
+    
+    console.log("\n🚀 READY TO TEST:");
+    console.log("-".repeat(30));
+    console.log("1. Start backend: npm run dev");
+    console.log("2. Run API tests: npm run test:api");
+    console.log("\n✅ Users are PRE-VERIFIED - No OTP needed for login!");
 
-    console.log("\nSummary:");
-    console.log(`- Coworking Spaces: ${insertedCoworkingSpaces.length}`);
-    console.log(`- Virtual Offices: ${insertedVirtualOffices.length}`);
-
+    await mongoose.disconnect();
+    console.log("\n🔌 Disconnected from database.");
+    
     process.exit(0);
   } catch (error) {
-    console.error("Error seeding database:", error);
-    fs.writeFileSync("seed-error.log", `Error seeding database: ${error}\n${error instanceof Error ? error.stack : ''}`);
+    console.error("❌ Error seeding database:", error);
     process.exit(1);
   }
 }
