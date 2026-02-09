@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://localhost:5000",
+  "users": {
+    "admin": {
+      "email": "admin@flashspace.co",
+      "password": "Admin@123",
+      "role": "admin"
+    },
+    "user": {
+      "email": "testuser@example.com",
+      "password": "User@123",
+      "role": "user"
+    }
+  },
+  "testTicket": {
+    "subject": "Test Ticket - API Testing",
+    "description": "This is a test ticket created by the automated test script to verify the ticket system functionality.",
+    "category": "technical",
+    "priority": "medium"
+  }
+}

@@ -8,6 +8,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+import { ticketRoutes } from './flashspaceWeb/ticketModule/routes/ticket.routes';
 
 export const mainRoutes = Router();
 
@@ -30,4 +31,4 @@ mainRoutes.use("/user", userDashboardRoutes);
 // /api/admin (Admin Dashboard APIs)
 mainRoutes.use("/admin", adminRoutes);
 
-
+mainRoutes.use('/tickets', ticketRoutes);
