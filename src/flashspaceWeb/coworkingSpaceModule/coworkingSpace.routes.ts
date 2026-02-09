@@ -7,6 +7,7 @@ import {
     updateCoworkingSpace,
     deleteCoworkingSpace
 } from "./coworkingSpace.controller";
+import { readRateLimiter } from "../../config/rateLimiter.config";
 
 export const coworkingSpaceRoutes = Router();
 
@@ -14,13 +15,13 @@ export const coworkingSpaceRoutes = Router();
 coworkingSpaceRoutes.post("/create", createCoworkingSpace);
 
 // GET /api/coworkingSpace/getAll
-coworkingSpaceRoutes.get("/getAll", getAllCoworkingSpaces);
+coworkingSpaceRoutes.get("/getAll", readRateLimiter, getAllCoworkingSpaces);
 
 // GET /api/coworkingSpace/getByCity/:city
-coworkingSpaceRoutes.get("/getByCity/:city", getCoworkingSpacesByCity);
+coworkingSpaceRoutes.get("/getByCity/:city", readRateLimiter, getCoworkingSpacesByCity);
 
 // GET /api/coworkingSpace/getById/:coworkingSpaceId
-coworkingSpaceRoutes.get("/getById/:coworkingSpaceId", getCoworkingSpaceById);
+coworkingSpaceRoutes.get("/getById/:coworkingSpaceId", readRateLimiter, getCoworkingSpaceById);
 
 // PUT /api/coworkingSpace/update/:coworkingSpaceId
 coworkingSpaceRoutes.put("/update/:coworkingSpaceId", updateCoworkingSpace);

@@ -10,6 +10,7 @@ import { mainRoutes } from "./mainRoutes";
 import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
 import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
+import { globalRateLimiter } from "./config/rateLimiter.config";
 
 const PORT: string | number = process.env.PORT || 5000;
 
@@ -83,6 +84,9 @@ app.use((req, res, next) => {
   console.log(`[REQUEST] ${req.method} ${req.url}`);
   next();
 });
+
+// Global rate limiting - applies to all requests
+app.use(globalRateLimiter);
 
 // Database connection with feedback
 dbConnection()
