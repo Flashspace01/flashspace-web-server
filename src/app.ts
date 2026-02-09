@@ -49,20 +49,11 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  ...corsOptions,
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, origin);
-    } else {
-      console.error('CORS blocked origin:', origin);
-      callback(new Error("CORS not allowed"), false);
-    }
-  }
+  origin: "http://localhost:5173",
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['Set-Cookie']
 }));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
 console.log(process.env.MONGODB_URI)

@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/adarshXpal/flashspace-server#readme",
   "dependencies": {
+    "@google/genai": "^1.40.0",
     "@sendgrid/mail": "^8.1.6",
     "@typegoose/typegoose": "^12.19.0",
     "@types/bcryptjs": "^2.4.6",
