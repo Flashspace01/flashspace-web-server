@@ -6,7 +6,15 @@ const spaceMediaService = new SpaceMediaService();
 
 export const createSpace = async (req: Request, res: Response) => {
     try {
-        const partnerId = (req as any).user.id;
+        console.log('[createSpace] Request body:', req.body);
+
+        // Mock partnerId for testing without auth
+        const partnerId = (req as any).user?.id || "507f1f77bcf86cd799439011";
+
+        if (!req.body) {
+            return res.status(400).json({ message: 'Request body is missing' });
+        }
+
         const { mediaIds, ...spaceData } = req.body;
 
         const space = new Space({
@@ -19,13 +27,6 @@ export const createSpace = async (req: Request, res: Response) => {
 
         if (mediaIds && Array.isArray(mediaIds)) {
             await spaceMediaService.assignMediaToSpace(mediaIds, space._id as string, partnerId);
-            // Reload space to Populate if needed, or just update the references in Space model if we decide to keep references there too (we have `images` and `videos` arrays in the model).
-            // For now, let's update the arrays in the space model based on media types, or assuming the UI sends them split.
-            // Actually, the model expects images: [] and videos: [].
-            // If the UI sends just `mediaIds`, we'd need to query them to know which is which. 
-            // Or the UI sends `images` and `videos` arrays of IDs directly.
-
-            // Let's assume the body matches the model structure roughly, but we need to ensure ownership.
         }
 
         res.status(201).json(space);
@@ -37,18 +38,28 @@ export const createSpace = async (req: Request, res: Response) => {
 
 export const getSpaces = async (req: Request, res: Response) => {
     try {
-        const partnerId = (req as any).user.id;
+        const partnerId = (req as any).user?.id || "507f1f77bcf86cd799439011";
+        console.log(`[getSpaces] Fetching spaces for partnerId: ${partnerId}`);
         const spaces = await Space.find({ partnerId }).sort({ createdAt: -1 });
+        console.log(`[getSpaces] Found ${spaces.length} spaces`);
         res.json(spaces);
     } catch (error) {
-        console.error('Error fetching spaces:', error);
-        res.status(500).json({ message: 'Error fetching spaces', error });
+        console.error('Error fetching spaces (DETAILS):', JSON.stringify(error, null, 2));
+        if (error instanceof Error) {
+            console.error('Error stack:', error.stack);
+            console.error('Error message:', error.message);
+        }
+        res.status(500).json({
+            message: 'Error fetching spaces',
+            error: error instanceof Error ? error.message : error,
+            stack: error instanceof Error ? error.stack : undefined
+        });
     }
 };
 
 export const getSpaceById = async (req: Request, res: Response) => {
     try {
-        const partnerId = (req as any).user.id;
+        const partnerId = (req as any).user?.id || "507f1f77bcf86cd799439011";
         const { id } = req.params;
         const space = await Space.findOne({ _id: id, partnerId }).populate('images').populate('videos');
 
@@ -65,7 +76,7 @@ export const getSpaceById = async (req: Request, res: Response) => {
 
 export const updateSpace = async (req: Request, res: Response) => {
     try {
-        const partnerId = (req as any).user.id;
+        const partnerId = (req as any).user?.id || "507f1f77bcf86cd799439011";
         const { id } = req.params;
         const updates = req.body;
 
@@ -86,7 +97,7 @@ export const updateSpace = async (req: Request, res: Response) => {
 
 export const deleteSpace = async (req: Request, res: Response) => {
     try {
-        const partnerId = (req as any).user.id;
+        const partnerId = (req as any).user?.id || "507f1f77bcf86cd799439011";
         const { id } = req.params;
 
         const space = await Space.findOne({ _id: id, partnerId });

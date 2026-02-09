@@ -11,7 +11,7 @@ import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
 import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
 
-const PORT: string | number = process.env.PORT || 5000;
+const PORT: string | number = process.env.PORT || 5001;
 
 const app: Application = express();
 
@@ -65,7 +65,7 @@ app.use(cors({
   }
 }));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
-console.log(process.env.MONGODB_URI)
+console.log(process.env.MONGO_URI)
 
 
 // Middleware
@@ -89,14 +89,16 @@ app.use((req, res, next) => {
 // Database connection with feedback
 dbConnection()
   .then(() => {
-    console.log("Database connection established successfully.");
+    console.log(`[DEBUG] Database connection established. PID: ${process.pid}`);
 
     // Start server with feedback and explicit host binding
-    const HOST = process.env.HOST || '0.0.0.0';
-    app
+    // Use 127.0.0.1 to force IPv4 and avoid dual-stack conflicts on Windows
+    const HOST = process.env.HOST || '127.0.0.1';
+    console.log(`[DEBUG] Attempting to listen on ${HOST}:${PORT}`);
+
+    const server = app
       .listen(Number(PORT), HOST, () => {
-        const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
-        console.log(`API server started at http://${hostLabel}:${PORT}`);
+        console.log(`API server started at http://${HOST}:${PORT}`);
       })
       .on('error', (err: any) => {
         console.error('Failed to start HTTP server:', err?.message || err);

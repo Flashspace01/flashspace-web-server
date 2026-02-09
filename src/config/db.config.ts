@@ -1,11 +1,16 @@
 import mongoose from "mongoose";
+import dotenv from "dotenv";
+dotenv.config();
 
 export const dbConnection = async () => {
     try {
-        if (!process.env.DB_URI) {
-            throw new Error("DB_URI is not defined in environment variables");
+
+        const connectionString = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+        if (!connectionString) {
+            throw new Error("MONGO_URI (or MONGODB_URI) is not defined in environment variables");
         }
-        await mongoose.connect(process.env.DB_URI as string, {
+        await mongoose.connect(connectionString as string, {
             // connection options to help with stability
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,

@@ -34,12 +34,54 @@ export class AuthMiddleware {
       }
 
       if (!token) {
+        // Try refresh token logic
+        const refreshToken = req.cookies?.refreshToken;
+        if (refreshToken) {
+          console.log('🔄 Access token missing, attempting refresh with refresh token');
+          try {
+            const decoded = JwtUtil.verifyRefreshToken(refreshToken);
+            const user = await AuthMiddleware.userRepository.findById(decoded.userId);
+
+            if (user) {
+              // Generate new tokens
+              const newTokens = JwtUtil.generateTokenPair({
+                userId: user._id.toString(),
+                email: user.email,
+                role: user.role
+              });
+
+              // Set new cookies
+              AuthMiddleware.setTokenCookies(res, newTokens.accessToken, newTokens.refreshToken);
+
+              // Attach user to request
+              req.user = {
+                id: user._id.toString(),
+                email: user.email,
+                role: user.role
+              };
+              console.log('✅ Auto-refreshed tokens for user:', user.email);
+              next();
+              return;
+            }
+          } catch (refreshError: any) {
+            console.log('⚠️ Refresh token invalid during strict auth:', refreshError.message);
+          }
+        } else {
+          console.log('❌ Auth Failed: No refresh token found in cookies');
+        }
+
+        console.log('❌ Auth Failed: No valid tokens found');
+        console.log('Headers:', req.headers);
+        console.log('Cookies:', req.cookies);
+
         res.status(401).json({
           success: false,
           message: 'Access token required'
         });
         return;
       }
+
+      console.log('✅ Token found, verifying...');
 
       try {
         const decoded = JwtUtil.verifyAccessToken(token);
@@ -60,6 +102,7 @@ export class AuthMiddleware {
           email: user.email,
           role: user.role
         };
+        console.log('✅ User authenticated:', user.email);
 
         next();
       } catch (tokenError) {

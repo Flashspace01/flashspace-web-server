@@ -20,6 +20,14 @@ enum DeskType {
 @index({ popular: 1, rating: -1 }) // Featured/popular spaces
 @index({ "coordinates.lat": 1, "coordinates.lng": 1 }) // Geospatial queries
 @index({ price: 1 }) // Price-based filtering
+export class Coordinates {
+    @prop()
+    public lat?: number;
+
+    @prop()
+    public lng?: number;
+}
+
 export class CoworkingSpace {
     @prop({ required: true, trim: true })
     public name!: string;
@@ -70,11 +78,8 @@ export class CoworkingSpace {
     @prop({ default: false })
     public popular!: boolean;
 
-    @prop({ type: () => Object })
-    public coordinates?: {
-        lat: number;
-        lng: number;
-    };
+    @prop({ type: () => Coordinates, _id: false })
+    public coordinates?: Coordinates;
 
     @prop({ type: () => String })
     public image?: string;

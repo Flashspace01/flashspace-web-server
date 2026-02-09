@@ -49,6 +49,14 @@ class BookingDocument {
   generatedAt?: Date;
 }
 
+class Coordinates {
+  @prop()
+  lat?: number;
+
+  @prop()
+  lng?: number;
+}
+
 class SpaceSnapshot {
   @prop()
   _id?: string;
@@ -68,8 +76,8 @@ class SpaceSnapshot {
   @prop()
   image?: string;
 
-  @prop({ type: () => Object })
-  coordinates?: { lat: number; lng: number };
+  @prop({ type: () => Coordinates, _id: false })
+  coordinates?: Coordinates;
 }
 
 @modelOptions({ options: { allowMixed: Severity.ALLOW } })
