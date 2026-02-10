@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../config/multer.config";
+import { uploadRateLimiter } from "../../../config/rateLimiter.config";
 import {
   getDashboardOverview,
   getAllBookings,
@@ -38,7 +39,7 @@ router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);
 router.put("/kyc/business-info", updateBusinessInfo);
-router.post("/kyc/upload", (req, res, next) => {
+router.post("/kyc/upload", uploadRateLimiter, (req, res, next) => {
   console.log("[Route] /kyc/upload hit (Pre-Multer)");
   uploadKYCFile.single('file')(req, res, (err) => {
     if (err) {

@@ -7,6 +7,7 @@ import {
     updateVirtualOffice,
     deleteVirtualOffice
 } from "./virtualOffice.controller";
+import { readRateLimiter } from "../../config/rateLimiter.config";
 
 export const virtualOfficeRoutes = Router();
 
@@ -14,13 +15,13 @@ export const virtualOfficeRoutes = Router();
 virtualOfficeRoutes.post("/create", createVirtualOffice);
 
 // GET /api/virtualOffice/getAll
-virtualOfficeRoutes.get("/getAll", getAllVirtualOffices);
+virtualOfficeRoutes.get("/getAll", readRateLimiter, getAllVirtualOffices);
 
 // GET /api/virtualOffice/getByCity/:city
-virtualOfficeRoutes.get("/getByCity/:city", getVirtualOfficesByCity);
+virtualOfficeRoutes.get("/getByCity/:city", readRateLimiter, getVirtualOfficesByCity);
 
 // GET /api/virtualOffice/getById/:virtualOfficeId
-virtualOfficeRoutes.get("/getById/:virtualOfficeId", getVirtualOfficeById);
+virtualOfficeRoutes.get("/getById/:virtualOfficeId", readRateLimiter, getVirtualOfficeById);
 
 // PUT /api/virtualOffice/update/:virtualOfficeId
 virtualOfficeRoutes.put("/update/:virtualOfficeId", updateVirtualOffice);

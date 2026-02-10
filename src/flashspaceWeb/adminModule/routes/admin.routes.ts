@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
+import { adminRateLimiter } from "../../../config/rateLimiter.config";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 
@@ -9,6 +10,8 @@ export const adminRoutes = Router();
 
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
+adminRoutes.use(AuthMiddleware.requireAdmin);
+adminRoutes.use(adminRateLimiter);
 
 // 2. Dashboard - Accessible by Admins, Partners, Space Managers, Sales
 // We check if they have at least one relevant permission to be here

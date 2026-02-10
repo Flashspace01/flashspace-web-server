@@ -1,29 +1,30 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { AuthMiddleware } from '../middleware/auth.middleware';
+import { authRateLimiter, strictAuthRateLimiter } from '../../../config/rateLimiter.config';
 
 const router = Router();
 const authController = new AuthController();
 
 // Public routes (no authentication required)
 router.post('/signup', 
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes - DISABLED FOR DEV
+  strictAuthRateLimiter,
   authController.signup
 );
 
 router.post('/login', 
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes - DISABLED FOR DEV
+  strictAuthRateLimiter,
   authController.login
 );
 
 // OTP-based verification
 router.post('/verify-otp',
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
+  authRateLimiter,
   authController.verifyOTP
 );
 
 router.post('/resend-otp',
-  // AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  authRateLimiter,
   authController.resendOTP
 );
 
@@ -31,12 +32,12 @@ router.post('/resend-otp',
 router.get('/verify-email', authController.verifyEmail);
 
 router.post('/forgot-password', 
-  AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  authRateLimiter,
   authController.forgotPassword
 );
 
 router.post('/reset-password', 
-  AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  authRateLimiter,
   authController.resetPassword
 );
 
