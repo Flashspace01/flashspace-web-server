@@ -221,9 +221,6 @@ export class AuthMiddleware {
   // Require admin role
   static requireAdmin = AuthMiddleware.requireRole(UserRole.ADMIN);
 
-  // Require vendor role (can access vendor features)
-  static requireVendor = AuthMiddleware.requireRole(UserRole.VENDOR, UserRole.ADMIN);
-
   // Check if user is verified
   static async requireVerifiedEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

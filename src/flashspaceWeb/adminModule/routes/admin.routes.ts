@@ -62,3 +62,27 @@ adminRoutes.use("/tickets", ticketRoutes);
 // GET /api/admin/tickets/admin/stats
 // PUT /api/admin/tickets/admin/:ticketId
 // etc.
+// 4. Bookings - Accessible by all roles (scoped)
+adminRoutes.get("/bookings",
+    RBACMiddleware.requireAnyPermission([
+        Permission.VIEW_ALL_BOOKINGS,
+        Permission.VIEW_OWN_BOOKINGS
+    ]),
+    AdminController.getAllBookings
+);
+
+// 5. KYC Management
+adminRoutes.get("/kyc/pending",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS, // Admin
+        Permission.MANAGE_OWN_SPACES // Partner/Manager (needs refinement later)
+    ]),
+    AdminController.getPendingKYC
+);
+adminRoutes.put("/kyc/:id/review",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    AdminController.reviewKYC
+);
