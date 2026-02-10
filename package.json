@@ -14,9 +14,7 @@
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
-    "test:otp": "ts-node src/scripts/test-otp-system.ts",
-    "test:api": "npx ts-node src/scripts/test-api.ts",
-    "test:watch": "nodemon --exec 'npm run test:api'"
+    "test:otp": "ts-node src/scripts/test-otp-system.ts"
   },
   "repository": {
     "type": "git",
