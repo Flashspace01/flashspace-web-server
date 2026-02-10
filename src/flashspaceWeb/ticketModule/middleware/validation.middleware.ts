@@ -24,7 +24,7 @@ export class TicketValidation {
         'any.only': 'Invalid category selected',
         'any.required': 'Category is required'
       }),
-      priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium'),
+      priority: Joi.string().valid('low', 'medium', 'high').default('medium'),
       attachments: Joi.array().items(Joi.string()).optional()
     });
 
@@ -75,7 +75,7 @@ export class TicketValidation {
     const schema = Joi.object({
       status: Joi.string().valid('open', 'in_progress', 'escalated', 'resolved', 'closed').optional(),
       assignee: Joi.string().optional(),
-      priority: Joi.string().valid('low', 'medium', 'high', 'urgent').optional(),
+      priority: Joi.string().valid('low', 'medium', 'high').optional(),
       category: Joi.string().valid(
         'virtual_office', 'coworking', 'billing', 'kyc',
         'technical', 'mail_services', 'bookings', 'compliance', 'other'
