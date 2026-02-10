@@ -11,6 +11,7 @@ import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
+import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 
 export const mainRoutes = Router();
 
@@ -36,5 +37,9 @@ mainRoutes.use("/admin", adminRoutes);
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
+// /api/coupon
+mainRoutes.use("/coupon", couponRoutes);
+
+
 
 
