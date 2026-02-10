@@ -1,4 +1,5 @@
-import { prop, getModelForClass, modelOptions, index } from "@typegoose/typegoose";
+import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import { User } from "../authModule/models/user.model";
 
 @modelOptions({
     schemaOptions: {
@@ -79,6 +80,12 @@ export class VirtualOffice {
 
     @prop({ default: true })
     public isActive?: boolean;
+
+    @prop({ ref: () => User })
+    public partner?: Ref<User>;
+
+    @prop({ ref: () => User, default: [] })
+    public managers?: Ref<User>[];
 }
 
 export const VirtualOfficeModel = getModelForClass(VirtualOffice);

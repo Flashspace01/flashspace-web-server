@@ -7,7 +7,7 @@ export class AdminController {
 
     // GET /api/admin/dashboard
     static async getDashboardStats(req: Request, res: Response) {
-        const result = await adminService.getDashboardStats();
+        const result = await adminService.getDashboardStats(req.user);
         if (result.success) {
             res.status(200).json(result);
         } else {
@@ -32,7 +32,7 @@ export class AdminController {
 
     // GET /api/admin/kyc/pending
     static async getPendingKYC(req: Request, res: Response) {
-        const result = await adminService.getPendingKYC();
+        const result = await adminService.getPendingKYC(req.user);
         if (result.success) {
             res.status(200).json(result);
         } else {
@@ -59,7 +59,7 @@ export class AdminController {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 50;
 
-        const result = await adminService.getAllBookings(page, limit);
+        const result = await adminService.getAllBookings(req.user, page, limit);
         if (result.success) {
             res.status(200).json(result);
         } else {
@@ -84,6 +84,37 @@ export class AdminController {
             res.status(200).json(result);
         } else {
             const statusCode = result.message === "KYC document not found" ? 404 : 500;
+            res.status(statusCode).json(result);
+        }
+    }
+    // POST /api/admin/users
+    static async createUser(req: Request, res: Response) {
+        const { fullName, email, password, role } = req.body;
+
+        if (!fullName || !email || !password || !role) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields"
+            });
+        }
+
+        const result = await adminService.createUser({ fullName, email, password, role });
+        if (result.success) {
+            res.status(201).json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    }
+    // PUT /api/admin/users/:id
+    static async updateUser(req: Request, res: Response) {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const result = await adminService.updateUser(id, updates);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode = result.message === "User not found" ? 404 : 500;
             res.status(statusCode).json(result);
         }
     }
