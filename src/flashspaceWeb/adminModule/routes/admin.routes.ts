@@ -1,30 +1,59 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
-import { RoleMiddleware } from "../../authModule/middleware/role.middleware";
+import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
+import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
 
+console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
 
-// Protect all admin routes
+// 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
-adminRoutes.use(RoleMiddleware.requireAdmin);
 
-// Dashboard Routes
-adminRoutes.get("/dashboard", AdminController.getDashboardStats);
+// 2. Dashboard - Accessible by Admins, Partners, Space Managers, Sales
+// Updated to use VIEW_DASHBOARD permission instead of space permissions
+adminRoutes.get("/dashboard",
+    RBACMiddleware.requirePermission(Permission.VIEW_DASHBOARD),
+    AdminController.getDashboardStats
+);
 
-// User Management Routes
-adminRoutes.get("/users", AdminController.getUsers);
-adminRoutes.delete("/users/:id", AdminController.deleteUser);
+// 3. User Management - Currently Super Admin only
+adminRoutes.get("/users",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.getUsers
+);
+adminRoutes.delete("/users/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.deleteUser
+);
 
-// Bookings Routes
-adminRoutes.get("/bookings", AdminController.getAllBookings);
+// 4. Bookings - Accessible by all roles (scoped)
+adminRoutes.get("/bookings",
+    RBACMiddleware.requireAnyPermission([
+        Permission.VIEW_ALL_BOOKINGS,
+        Permission.VIEW_OWN_BOOKINGS
+    ]),
+    AdminController.getAllBookings
+);
 
-// KYC Management Routes
-adminRoutes.get("/kyc/pending", AdminController.getPendingKYC);
-adminRoutes.put("/kyc/:id/review", AdminController.reviewKYC);
+// 5. KYC Management
+adminRoutes.get("/kyc/pending",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS, // Admin
+        Permission.MANAGE_OWN_SPACES // Partner/Manager (needs refinement later)
+    ]),
+    AdminController.getPendingKYC
+);
+adminRoutes.put("/kyc/:id/review",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    AdminController.reviewKYC
+);
 
-// Ticket Management Routes (from ticket module)
+// 6. Ticket Management Routes (from ticket module)
 adminRoutes.use("/tickets", ticketRoutes);
 
 // Note: The ticket routes from ticketModule already have /admin prefix

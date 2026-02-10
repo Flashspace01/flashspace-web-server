@@ -62,6 +62,107 @@ const testUsers = [
     isDeleted: false,
     refreshTokens: [],
     isTwoFactorEnabled: false
+  },
+  // RBAC Test Users
+  {
+    email: 'admin@flashspace.com',
+    fullName: 'Test Admin',
+    password: 'Admin@123',
+    phoneNumber: '+91-9876543212',
+    authProvider: 'local',
+    role: 'admin',
+    isEmailVerified: true,
+    kycVerified: true,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 100,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  },
+  {
+    email: 'partner@flashspace.com',
+    fullName: 'Test Partner',
+    password: 'Partner@123',
+    phoneNumber: '+91-9876543213',
+    authProvider: 'local',
+    role: 'partner',
+    isEmailVerified: true,
+    kycVerified: true,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 50,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  },
+  {
+    email: 'manager@flashspace.com',
+    fullName: 'Test Space Manager',
+    password: 'Manager@123',
+    phoneNumber: '+91-9876543214',
+    authProvider: 'local',
+    role: 'space_manager',
+    isEmailVerified: true,
+    kycVerified: true,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 25,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  },
+  {
+    email: 'sales@flashspace.com',
+    fullName: 'Test Sales',
+    password: 'Sales@123',
+    phoneNumber: '+91-9876543215',
+    authProvider: 'local',
+    role: 'sales',
+    isEmailVerified: true,
+    kycVerified: false,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 10,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
+  },
+  {
+    email: 'user@flashspace.com',
+    fullName: 'Test User',
+    password: 'User@123',
+    phoneNumber: '+91-9876543216',
+    authProvider: 'local',
+    role: 'user',
+    isEmailVerified: true,
+    kycVerified: false,
+    emailVerificationOTP: '123456',
+    emailVerificationOTPExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
+    emailVerificationOTPAttempts: 0,
+    lastOTPRequestTime: new Date(),
+    otpRequestCount: 1,
+    isActive: true,
+    credits: 0,
+    isDeleted: false,
+    refreshTokens: [],
+    isTwoFactorEnabled: false
   }
 ];
 
@@ -199,7 +300,7 @@ const bookings = [
     createdAt: getRandomPastDate(20),
     updatedAt: getRandomPastDate(20)
   },
-  
+
   // Document 2: Coworking Space
   {
     bookingNumber: generateBookingNumber(),
@@ -263,7 +364,7 @@ const bookings = [
     createdAt: getRandomPastDate(15),
     updatedAt: getRandomPastDate(14)
   },
-  
+
   // Document 3: Meeting Room (pending KYC)
   {
     bookingNumber: generateBookingNumber(),
@@ -319,7 +420,7 @@ const bookings = [
     createdAt: getRandomPastDate(2),
     updatedAt: getRandomPastDate(1)
   },
-  
+
   // Document 4: Virtual Office (pending payment)
   {
     bookingNumber: generateBookingNumber(),
@@ -364,7 +465,7 @@ const bookings = [
     createdAt: new Date(),
     updatedAt: new Date()
   },
-  
+
   // Document 5: Coworking Space (expired)
   {
     bookingNumber: generateBookingNumber(),
@@ -492,17 +593,31 @@ async function seedDatabase() {
 
     const insertedUsers = await UserModel.insertMany(hashedUsers);
     console.log(`✅ ${insertedUsers.length} users inserted!`);
-    
+
     console.log("\n🔑 TEST USER CREDENTIALS:");
     console.log("=".repeat(40));
-    console.log("1. Regular User:");
+    console.log("1. User (Role: User):");
     console.log("   Email: test@example.com");
     console.log("   Password: Test@123");
-    console.log("   Verified: YES (no OTP needed)");
-    console.log("\n2. Admin User:");
+    console.log("\n2. Admin (Role: Admin):");
     console.log("   Email: admin@flashspace.co");
     console.log("   Password: Admin@123");
-    console.log("   Verified: YES (no OTP needed)");
+    console.log("\n3. RBAC Admin (Role: Admin):");
+    console.log("   Email: admin@flashspace.com");
+    console.log("   Password: Admin@123");
+    console.log("\n4. Partner (Role: Partner):");
+    console.log("   Email: partner@flashspace.com");
+    console.log("   Password: Partner@123");
+    console.log("\n5. Space Manager (Role: Space Manager):");
+    console.log("   Email: manager@flashspace.com");
+    console.log("   Password: Manager@123");
+    console.log("\n6. Sales (Role: Sales):");
+    console.log("   Email: sales@flashspace.com");
+    console.log("   Password: Sales@123");
+    console.log("\n7. RBAC User (Role: User):");
+    console.log("   Email: user@flashspace.com");
+    console.log("   Password: User@123");
+    console.log("\n✅ ALL USERS ARE PRE-VERIFIED (No OTP needed)");
 
     // ============ SEED COWORKING SPACES ============
     console.log("\n💼 Seeding coworking spaces...");
@@ -516,20 +631,17 @@ async function seedDatabase() {
 
     // ============ SEED BOOKINGS ============
     console.log("\n📋 Seeding bookings...");
-    
-    // Get user IDs after insertion
-    const regularUser = insertedUsers.find(u => u.email === 'test@example.com');
-    const adminUser = insertedUsers.find(u => u.email === 'admin@flashspace.co');
-    
+
     // Assign user references to bookings and fix spaceSnapshot._id
     const bookingsWithUsers = bookings.map((booking, index) => {
-      // Alternate between regular user and admin user
-      const userRef = index % 2 === 0 ? regularUser?._id : adminUser?._id;
+      // Rotate through all users
+      const userIndex = index % insertedUsers.length;
+      const assignedUser = insertedUsers[userIndex];
       const spaceId = booking.spaceId;
-      
+
       return {
         ...booking,
-        user: userRef,
+        user: assignedUser._id,
         spaceSnapshot: {
           ...booking.spaceSnapshot,
           _id: spaceId
@@ -539,13 +651,14 @@ async function seedDatabase() {
 
     const insertedBookings = await BookingModel.insertMany(bookingsWithUsers);
     console.log(`✅ ${insertedBookings.length} bookings inserted!`);
-    
+
     // Show booking summary
     console.log("\n📊 BOOKING SUMMARY:");
     console.log("=".repeat(40));
     insertedBookings.forEach((booking, index) => {
-      const userEmail = index % 2 === 0 ? 'test@example.com' : 'admin@flashspace.co';
-      console.log(`${index + 1}. ${booking.bookingNumber}: ${booking.type} - ${booking.status} (${userEmail})`);
+      const userIndex = index % insertedUsers.length;
+      const assignedUser = insertedUsers[userIndex];
+      console.log(`${index + 1}. ${booking.bookingNumber}: ${booking.type} - ${booking.status} (${assignedUser.email})`);
     });
 
     // ============ FINAL SUMMARY ============
@@ -556,19 +669,19 @@ async function seedDatabase() {
     console.log(`💼 Coworking Spaces: ${insertedCoworkingSpaces.length}`);
     console.log(`🏢 Virtual Offices: ${insertedVirtualOffices.length}`);
     console.log(`📋 Bookings: ${insertedBookings.length}`);
-    
+
     // Booking status breakdown
     const statusCount: Record<string, number> = {};
     insertedBookings.forEach(booking => {
       statusCount[booking.status] = (statusCount[booking.status] || 0) + 1;
     });
-    
+
     console.log("\n📈 BOOKING STATUS BREAKDOWN:");
     console.log("-".repeat(30));
     Object.entries(statusCount).forEach(([status, count]) => {
       console.log(`  ${status}: ${count}`);
     });
-    
+
     console.log("\n🚀 READY TO TEST:");
     console.log("-".repeat(30));
     console.log("1. Start backend: npm run dev");
@@ -578,7 +691,7 @@ async function seedDatabase() {
 
     await mongoose.disconnect();
     console.log("\n🔌 Disconnected from database.");
-    
+
     process.exit(0);
   } catch (error) {
     console.error("❌ Error seeding database:", error);

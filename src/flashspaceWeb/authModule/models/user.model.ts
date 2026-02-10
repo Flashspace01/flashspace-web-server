@@ -11,6 +11,9 @@ export enum UserRole {
   USER = "user",
   ADMIN = "admin",
   VENDOR = "vendor",
+  PARTNER = "partner",
+  SPACE_MANAGER = "space_manager",
+  SALES = "sales",
 }
 
 @modelOptions({

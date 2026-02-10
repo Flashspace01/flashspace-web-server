@@ -1,0 +1,202 @@
+﻿≡ƒôü Loading environment from: C:\Users\shaws\OneDrive\Desktop\flashspace\flashspace-web-server\.env
+[dotenv@17.2.2] injecting env (16) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+≡ƒîÉ Base URL: http://localhost:5000/api
+
+============================================================
+≡ƒöÉ FLASHSPACE RBAC SECURITY TEST SUITE (FIXED)
+============================================================
+≡ƒîÉ Base URL: http://localhost:5000/api
+============================================================
+
+≡ƒôï Step 1: Logging in test users...
+
+
+≡ƒöº SETUP: Logging in Test Users
+================================
+≡ƒº¬ Login admin user...
+   Attempting login for admin@flashspace.com...
+   ≡ƒì¬ Cookies obtained for admin
+   ≡ƒöæ Token obtained for admin
+   Γ£à admin login successful
+Γ£à Login admin user - PASSED
+≡ƒº¬ Login partner user...
+   Attempting login for partner@flashspace.com...
+   ≡ƒì¬ Cookies obtained for partner
+   ≡ƒöæ Token obtained for partner
+   Γ£à partner login successful
+Γ£à Login partner user - PASSED
+≡ƒº¬ Login spaceManager user...
+   Attempting login for manager@flashspace.com...
+   ≡ƒì¬ Cookies obtained for spaceManager
+   ≡ƒöæ Token obtained for spaceManager
+   Γ£à spaceManager login successful
+Γ£à Login spaceManager user - PASSED
+≡ƒº¬ Login sales user...
+   Attempting login for sales@flashspace.com...
+   ≡ƒì¬ Cookies obtained for sales
+   ≡ƒöæ Token obtained for sales
+   Γ£à sales login successful
+Γ£à Login sales user - PASSED
+≡ƒº¬ Login user user...
+   Attempting login for user@flashspace.com...
+   ≡ƒì¬ Cookies obtained for user
+   ≡ƒöæ Token obtained for user
+   Γ£à user login successful
+Γ£à Login user user - PASSED
+
+Γ£à All test users logged in successfully!
+
+≡ƒôï Step 2: Running security tests...
+
+
+≡ƒöÉ TEST 1: Authentication & Authorization
+=========================================
+≡ƒº¬ Unauthenticated access to dashboard...
+Γ£à Unauthenticated access to dashboard - PASSED (Correctly blocked with 401)
+≡ƒº¬ Invalid cookie access...
+Γ£à Invalid cookie access - PASSED (Correctly blocked with 401)
+≡ƒº¬ User access to own profile...
+Γ£à User access to own profile - PASSED (200)
+
+≡ƒææ TEST 2: Admin Permissions (MANAGE_ALL_USERS, MANAGE_SYSTEM)
+===============================================================
+≡ƒº¬ Admin access to dashboard...
+Γ£à Admin access to dashboard - PASSED (200)
+≡ƒº¬ Admin access to user list...
+Γ£à Admin access to user list - PASSED (200)
+≡ƒº¬ Admin access to all bookings...
+Γ£à Admin access to all bookings - PASSED (200)
+≡ƒº¬ Admin access to pending KYC...
+Γ£à Admin access to pending KYC - PASSED (200)
+
+≡ƒñ¥ TEST 3: Partner Permissions (MANAGE_OWN_SPACES, VIEW_OWN_BOOKINGS)
+======================================================================
+≡ƒº¬ Partner access to dashboard...
+npx : Γ¥î Partner 
+access to dashboard - 
+FAILED: Access 
+denied. Admin role 
+required. (403)
+At line:1 char:1
++ npx ts-node src/scri
+pts/test-rbac-security
+.ts 2>&1 | Out-File 
+-FilePa ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Γ¥î Partne   
+ r acc...required.    
+ (403):String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+≡ƒº¬ Partner blocked from user management...
+Γ£à Partner blocked from user management - PASSED (Correctly blocked with 403)
+≡ƒº¬ Partner access to bookings...
+Γ¥î Partner access to 
+bookings - FAILED: 
+Access denied. Admin 
+role required. (403)
+≡ƒº¬ Partner access to KYC...
+Γ¥î Partner access to 
+KYC - FAILED: Access 
+denied. Admin role 
+required. (403)
+
+≡ƒÅó TEST 4: Space Manager Permissions (MANAGE_OWN_SPACES)
+========================================================
+≡ƒº¬ Space Manager access to dashboard...
+Γ¥î Space Manager 
+access to dashboard - 
+FAILED: Access 
+denied. Admin role 
+required. (403)
+≡ƒº¬ Space Manager blocked from user management...
+Γ£à Space Manager blocked from user management - PASSED (Correctly blocked with 403)
+≡ƒº¬ Space Manager access to bookings...
+
+≡ƒÆ╝ TEST 5: Sales Permissions (VIEW_ALL_SPACES, MANAGE_LEADS)
+============================================================
+≡ƒº¬ Sales access to dashboard...
+Γ¥î Space Manager 
+access to bookings - 
+FAILED: Access 
+denied. Admin role 
+required. (403)
+Γ¥î Sales access to 
+dashboard - FAILED: 
+Access denied. Admin 
+role required. (403)
+≡ƒº¬ Sales blocked from user management...
+Γ£à Sales blocked from user management - PASSED (Correctly blocked with 403)
+≡ƒº¬ Sales access to all bookings...
+Γ¥î Sales access to 
+all bookings - 
+FAILED: Access 
+denied. Admin role 
+required. (403)
+≡ƒº¬ Sales blocked from KYC management...
+Γ£à Sales blocked from KYC management - PASSED (Correctly blocked with 403)
+
+≡ƒæñ TEST 6: Regular User Permissions (No Admin Access)
+=====================================================
+≡ƒº¬ User blocked from admin dashboard...
+Γ£à User blocked from admin dashboard - PASSED (Correctly blocked with 403)
+≡ƒº¬ User blocked from user management...
+Γ£à User blocked from user management - PASSED (Correctly blocked with 403)
+≡ƒº¬ User blocked from admin bookings...
+Γ£à User blocked from admin bookings - PASSED (Correctly blocked with 403)
+≡ƒº¬ User access to own dashboard...
+Γ£à User access to own dashboard - PASSED (200)
+
+≡ƒöÆ TEST 7: Cross-Role Security (Privilege Escalation Prevention)
+=================================================================
+≡ƒº¬ Partner blocked from deleting users...
+Γ£à Partner blocked from deleting users - PASSED (Correctly blocked with 403)
+≡ƒº¬ Sales blocked from KYC review...
+Γ£à Sales blocked from KYC review - PASSED (Correctly blocked with 403)
+≡ƒº¬ Space Manager blocked from user list...
+Γ£à Space Manager blocked from user list - PASSED (Correctly blocked with 403)
+
+============================================================
+≡ƒöÉ RBAC SECURITY TEST REPORT
+============================================================
+Γ£à Tests Passed: 23
+Γ¥î Tests Failed: 7
+≡ƒôê Total Tests: 30
+≡ƒÄ» Success Rate: 77%
+
+≡ƒöÆ SECURITY STATUS:
+----------------------------------------
+Γ¥î INSECURE - Critical security issues detected
+Γ¥î IMMEDIATE ACTION REQUIRED
+
+≡ƒÜ¿ SECURITY VULNERABILITIES DETECTED:
+----------------------------------------
+1. Partner access to dashboard
+   Expected: 2xx, Got: 403
+2. Partner access to bookings
+   Expected: 2xx, Got: 403
+3. Partner access to KYC
+   Expected: 2xx, Got: 403
+4. Space Manager access to dashboard
+   Expected: 2xx, Got: 403
+5. Space Manager access to bookings
+   Expected: 2xx, Got: 403
+6. Sales access to dashboard
+   Expected: 2xx, Got: 403
+7. Sales access to all bookings
+   Expected: 2xx, Got: 403
+
+≡ƒÆí TROUBLESHOOTING GUIDE:
+1. Check if test users have correct roles in database
+2. Verify RBAC middleware is applied to all admin routes
+3. Check backend logs for RBAC debug messages
+4. Ensure permissions.config.ts has correct permissions
+5. Make sure you updated the files as shown in previous instructions
+6. DO NOT DEPLOY TO PRODUCTION until all tests pass
