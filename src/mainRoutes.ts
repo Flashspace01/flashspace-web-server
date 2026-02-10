@@ -9,6 +9,7 @@ import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 import { ticketRoutes } from './flashspaceWeb/ticketModule/routes/ticket.routes';
+import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 
 export const mainRoutes = Router();
 
@@ -16,6 +17,8 @@ export const mainRoutes = Router();
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
+// /api/feeback
+mainRoutes.use("/feedback", feedbackRoutes)
 // /api/spaceProvider
 // mainRoutes.use("/spaceProvider", spaceProviderRoutes);
 // /api/virtualOffice
