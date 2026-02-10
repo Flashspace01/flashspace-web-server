@@ -1,0 +1,84 @@
+﻿============================================================
+   TICKET SYSTEM API TESTS
+   FlashSpace Backend v1.0
+============================================================
+
+--------------------------------------------------
+  AUTHENTICATION
+--------------------------------------------------
+
+1. Testing User Login...
+   POST http://localhost:5000/api/auth/login
+   Γ£à User login successful
+
+2. Testing Admin Login...
+   POST http://localhost:5000/api/auth/login
+   Γ£à Admin login successful
+
+--------------------------------------------------
+  USER ENDPOINTS
+--------------------------------------------------
+
+3. Creating Ticket...
+   POST http://localhost:5000/api/tickets/
+   Γ£à Ticket created: TKT26027609
+
+4. Getting User Tickets...
+   GET http://localhost:5000/api/tickets/my-tickets
+   Γ£à User tickets retrieved: 3
+
+5. Getting Ticket by ID...
+   GET http://localhost:5000/api/tickets/69873146fce9816c0b9991fd
+   Γ£à Ticket retrieved: Test Ticket
+
+6. Replying to Ticket (User)...
+   POST http://localhost:5000/api/tickets/69873146fce9816c0b9991fd/reply
+   Γ£à User reply added successfully
+
+--------------------------------------------------
+  ADMIN ENDPOINTS
+--------------------------------------------------
+
+7. Getting All Tickets (Admin)...
+   GET http://localhost:5000/api/tickets/admin/all
+   Γ£à All tickets retrieved: 3
+
+8. Getting Ticket Stats...
+   GET http://localhost:5000/api/tickets/admin/stats
+   Γ£à Stats retrieved
+      - Total: N/A
+      - Open: N/A
+
+9. Assigning Ticket...
+   POST http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd/assign
+   Γ£à Ticket assigned successfully
+
+10. Adding Admin Reply...
+    POST http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd/reply
+    Γ£à Admin reply added successfully
+
+11. Updating Ticket...
+    PUT http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd
+    Γ£à Ticket updated successfully
+
+12. Escalating Ticket...
+    POST http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd/escalate
+    Γ£à Ticket escalated successfully
+
+13. Resolving Ticket...
+    POST http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd/resolve
+    Γ£à Ticket resolved successfully
+
+14. Closing Ticket...
+    POST http://localhost:5000/api/tickets/admin/69873146fce9816c0b9991fd/close
+    Γ£à Ticket closed successfully
+
+============================================================
+Γ£à ALL TESTS COMPLETED SUCCESSFULLY!
+============================================================
+
+Endpoints Tested:
+  User Endpoints:   4/4 Γ£à
+  Admin Endpoints:  8/8 Γ£à
+  Total:           12/12 Γ£à
+============================================================

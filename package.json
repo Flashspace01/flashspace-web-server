@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
     "test:api": "npx ts-node src/scripts/test-api.ts",
+    "test:tickets": "ts-node src/scripts/test-tickets.js",
     "test:watch": "nodemon --exec 'npm run test:api'",
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
+import { RoleMiddleware } from "../../authModule/middleware/role.middleware";
+import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 
@@ -50,6 +52,19 @@ adminRoutes.delete("/users/:id",
     AdminController.deleteUser
 );
 
+// KYC Management Routes
+adminRoutes.get("/kyc/pending", AdminController.getPendingKYC);
+adminRoutes.put("/kyc/:id/review", AdminController.reviewKYC);
+
+// Ticket Management Routes (from ticket module)
+adminRoutes.use("/tickets", ticketRoutes);
+
+// Note: The ticket routes from ticketModule already have /admin prefix
+// So they will be accessible at:
+// GET /api/admin/tickets/admin/all
+// GET /api/admin/tickets/admin/stats
+// PUT /api/admin/tickets/admin/:ticketId
+// etc.
 // 4. Bookings - Accessible by all roles (scoped)
 adminRoutes.get("/bookings",
     RBACMiddleware.requireAnyPermission([
