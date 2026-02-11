@@ -229,14 +229,13 @@ export class AdminService {
                 isDeleted: false
             };
 
-            // If partner, filter KYC docs by bookingId
-            if (!isAdminOrSales) {
-                query.bookingId = { $in: bookingIds };
+            // If partner, filter KYC docs by linkedBookings
+            if (!isAdminOrSales && bookingIds.length > 0) {
+                query.linkedBookings = { $in: bookingIds };
             }
 
             const kycDocs = await KYCDocumentModel.find(query)
                 .populate('user', 'fullName email phoneNumber')
-                .populate('bookingId') // Populate booking to show which space/plan
                 .sort({ updatedAt: -1 });
 
             return {
