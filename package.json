@@ -7,7 +7,9 @@
     "start": "ts-node-dev --respawn src/app.ts",
     "build": "tsc -p tsconfig.json",
     "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
-    "seed": "ts-node src/scripts/seedData.ts",
+    "seed": "ts-node src/scripts/seedData.ts && ts-node src/scripts/seedSpacePortal.ts",
+    "seed:space-portal": "ts-node src/scripts/seedSpacePortal.ts",
+    "token:space-portal": "ts-node src/scripts/printSpacePortalToken.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
     "test:otp": "ts-node src/scripts/test-otp-system.ts"
