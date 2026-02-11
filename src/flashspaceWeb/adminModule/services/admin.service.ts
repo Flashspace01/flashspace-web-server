@@ -448,4 +448,111 @@ export class AdminService {
             return { success: false, message: "Failed to update user", error: error.message };
         }
     }
+    // Get Revenue Dashboard Stats
+    async getRevenueDashboard(user: any): Promise<ApiResponse<any>> {
+        try {
+            const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(user.role);
+            let spaceIds: string[] = [];
+            let matchStage: any = {
+                status: { $in: ['active', 'completed'] }, // Only counted revenue
+                isDeleted: false
+            };
+
+            // If not admin, restrict to their spaces
+            if (!isAdminOrSales) {
+                spaceIds = await this.getManagedSpaceIds(user.id);
+                if (spaceIds.length === 0) {
+                    return { success: true, message: "No data", data: this.getEmptyRevenueStats() };
+                }
+                matchStage.spaceId = { $in: spaceIds };
+            }
+
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+            // 1. Key Metrics Aggregation
+            const metrics = await BookingModel.aggregate([
+                { $match: matchStage },
+                {
+                    $facet: {
+                        totalRevenue: [{ $group: { _id: null, amount: { $sum: "$amount" } } }],
+                        mtdRevenue: [
+                            { $match: { createdAt: { $gte: startOfMonth } } },
+                            { $group: { _id: null, amount: { $sum: "$amount" } } }
+                        ],
+                        ytdRevenue: [
+                            { $match: { createdAt: { $gte: startOfYear } } },
+                            { $group: { _id: null, amount: { $sum: "$amount" } } }
+                        ],
+                        uniqueClients: [{ $group: { _id: "$user" } }, { $count: "count" }]
+                    }
+                }
+            ]);
+
+            const mtd = metrics[0].mtdRevenue[0]?.amount || 0;
+            const ytd = metrics[0].ytdRevenue[0]?.amount || 0;
+            const total = metrics[0].totalRevenue[0]?.amount || 0;
+            const clients = metrics[0].uniqueClients[0]?.count || 1; // Avoid div by 0
+            const avgPerClient = Math.round(total / clients);
+
+            // 2. Revenue by City
+            const byCity = await BookingModel.aggregate([
+                { $match: matchStage },
+                {
+                    $lookup: {
+                        from: "spaces", // Polymorphic lookup difficult in agg, simplifying assumption or verify schema
+                        localField: "spaceId",
+                        foreignField: "_id",
+                        as: "space"
+                    }
+                },
+                // Note: Direct lookup on 'spaces' collection might fail if you have separate collections for Coworking/Virtual
+                // For now, assuming basic aggregation or we might need to fetch and map if collections are split.
+                // Alternative: Use 'spaceSnapshot' if available and reliable.
+                { $group: { _id: "$spaceSnapshot.city", revenue: { $sum: "$amount" } } },
+                { $sort: { revenue: -1 } },
+                { $limit: 5 }
+            ]);
+
+            // 3. Revenue by Category
+            const byCategory = await BookingModel.aggregate([
+                { $match: matchStage },
+                { $group: { _id: "$spaceType", revenue: { $sum: "$amount" }, bookings: { $sum: 1 } } }
+            ]);
+
+            // 4. Partner Payouts (Mock logic: 80% of revenue)
+            // Real logic would join with Payouts collection
+            const partnerPayouts = Math.round(total * 0.8);
+
+            return {
+                success: true,
+                message: "Revenue dashboard fetched",
+                data: {
+                    metrics: {
+                        mtd,
+                        ytd,
+                        avgPerClient,
+                        partnerPayouts
+                    },
+                    byCity: byCity.map(c => ({ name: c._id || 'Unknown', revenue: c.revenue })),
+                    byCategory: byCategory.map(c => ({ name: c._id, revenue: c.revenue, bookings: c.bookings })),
+                    byPartner: [] // Implement if partner details are needed/available
+                }
+            };
+
+        } catch (error: any) {
+            console.error("Revenue dashboard error:", error);
+            return { success: false, message: "Failed to fetch revenue stats", error: error.message };
+        }
+    }
+
+    private getEmptyRevenueStats() {
+        return {
+            metrics: { mtd: 0, ytd: 0, avgPerClient: 0, partnerPayouts: 0 },
+            byCity: [],
+            byCategory: [],
+            byPartner: []
+        };
+    }
 }

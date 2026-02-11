@@ -23,6 +23,16 @@ adminRoutes.get("/dashboard",
     AdminController.getDashboardStats
 );
 
+// 2.1 Revenue Dashboard
+adminRoutes.get("/revenue/dashboard",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_SPACES,
+        Permission.MANAGE_OWN_SPACES,
+        Permission.VIEW_ALL_SPACES
+    ]),
+    AdminController.getRevenueDashboard
+);
+
 // 3. User Management - Currently Super Admin only
 adminRoutes.get("/users",
     RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
