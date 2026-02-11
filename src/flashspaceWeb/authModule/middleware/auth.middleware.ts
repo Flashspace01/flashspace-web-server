@@ -2,19 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { JwtUtil } from '../utils/jwt.util';
 import { UserRepository } from '../repositories/user.repository';
 import { UserRole } from '../models/user.model';
-
-// Extend Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: string;
-      };
-    }
-  }
-}
+import { AuthUser } from '../types/auth.types';
 
 export class AuthMiddleware {
   private static userRepository = new UserRepository();
@@ -56,10 +44,11 @@ export class AuthMiddleware {
 
         // Attach user info to request
         req.user = {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           role: user.role
-        };
+        } as AuthUser;
 
         next();
       } catch (tokenError) {
@@ -78,6 +67,7 @@ export class AuthMiddleware {
       return;
     }
   }
+
 
   // Optional authentication with auto-refresh - doesn't fail if no token
   // But will try to refresh expired access token using refresh token
@@ -122,6 +112,7 @@ export class AuthMiddleware {
 
               // Attach user to request
               req.user = {
+                _id: user._id.toString(),
                 id: user._id.toString(),
                 email: user.email,
                 role: user.role
@@ -147,6 +138,7 @@ export class AuthMiddleware {
 
         if (user) {
           req.user = {
+            _id: user._id.toString(),
             id: user._id.toString(),
             email: user.email,
             role: user.role
@@ -178,6 +170,7 @@ export class AuthMiddleware {
 
               // Attach user to request
               req.user = {
+                _id: user._id.toString(),
                 id: user._id.toString(),
                 email: user.email,
                 role: user.role
@@ -227,9 +220,6 @@ export class AuthMiddleware {
 
   // Require admin role
   static requireAdmin = AuthMiddleware.requireRole(UserRole.ADMIN);
-
-  // Require vendor role (can access vendor features)
-  static requireVendor = AuthMiddleware.requireRole(UserRole.VENDOR, UserRole.ADMIN);
 
   // Check if user is verified
   static async requireVerifiedEmail(req: Request, res: Response, next: NextFunction): Promise<void> {

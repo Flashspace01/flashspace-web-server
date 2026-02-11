@@ -10,6 +10,7 @@ import {
   updateBusinessInfo,
   uploadKYCDocument,
   deleteKYCDocument,
+  submitKYCForReview,
   linkBookingToProfile,
   getAllInvoices,
   getInvoiceById,
@@ -54,6 +55,7 @@ router.post("/kyc/upload", (req, res, next) => {
   });
 }, uploadKYCDocument);
 router.delete("/kyc/upload", deleteKYCDocument);
+router.post("/kyc/submit", submitKYCForReview);
 
 // ============ INVOICES ============
 router.get("/invoices", getAllInvoices);
