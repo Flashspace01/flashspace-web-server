@@ -23,10 +23,7 @@ export enum Permission {
     VIEW_LEADS = "view_leads",
 
     // System
-    MANAGE_SYSTEM = "manage_system", // CMS, SEO, Commission, etc.
-    
-    // NEW: Dashboard Access (common for all admin roles)
-    VIEW_DASHBOARD = "view_dashboard"
+    MANAGE_SYSTEM = "manage_system" // CMS, SEO, Commission, etc.
 }
 
 export const RolePermissions: Record<UserRole, Permission[]> = {
@@ -39,29 +36,22 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.VIEW_FINANCIALS,
         Permission.MANAGE_LEADS,
         Permission.VIEW_LEADS,
-        Permission.MANAGE_SYSTEM,
-        Permission.VIEW_DASHBOARD
+        Permission.MANAGE_SYSTEM
     ],
     [UserRole.PARTNER]: [
         Permission.MANAGE_OWN_SPACES,
         Permission.VIEW_OWN_BOOKINGS,
         Permission.MANAGE_SPACE_MANAGERS,
-        Permission.VIEW_FINANCIALS, // Only their own, logic handled in service
-        Permission.VIEW_DASHBOARD  // ADDED: Partner needs dashboard access
+        Permission.VIEW_FINANCIALS // Only their own, logic handled in service
     ],
-    [UserRole.SPACE_MANAGER]: [
-        Permission.MANAGE_OWN_SPACES,
-        Permission.VIEW_OWN_BOOKINGS,
-        Permission.VIEW_DASHBOARD  // ADDED: Space Manager needs dashboard access
-    ],
+    
     [UserRole.SALES]: [
         Permission.VIEW_ALL_SPACES, // Read-only
         Permission.VIEW_ALL_BOOKINGS,
         Permission.MANAGE_BOOKINGS, // Can create manual bookings
         Permission.MANAGE_LEADS,
-        Permission.VIEW_LEADS,
-        Permission.VIEW_DASHBOARD  // ADDED: Sales needs dashboard access
+        Permission.VIEW_LEADS
     ],
     [UserRole.USER]: [], // Basic user permissions (booking, etc.) are public/authenticated scope
-    [UserRole.VENDOR]: [] // Legacy role, no special permissions
+
 };

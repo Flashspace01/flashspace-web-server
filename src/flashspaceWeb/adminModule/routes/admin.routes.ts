@@ -4,6 +4,8 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
+import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
+import { Permission } from "../../authModule/config/permissions.config";
 
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
@@ -12,9 +14,13 @@ export const adminRoutes = Router();
 adminRoutes.use(AuthMiddleware.authenticate);
 
 // 2. Dashboard - Accessible by Admins, Partners, Space Managers, Sales
-// Updated to use VIEW_DASHBOARD permission instead of space permissions
+// We check if they have at least one relevant permission to be here
 adminRoutes.get("/dashboard",
-    RBACMiddleware.requirePermission(Permission.VIEW_DASHBOARD),
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_SPACES,
+        Permission.MANAGE_OWN_SPACES,
+        Permission.VIEW_ALL_SPACES
+    ]),
     AdminController.getDashboardStats
 );
 
@@ -23,18 +29,28 @@ adminRoutes.get("/users",
     RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
     AdminController.getUsers
 );
+adminRoutes.post("/users",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.createUser
+);
+adminRoutes.put("/users/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+// Alias for PATCH
+adminRoutes.patch("/users/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+// Alias for explicit update path
+adminRoutes.put("/users/update/:id",
+    RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+    AdminController.updateUser
+);
+
 adminRoutes.delete("/users/:id",
     RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
     AdminController.deleteUser
-);
-
-// 4. Bookings - Accessible by all roles (scoped)
-adminRoutes.get("/bookings",
-    RBACMiddleware.requireAnyPermission([
-        Permission.VIEW_ALL_BOOKINGS,
-        Permission.VIEW_OWN_BOOKINGS
-    ]),
-    AdminController.getAllBookings
 );
 
 // 5. KYC Management

@@ -12,6 +12,8 @@ import { ticketRoutes } from './flashspaceWeb/ticketModule/routes/ticket.routes'
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
+import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
+import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 
 export const mainRoutes = Router();
 
@@ -19,6 +21,8 @@ export const mainRoutes = Router();
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
+// /api/feeback
+mainRoutes.use("/feedback", feedbackRoutes)
 // /api/spaceProvider
 // mainRoutes.use("/spaceProvider", spaceProviderRoutes);
 // /api/virtualOffice
@@ -37,5 +41,9 @@ mainRoutes.use("/admin", adminRoutes);
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
+// /api/coupon
+mainRoutes.use("/coupon", couponRoutes);
+
+
 
 mainRoutes.use('/tickets', ticketRoutes);
