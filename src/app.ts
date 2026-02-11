@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express, { Application } from "express";
+import http from "http"; // Import http module
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -10,16 +11,21 @@ import { mainRoutes } from "./mainRoutes";
 import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
 import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
+import { initSocket } from "./socket"; // Import socket init
 
 const PORT: string | number = process.env.PORT || 5000;
 
 const app: Application = express();
+const server = http.createServer(app); // Create HTTP server
 
 // Initialize email service
 EmailUtil.initialize();
 
 // Initialize Google OAuth
 GoogleUtil.initialize();
+
+// Initialize Socket.IO
+initSocket(server);
 
 // CORS configuration with credentials support (MUST be FIRST) 
 // Updated to fix wildcard CORS issue
@@ -93,7 +99,7 @@ dbConnection()
 
     // Start server with feedback and explicit host binding
     const HOST = process.env.HOST || '0.0.0.0';
-    app
+    server // Listen on server, not app
       .listen(Number(PORT), HOST, () => {
         const hostLabel = HOST === '0.0.0.0' ? 'localhost' : HOST;
         console.log(`API server started at http://${hostLabel}:${PORT}`);
