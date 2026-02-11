@@ -35,7 +35,7 @@ router.get("/bookings/:bookingId", getBookingById);
 router.patch("/bookings/:bookingId/auto-renew", toggleAutoRenew);
 router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
 
-// ============ KYC ============
+
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);
 router.put("/kyc/business-info", updateBusinessInfo);

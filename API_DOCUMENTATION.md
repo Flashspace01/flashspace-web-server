@@ -1,6 +1,140 @@
-# FlashSpace API Documentation
+# FlashSpace Server API Documentation
 
-**Base URL:** `http://localhost:5000/api`
+> Complete API documentation for FlashSpace backend services
+
+**Base URL:** `http://localhost:5000/api`  
+**Production URL:** `https://api.flashspace.com/api`
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ and npm
+- MongoDB 5.0+
+- TypeScript knowledge
+
+### Setup Instructions
+
+1. **Clone and Install**
+   ```bash
+   git clone <repository-url>
+   cd flashspace-web-server
+   npm install
+   ```
+
+2. **Environment Configuration**
+   ```bash
+   cp .env.example .env
+   ```
+   Update `.env` with your configuration:
+   ```env
+   # Server Configuration
+   PORT=5000
+   NODE_ENV=development
+   
+   # Database
+   MONGODB_URI=mongodb://localhost:27017/flashspace
+   
+   # Authentication
+   JWT_SECRET=your_secure_jwt_secret
+   JWT_EXPIRES_IN=7d
+   
+   # Email Services
+   SENDGRID_API_KEY=your_sendgrid_api_key
+   FROM_EMAIL=noreply@flashspace.com
+   
+   # Payment Gateway
+   RAZORPAY_KEY_ID=your_razorpay_key
+   RAZORPAY_SECRET=your_razorpay_secret
+   
+   # Google Services
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
+3. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Verify Installation**
+   ```bash
+   curl http://localhost:5000/api/health
+   ```
+
+## 🏗️ Tech Stack
+
+- **Runtime:** Node.js with TypeScript
+- **Framework:** Express.js
+- **Database:** MongoDB with Mongoose
+- **Authentication:** JWT + Google OAuth
+- **Email:** SendGrid
+- **Payments:** Razorpay
+- **File Upload:** Multer
+- **Security:** Helmet, CORS, bcrypt
+
+## 📁 Project Structure
+
+```
+src/
+├── app.ts                    # Express app configuration
+├── mainRoutes.ts            # Main route definitions
+├── config/
+│   ├── database.ts          # Database connection
+│   ├── email.ts             # Email configuration
+│   └── payment.ts           # Payment gateway setup
+├── flashspaceWeb/
+│   ├── controllers/         # Route handlers
+│   ├── models/             # Database models
+│   ├── routes/             # API routes
+│   ├── middleware/         # Custom middleware
+│   ├── services/           # Business logic
+│   └── validators/         # Input validation
+└── scripts/
+    ├── seedData.ts         # Database seeding
+    └── test-email.ts       # Email testing
+```
+
+## 🔧 Available Scripts
+
+```bash
+# Development
+npm run dev              # Start with auto-reload
+npm start               # Start production server
+npm run build           # Compile TypeScript
+
+# Database
+npm run seed            # Seed initial data
+npm run add:coordinates # Add location coordinates
+
+# Testing
+npm run test:email      # Test email functionality
+npm run test:otp        # Test OTP system
+```
+
+## 🛡️ Authentication & Security
+
+### JWT Token Structure
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "email": "user@example.com",
+  "role": "user|admin|partner",
+  "permissions": ["read", "write"],
+  "iat": 1640995200,
+  "exp": 1641600000
+}
+```
+
+### Headers Required
+```http
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+### Rate Limiting
+- **General API:** 100 requests per 15 minutes
+- **Authentication:** 5 attempts per 15 minutes
+- **File Upload:** 10 uploads per hour
 
 ---
 
@@ -17,6 +151,9 @@
    - [KYC](#63-kyc-verification)
    - [Invoices](#64-invoices)
    - [Support Tickets](#65-support-tickets)
+7. [Error Handling](#7-error-handling)
+8. [Testing](#8-testing)
+9. [Deployment](#9-deployment)
 
 ---
 
@@ -1532,3 +1669,202 @@ Authorization: Bearer <access_token>
   "success": true,
   "message": "Reply sent"
 }
+
+---
+
+## 7. Error Handling
+
+### Standard Error Response Format
+
+`json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human readable error message",
+    "details": "Additional error context",
+    "timestamp": "2026-02-05T10:30:00.000Z",
+    "path": "/api/endpoint"
+  }
+}
+`
+
+### Common Error Codes
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `VALIDATION_ERROR` | 400 | Invalid input data |
+| `AUTHENTICATION_FAILED` | 401 | Invalid credentials |
+| `UNAUTHORIZED` | 401 | Missing or invalid token |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `RESOURCE_NOT_FOUND` | 404 | Resource doesn't exist |
+| `CONFLICT` | 409 | Resource already exists |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+| `INTERNAL_ERROR` | 500 | Server error |
+| `SERVICE_UNAVAILABLE` | 503 | Service temporarily down |
+
+### Error Examples
+
+#### Validation Error
+`json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed",
+    "details": {
+      "field": "email",
+      "value": "invalid-email",
+      "message": "Please provide a valid email address"
+    }
+  }
+}
+`
+
+---
+
+## 8. Testing
+
+### API Testing with cURL
+
+#### Test Authentication
+`bash
+# Sign up
+curl -X POST http://localhost:5000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "fullName": "Test User",
+    "password": "securePassword123",
+    "confirm-password": ""
+  }'
+
+# Sign in  
+curl -X POST http://localhost:5000/api/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "securePassword123"
+  }'
+`
+
+### Testing Scripts
+
+`bash
+# Test email functionality
+npm run test:email
+
+# Test OTP system
+npm run test:otp
+`
+
+---
+
+## 9. Database Models
+
+### User Model
+`typescript
+interface IUser {
+  _id: ObjectId;
+  email: string;
+  fullName: string;
+  phoneNumber?: string;
+  password: string;
+  role: 'user' | 'admin' | 'partner';
+  isEmailVerified: boolean;
+  emailVerificationToken?: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+`
+
+### Booking Model
+`typescript
+interface IBooking {
+  _id: ObjectId;
+  userId: ObjectId;
+  spaceId: ObjectId;
+  bookingType: 'virtual-office' | 'coworking';
+  startDate: Date;
+  endDate: Date;
+  duration: number;
+  totalAmount: number;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  paymentStatus: 'pending' | 'completed' | 'failed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+`
+
+---
+
+## 10. Deployment
+
+### Environment Setup
+
+#### Development
+`env
+NODE_ENV=development
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/flashspace_dev
+JWT_SECRET=dev_secret_key
+`
+
+#### Production
+`env
+NODE_ENV=production
+PORT=5000
+MONGODB_URI=mongodb://prod-cluster/flashspace
+JWT_SECRET=super_secure_production_secret
+`
+
+### Health Check Endpoint
+
+**GET** `/api/health`
+
+`json
+{
+  "success": true,
+  "status": "healthy",
+  "timestamp": "2026-02-05T10:30:00.000Z",
+  "services": {
+    "database": "connected",
+    "email": "operational", 
+    "payment": "operational"
+  },
+  "version": "1.0.0",
+  "uptime": "2h 15m 30s"
+}
+`
+
+---
+
+##  Contributing
+
+### Code Standards
+- Use TypeScript for all new code
+- Follow ESLint configuration
+- Write unit tests for new features
+- Document all API changes
+
+### Pull Request Process
+1. Create feature branch from `develop`
+2. Implement changes with tests
+3. Update API documentation
+4. Submit pull request
+5. Code review by 2+ developers
+
+---
+
+##  Support
+
+For API support:
+- **Issues:** Create GitHub issue
+- **Documentation:** Check `/docs` folder
+- **Emergency:** Contact development team
+
+---
+
+**Happy coding! **
