@@ -33,3 +33,4 @@ src/flashspaceWeb/meetingSchedulerModule/google-tokens.json
 
 seedData.ts
 addCoordinates.ts
+src/scripts/seedData.ts

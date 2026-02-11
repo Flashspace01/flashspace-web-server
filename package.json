@@ -11,6 +11,7 @@
     "test:tickets": "ts-node src/scripts/test-tickets.js",
     "test:watch": "nodemon --exec 'npm run test:api'",
     "test:feedback": "ts-node src/scripts/test-feedback.ts",
+    "test:rbac": "ts-node src/scripts/test-rbac-security.ts",
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",

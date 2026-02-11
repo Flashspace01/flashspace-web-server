@@ -4,8 +4,7 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
-import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
-import { Permission } from "../../authModule/config/permissions.config";
+
 
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();

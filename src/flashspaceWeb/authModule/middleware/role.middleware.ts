@@ -59,20 +59,6 @@ export class RoleMiddleware {
   }
 
   /**
-   * Middleware to require space manager role
-   */
-  static requireSpaceManager(req: Request, res: Response, next: NextFunction) {
-    if (req.user?.role !== UserRole.SPACE_MANAGER) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Space Manager role required.',
-        error: 'Forbidden'
-      });
-    }
-    next();
-  }
-
-  /**
    * Middleware to require sales role
    */
   static requireSales(req: Request, res: Response, next: NextFunction) {
@@ -87,10 +73,10 @@ export class RoleMiddleware {
   }
 
   /**
-   * Middleware to allow admin, partner, or space manager
+   * Middleware to allow admin or partner
    */
   static requireManagementRole(req: Request, res: Response, next: NextFunction) {
-    const allowedRoles = [UserRole.ADMIN, UserRole.PARTNER, UserRole.SPACE_MANAGER];
+    const allowedRoles = [UserRole.ADMIN, UserRole.PARTNER];
     if (!req.user || !allowedRoles.includes(req.user.role as UserRole)) {
       return res.status(403).json({
         success: false,

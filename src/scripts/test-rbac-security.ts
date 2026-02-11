@@ -43,11 +43,6 @@ const TEST_USERS = {
         password: 'Partner@123',
         role: 'partner'
     },
-    spaceManager: {
-        email: 'manager@flashspace.com',
-        password: 'Manager@123',
-        role: 'space_manager'
-    },
     sales: {
         email: 'sales@flashspace.com',
         password: 'Sales@123',
@@ -69,7 +64,7 @@ const api = axios.create({
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     },
-    httpsAgent: new https.Agent({  
+    httpsAgent: new https.Agent({
         rejectUnauthorized: false // For development only
     })
 });
@@ -85,7 +80,6 @@ interface TestResult {
 interface UserTokens {
     admin?: string;
     partner?: string;
-    spaceManager?: string;
     sales?: string;
     user?: string;
 }
@@ -183,7 +177,7 @@ async function loginTestUsers() {
         results.push(await runTest(`Login ${roleName} user`, async () => {
             try {
                 console.log(`   Attempting login for ${userData.email}...`);
-                
+
                 // Login to get cookies
                 const loginResponse = await api.post('/auth/login', {
                     email: userData.email,
@@ -227,18 +221,18 @@ function getConfigForRole(roleName: keyof typeof TEST_USERS) {
     const config: any = {
         withCredentials: true
     };
-    
+
     if (roleCookies && roleCookies.length > 0) {
         // Extract just the cookie values
         const cookieString = roleCookies
             .map(cookie => cookie.split(';')[0]) // Get cookie pair
             .join('; ');
-        
+
         config.headers = {
             Cookie: cookieString
         };
     }
-    
+
     return config;
 }
 
@@ -258,8 +252,8 @@ async function testAuthentication() {
     // Test 1.2: Invalid token should fail
     results.push(await expectUnauthorized('Invalid cookie access', async () => {
         return await api.get('/admin/dashboard', {
-            headers: { 
-                Cookie: 'accessToken=invalid_token_12345' 
+            headers: {
+                Cookie: 'accessToken=invalid_token_12345'
             }
         });
     }));
@@ -343,62 +337,33 @@ async function testPartnerPermissions() {
     return results;
 }
 
-// ============ TEST 4: SPACE MANAGER PERMISSIONS ============
-
-async function testSpaceManagerPermissions() {
-    console.log('\n🏢 TEST 4: Space Manager Permissions (MANAGE_OWN_SPACES)');
-    console.log('========================================================');
-
-    const results: TestResult[] = [];
-
-    // Test 4.1: Space Manager can access dashboard
-    results.push(await expectSuccess('Space Manager access to dashboard', async () => {
-        const config = getConfigForRole('spaceManager');
-        return await api.get('/admin/dashboard', config);
-    }));
-
-    // Test 4.2: Space Manager CANNOT access user management
-    results.push(await expectForbidden('Space Manager blocked from user management', async () => {
-        const config = getConfigForRole('spaceManager');
-        return await api.get('/admin/users', config);
-    }));
-
-    // Test 4.3: Space Manager can access bookings (scoped to assigned spaces)
-    results.push(await expectSuccess('Space Manager access to bookings', async () => {
-        const config = getConfigForRole('spaceManager');
-        return await api.get('/admin/bookings', config);
-    }));
-
-    return results;
-}
-
-// ============ TEST 5: SALES PERMISSIONS ============
+// ============ TEST 4: SALES PERMISSIONS ============
 
 async function testSalesPermissions() {
-    console.log('\n💼 TEST 5: Sales Permissions (VIEW_ALL_SPACES, MANAGE_LEADS)');
+    console.log('\n💼 TEST 4: Sales Permissions (VIEW_ALL_SPACES, MANAGE_LEADS)');
     console.log('============================================================');
 
     const results: TestResult[] = [];
 
-    // Test 5.1: Sales can access dashboard
+    // Test 4.1: Sales can access dashboard
     results.push(await expectSuccess('Sales access to dashboard', async () => {
         const config = getConfigForRole('sales');
         return await api.get('/admin/dashboard', config);
     }));
 
-    // Test 5.2: Sales CANNOT access user management
+    // Test 4.2: Sales CANNOT access user management
     results.push(await expectForbidden('Sales blocked from user management', async () => {
         const config = getConfigForRole('sales');
         return await api.get('/admin/users', config);
     }));
 
-    // Test 5.3: Sales can view all bookings
+    // Test 4.3: Sales can view all bookings
     results.push(await expectSuccess('Sales access to all bookings', async () => {
         const config = getConfigForRole('sales');
         return await api.get('/admin/bookings', config);
     }));
 
-    // Test 5.4: Sales CANNOT access KYC management
+    // Test 4.4: Sales CANNOT access KYC management
     results.push(await expectForbidden('Sales blocked from KYC management', async () => {
         const config = getConfigForRole('sales');
         return await api.get('/admin/kyc/pending', config);
@@ -407,33 +372,33 @@ async function testSalesPermissions() {
     return results;
 }
 
-// ============ TEST 6: REGULAR USER PERMISSIONS ============
+// ============ TEST 5: REGULAR USER PERMISSIONS ============
 
 async function testUserPermissions() {
-    console.log('\n👤 TEST 6: Regular User Permissions (No Admin Access)');
+    console.log('\n👤 TEST 5: Regular User Permissions (No Admin Access)');
     console.log('=====================================================');
 
     const results: TestResult[] = [];
 
-    // Test 6.1: User CANNOT access admin dashboard
+    // Test 5.1: User CANNOT access admin dashboard
     results.push(await expectForbidden('User blocked from admin dashboard', async () => {
         const config = getConfigForRole('user');
         return await api.get('/admin/dashboard', config);
     }));
 
-    // Test 6.2: User CANNOT access user management
+    // Test 5.2: User CANNOT access user management
     results.push(await expectForbidden('User blocked from user management', async () => {
         const config = getConfigForRole('user');
         return await api.get('/admin/users', config);
     }));
 
-    // Test 6.3: User CANNOT access admin bookings
+    // Test 5.3: User CANNOT access admin bookings
     results.push(await expectForbidden('User blocked from admin bookings', async () => {
         const config = getConfigForRole('user');
         return await api.get('/admin/bookings', config);
     }));
 
-    // Test 6.4: User CAN access their own dashboard
+    // Test 5.4: User CAN access their own dashboard
     results.push(await expectSuccess('User access to own dashboard', async () => {
         const config = getConfigForRole('user');
         return await api.get('/user/dashboard', config);
@@ -442,21 +407,21 @@ async function testUserPermissions() {
     return results;
 }
 
-// ============ TEST 7: CROSS-ROLE SECURITY ============
+// ============ TEST 6: CROSS-ROLE SECURITY ============
 
 async function testCrossRoleSecurity() {
-    console.log('\n🔒 TEST 7: Cross-Role Security (Privilege Escalation Prevention)');
+    console.log('\n🔒 TEST 6: Cross-Role Security (Privilege Escalation Prevention)');
     console.log('=================================================================');
 
     const results: TestResult[] = [];
 
-    // Test 7.1: Partner cannot delete users
+    // Test 6.1: Partner cannot delete users
     results.push(await expectForbidden('Partner blocked from deleting users', async () => {
         const config = getConfigForRole('partner');
         return await api.delete('/admin/users/fake-user-id', config);
     }));
 
-    // Test 7.2: Sales cannot modify KYC
+    // Test 6.2: Sales cannot modify KYC
     results.push(await expectForbidden('Sales blocked from KYC review', async () => {
         const config = getConfigForRole('sales');
         return await api.put('/admin/kyc/fake-kyc-id/review', {
@@ -464,9 +429,9 @@ async function testCrossRoleSecurity() {
         }, config);
     }));
 
-    // Test 7.3: Space Manager cannot access user list
-    results.push(await expectForbidden('Space Manager blocked from user list', async () => {
-        const config = getConfigForRole('spaceManager');
+    // Test 6.3: User cannot access admin user list
+    results.push(await expectForbidden('User blocked from admin user list', async () => {
+        const config = getConfigForRole('user');
         return await api.get('/admin/users', config);
     }));
 
@@ -496,7 +461,7 @@ async function main() {
             console.log('\n⚠️  Some users failed to login. Cannot run full test suite.');
             console.log('   Please ensure test users exist with correct passwords.');
             console.log('   Run: npm run setup:users\n');
-            
+
             printSecurityReport(allResults);
             return;
         }
@@ -511,7 +476,6 @@ async function main() {
         allResults.push(...await testAuthentication());
         allResults.push(...await testAdminPermissions());
         allResults.push(...await testPartnerPermissions());
-        allResults.push(...await testSpaceManagerPermissions());
         allResults.push(...await testSalesPermissions());
         allResults.push(...await testUserPermissions());
         allResults.push(...await testCrossRoleSecurity());

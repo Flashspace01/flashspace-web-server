@@ -31,10 +31,6 @@ export class PasswordUtil {
       errors.push('Password must be at least 8 characters long');
     }
 
-    if (password.length > 128) {
-      errors.push('Password must not exceed 128 characters');
-    }
-
     if (!/[a-z]/.test(password)) {
       errors.push('Password must contain at least one lowercase letter');
     }
@@ -43,28 +39,8 @@ export class PasswordUtil {
       errors.push('Password must contain at least one uppercase letter');
     }
 
-    if (!/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
       errors.push('Password must contain at least one special character');
-    }
-
-    // Check for common patterns
-    const commonPatterns = [
-      /123456/,
-      /password/i,
-      /qwerty/i,
-      /admin/i,
-      /abc123/i,
-    ];
-
-    for (const pattern of commonPatterns) {
-      if (pattern.test(password)) {
-        errors.push('Password contains common patterns that are not secure');
-        break;
-      }
     }
 
     return {
@@ -78,7 +54,7 @@ export class PasswordUtil {
     const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
+
     const allChars = lowercase + uppercase + numbers + symbols;
     let password = '';
 

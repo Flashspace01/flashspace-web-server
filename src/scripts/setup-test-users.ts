@@ -48,14 +48,6 @@ async function setupUsers() {
         phoneNumber: '+91-9876543211'
       },
       {
-        email: 'manager@flashspace.com',
-        fullName: 'Test Space Manager',
-        password: 'Manager@123',
-        role: 'space_manager',
-        isEmailVerified: true,
-        phoneNumber: '+91-9876543212'
-      },
-      {
         email: 'sales@flashspace.com',
         fullName: 'Test Sales',
         password: 'Sales@123',
@@ -74,11 +66,11 @@ async function setupUsers() {
     ];
 
     console.log('\n👤 Creating test users...');
-    
+
     for (const user of users) {
       // Check if user already exists
       const existingUser = await User.findOne({ email: user.email });
-      
+
       if (existingUser) {
         // Update existing user
         const hashedPassword = await bcrypt.hash(user.password, 12);
@@ -100,11 +92,11 @@ async function setupUsers() {
     console.log('\n' + '='.repeat(50));
     console.log('🎉 ALL TEST USERS SETUP COMPLETE!');
     console.log('='.repeat(50));
-    
+
     // Display created users
     const allUsers = await User.find({}, 'email role -_id');
     console.log('\n📋 Current Users in Database:');
-    console.log('-' .repeat(40));
+    console.log('-'.repeat(40));
     allUsers.forEach(user => {
       console.log(`${user.email.padEnd(30)} → ${user.role}`);
     });
@@ -114,7 +106,7 @@ async function setupUsers() {
 
     await mongoose.disconnect();
     process.exit(0);
-    
+
   } catch (error) {
     console.error('❌ Error setting up test users:', error);
     process.exit(1);
