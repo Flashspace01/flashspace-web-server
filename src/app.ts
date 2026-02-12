@@ -27,6 +27,7 @@ EmailUtil.initialize();
 // Initialize Google OAuth
 GoogleUtil.initialize();
 
+<<<<<<< HEAD
 // Initialize Socket.IO
 initSocket(server);
 
@@ -43,6 +44,11 @@ const corsOptions = {
 };
 
 const allowedOrigins = [
+=======
+// CORS configuration with credentials support (MUST be FIRST)
+// Avoid wildcard origin when credentials are included
+const allowedOrigins = new Set([
+>>>>>>> cb0547d (Added Test Scripts/Space-Portal)
   'https://flash-space-web-client.vercel.app',
   'https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app',
   'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app',
@@ -55,27 +61,47 @@ const allowedOrigins = [
   'https://www.flashspace.ai',
   'http://72.60.219.115:8080',
   'http://72.60.219.115'
-];
+]);
 
-app.use(cors({
-  ...corsOptions,
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
+const envOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+envOrigins.forEach((origin) => allowedOrigins.add(origin));
+
+const corsOptions = {
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
+    // Allow requests with no origin (like mobile apps or curl) without setting CORS headers
     if (!origin) {
-      return callback(null, true);
+      return callback(null, false);
     }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, origin);
-    } else {
-      console.error('CORS blocked origin:', origin);
-      callback(new Error("CORS not allowed"), false);
+    if (allowedOrigins.has(origin)) {
+      return callback(null, origin);
     }
+
+    console.error('CORS blocked origin:', origin);
+    return callback(new Error("CORS not allowed"), false);
   }
+<<<<<<< HEAD
 }));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
 console.log(process.env.MONGODB_URI)
 
+=======
+};
+
+app.use(cors(corsOptions));
+// Express 5 + path-to-regexp: avoid "*" string, use regex for catch-all
+app.options(/.*/, cors(corsOptions));
+console.log(`CORS enabled for allowed origins: ${Array.from(allowedOrigins).join(', ')}`);
+>>>>>>> cb0547d (Added Test Scripts/Space-Portal)
 
 // Middleware
 app.use(express.json());
@@ -119,6 +145,14 @@ dbConnection()
 // Serve uploaded files statically
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Health check
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Main API routes
 app.use("/api", mainRoutes);
