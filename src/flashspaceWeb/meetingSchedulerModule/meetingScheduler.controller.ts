@@ -185,7 +185,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
 
 export const getMeetingDetails = async (req: Request, res: Response) => {
   try {
-    const { meetingId } = req.params;
+    const meetingId = req.params.meetingId as string;
 
     if (!Types.ObjectId.isValid(meetingId)) {
       return res.status(400).json({

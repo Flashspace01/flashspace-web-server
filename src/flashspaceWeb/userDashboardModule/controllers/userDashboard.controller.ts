@@ -141,7 +141,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
 export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
   try {
-    const { spaceId } = req.params;
+    const spaceId = req.params.spaceId as string;
     const { month, year } = req.query;
     console.log("spaceId", spaceId);
     if (!spaceId || !mongoose.Types.ObjectId.isValid(spaceId)) {
@@ -401,7 +401,7 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
 export const linkBookingToProfile = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId as string;
     const { profileId } = req.body;
 
     if (!profileId) {
