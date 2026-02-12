@@ -15,7 +15,8 @@
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
-    "test:otp": "ts-node src/scripts/test-otp-system.ts"
+    "test:otp": "ts-node src/scripts/test-otp-system.ts",
+    "create:user": "ts-node src/scripts/create-user-interactive.ts"
   },
   "repository": {
     "type": "git",
