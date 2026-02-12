@@ -30,7 +30,7 @@
   "homepage": "https://github.com/adarshXpal/flashspace-server#readme",
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
-    "@typegoose/typegoose": "^12.19.0",
+    "@typegoose/typegoose": "^12.21.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/jsonwebtoken": "^9.0.10",

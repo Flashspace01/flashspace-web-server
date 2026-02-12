@@ -96,11 +96,14 @@ export class KYCDocument {
   @prop({ enum: ["individual", "business"], default: "individual" })
   kycType?: string;
 
+  @prop({ default: false })
+  isPartner?: boolean; // True if this is a partner profile (individual with different name)
+
   @prop({ type: () => [KYCDocumentItem], default: [] })
   documents?: KYCDocumentItem[];
 
   @prop({
-    enum: ["not_started", "pending", "approved", "rejected", "resubmit"],
+    enum: ["not_started", "in_progress", "pending", "approved", "rejected", "resubmit"],
     default: "not_started",
   })
   overallStatus?: string;
