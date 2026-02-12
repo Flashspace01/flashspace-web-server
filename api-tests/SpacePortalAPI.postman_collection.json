@@ -1,0 +1,869 @@
+{
+  "info": {
+    "name": "Space Portal API",
+    "description": "Complete Space Portal API Collection (/api/spaceportal). Auth required on all routes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "authToken", "value": "" },
+
+    { "key": "spaceId", "value": "" },
+    { "key": "clientId", "value": "" },
+    { "key": "enquiryId", "value": "" },
+    { "key": "ticketId", "value": "" },
+    { "key": "bookingId", "value": "" },
+    { "key": "requestId", "value": "" },
+    { "key": "invoiceId", "value": "" },
+    { "key": "notificationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Spaces",
+      "item": [
+        {
+          "name": "Create Space",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"FlashSpace Delhi\",\n  \"city\": \"Delhi\",\n  \"location\": \"Connaught Place\",\n  \"totalSeats\": 100,\n  \"availableSeats\": 80,\n  \"meetingRooms\": 5,\n  \"cabins\": 10,\n  \"status\": \"ACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const res = pm.response.json();",
+                  "pm.test('Envelope success true', function () {",
+                  "    pm.expect(res.success).to.eql(true);",
+                  "});",
+                  "",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('spaceId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Spaces (List)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces?page=1&limit=10&includeDeleted=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "includeDeleted", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Space By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces/{{spaceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces", "{{spaceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Space",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces/{{spaceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces", "{{spaceId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availableSeats\": 70,\n  \"status\": \"MAINTENANCE\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Space",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces/{{spaceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces", "{{spaceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Space",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/spaces/{{spaceId}}?restore=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "spaces", "{{spaceId}}"],
+              "query": [{ "key": "restore", "value": "true" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"WebBerry Pvt Ltd\",\n  \"contactName\": \"Premjeet Vivek\",\n  \"email\": \"premjeet@example.com\",\n  \"phone\": \"9999999999\",\n  \"plan\": \"Virtual Office Premium\",\n  \"space\": \"{{spaceId}}\",\n  \"startDate\": \"2026-02-01\",\n  \"endDate\": \"2026-05-01\",\n  \"status\": \"ACTIVE\",\n  \"kycStatus\": \"PENDING\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('clientId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Clients (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients?page=1&limit=10&includeDeleted=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "includeDeleted", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Client By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients", "{{clientId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Client Details",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients/{{clientId}}/details",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients", "{{clientId}}", "details"]
+            }
+          }
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients", "{{clientId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"EXPIRING_SOON\",\n  \"kycStatus\": \"VERIFIED\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Client",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients", "{{clientId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Client",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/clients/{{clientId}}?restore=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "clients", "{{clientId}}"],
+              "query": [{ "key": "restore", "value": "true" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Enquiries",
+      "item": [
+        {
+          "name": "Create Enquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"Rahul\",\n  \"companyName\": \"Rahul Traders\",\n  \"phone\": \"8888888888\",\n  \"email\": \"rahul@example.com\",\n  \"requestedPlan\": \"Team Space\",\n  \"requestedSpace\": \"{{spaceId}}\",\n  \"status\": \"NEW\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('enquiryId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Enquiries (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries?page=1&limit=10&includeDeleted=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "includeDeleted", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Enquiry By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries/{{enquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries", "{{enquiryId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Enquiry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries/{{enquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries", "{{enquiryId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"7777777777\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Enquiry Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries/{{enquiryId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries", "{{enquiryId}}", "status"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Enquiry",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries/{{enquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries", "{{enquiryId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Enquiry",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/enquiries/{{enquiryId}}?restore=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "enquiries", "{{enquiryId}}"],
+              "query": [{ "key": "restore", "value": "true" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Tickets",
+      "item": [
+        {
+          "name": "Get Tickets (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/tickets?page=1&limit=10&includeDeleted=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "tickets"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "includeDeleted", "value": "false" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data.tickets && res.data.tickets.length > 0){",
+                  "    pm.collectionVariables.set('ticketId', res.data.tickets[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Ticket By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "tickets", "{{ticketId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "tickets", "{{ticketId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\",\n  \"priority\": \"high\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "bookings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"WebBerry Pvt Ltd\",\n  \"space\": \"{{spaceId}}\",\n  \"startTime\": \"2026-02-12T10:00:00.000Z\",\n  \"endTime\": \"2026-02-12T12:00:00.000Z\",\n  \"status\": \"CONFIRMED\",\n  \"planName\": \"Hot Desk Monthly\",\n  \"amount\": 2000\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('bookingId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Bookings (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/bookings?spaceId={{spaceId}}&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "bookings"],
+              "query": [
+                { "key": "spaceId", "value": "{{spaceId}}" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Booking Requests (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/bookings/requests?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "bookings", "requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data.requests && res.data.requests.length > 0){",
+                  "    pm.collectionVariables.set('requestId', res.data.requests[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Booking Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/bookings/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "bookings", "requests"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientName\": \"Aman\",\n  \"space\": \"{{spaceId}}\",\n  \"requestedDate\": \"2026-02-20\",\n  \"requestedTime\": \"10:00 AM\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('requestId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Booking Request Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/bookings/requests/{{requestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "bookings", "requests", "{{requestId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Get Invoices (List)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/invoices?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "invoices"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data.invoices && res.data.invoices.length > 0){",
+                  "    pm.collectionVariables.set('invoiceId', res.data.invoices[0]._id || res.data.invoices[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Invoice By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/invoices/{{invoiceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "invoices", "{{invoiceId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "invoices"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceNumber\": \"INV-{{$timestamp}}\",\n  \"bookingNumber\": \"BK-1001\",\n  \"description\": \"Workspace booking invoice\",\n  \"subtotal\": 2000,\n  \"taxRate\": 18,\n  \"taxAmount\": 360,\n  \"total\": 2360,\n  \"dueDate\": \"2026-03-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data._id){",
+                  "    pm.collectionVariables.set('invoiceId', res.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/notifications?page=1&limit=10&unreadOnly=false",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "notifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "unreadOnly", "value": "false" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if(res.data && res.data.notifications && res.data.notifications.length > 0){",
+                  "    pm.collectionVariables.set('notificationId', res.data.notifications[0]._id || res.data.notifications[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification Read/Unread",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "notifications", "{{notificationId}}", "read"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"read\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "notifications", "{{notificationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Notification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/notifications/{{notificationId}}/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "notifications", "{{notificationId}}", "restore"]
+            }
+          }
+        },
+        {
+          "name": "Clear Notifications",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/notifications/clear",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "notifications", "clear"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Settings (Notification Preferences)",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "settings"]
+            }
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "settings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emailUpdates\": true,\n  \"bookingAlerts\": true,\n  \"smsAlerts\": false\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "profile"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"FlashSpace\",\n  \"location\": \"Delhi\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Booking Analytics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaceportal/analytics/booking",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "spaceportal", "analytics", "booking"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

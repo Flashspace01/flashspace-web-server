@@ -81,7 +81,7 @@ async function seedSpacePortal() {
 
     const hashedPassword = await PasswordUtil.hash(SEED_PASSWORD);
 
-    const [adminUser, supportUser] = await Promise.all([
+    const [adminUser, supportUser, partnerUser] = await Promise.all([
       UserModel.findOneAndUpdate(
         { email: "spaceportal.admin@flashspace.ai" },
         {
@@ -116,9 +116,26 @@ async function seedSpacePortal() {
         },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       ),
+      UserModel.findOneAndUpdate(
+        { email: "spaceportal.partner@flashspace.ai" },
+        {
+          $set: {
+            email: "spaceportal.partner@flashspace.ai",
+            fullName: "Space Portal Partner",
+            phoneNumber: "+1-206-555-0199",
+            password: hashedPassword,
+            authProvider: AuthProvider.LOCAL,
+            role: UserRole.VENDOR,
+            isEmailVerified: true,
+            isActive: true,
+            isDeleted: false,
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ),
     ]);
 
-    if (!adminUser || !supportUser) {
+    if (!adminUser || !supportUser || !partnerUser) {
       throw new Error("Failed to upsert seed users");
     }
 
@@ -152,6 +169,46 @@ async function seedSpacePortal() {
         meetingRooms: 3,
         cabins: 6,
         status: SpacePortalSpaceStatus.MAINTENANCE,
+      },
+      {
+        name: "Brooklyn Bridge Studio",
+        city: "New York",
+        location: "DUMBO, Brooklyn",
+        totalSeats: 140,
+        availableSeats: 36,
+        meetingRooms: 8,
+        cabins: 14,
+        status: SpacePortalSpaceStatus.ACTIVE,
+      },
+      {
+        name: "Denver Peak Hub",
+        city: "Denver",
+        location: "RiNo Art District",
+        totalSeats: 70,
+        availableSeats: 20,
+        meetingRooms: 5,
+        cabins: 7,
+        status: SpacePortalSpaceStatus.ACTIVE,
+      },
+      {
+        name: "Miami Bayfront Suites",
+        city: "Miami",
+        location: "Brickell Ave",
+        totalSeats: 90,
+        availableSeats: 0,
+        meetingRooms: 5,
+        cabins: 10,
+        status: SpacePortalSpaceStatus.INACTIVE,
+      },
+      {
+        name: "Seattle Sound Loft",
+        city: "Seattle",
+        location: "Pike/Pine Corridor",
+        totalSeats: 55,
+        availableSeats: 9,
+        meetingRooms: 3,
+        cabins: 5,
+        status: SpacePortalSpaceStatus.ACTIVE,
       },
     ];
 
@@ -195,6 +252,78 @@ async function seedSpacePortal() {
         startDate: daysAgo(180),
         endDate: daysAgo(5),
         status: ClientStatus.INACTIVE,
+        kycStatus: KycStatus.VERIFIED,
+      },
+      {
+        companyName: "BluePeak Ventures",
+        contactName: "Ava Thompson",
+        email: "ava@bluepeakvc.com",
+        phone: "+1-212-555-0140",
+        plan: ClientPlan.VIRTUAL_OFFICE_STANDARD,
+        space: "Brooklyn Bridge Studio",
+        startDate: daysAgo(25),
+        endDate: daysFromNow(180),
+        status: ClientStatus.ACTIVE,
+        kycStatus: KycStatus.VERIFIED,
+      },
+      {
+        companyName: "Orion HealthTech",
+        contactName: "Maya Gupta",
+        email: "maya@orionhealthtech.com",
+        phone: "+1-303-555-0122",
+        plan: ClientPlan.TEAM_SPACE,
+        space: "Denver Peak Hub",
+        startDate: daysAgo(10),
+        endDate: daysFromNow(355),
+        status: ClientStatus.ACTIVE,
+        kycStatus: KycStatus.VERIFIED,
+      },
+      {
+        companyName: "Sunset Commerce",
+        contactName: "Ethan Brooks",
+        email: "ethan@sunsetcommerce.com",
+        phone: "+1-305-555-0170",
+        plan: ClientPlan.VIRTUAL_OFFICE_PREMIUM,
+        space: "Miami Bayfront Suites",
+        startDate: daysAgo(120),
+        endDate: daysFromNow(30),
+        status: ClientStatus.EXPIRING_SOON,
+        kycStatus: KycStatus.PENDING,
+      },
+      {
+        companyName: "Aurora FinOps",
+        contactName: "Lila Patel",
+        email: "lila@aurorafinops.com",
+        phone: "+1-206-555-0136",
+        plan: ClientPlan.HOT_DESK_MONTHLY,
+        space: "Seattle Sound Loft",
+        startDate: daysAgo(5),
+        endDate: daysFromNow(25),
+        status: ClientStatus.ACTIVE,
+        kycStatus: KycStatus.PENDING,
+      },
+      {
+        companyName: "Summit Robotics",
+        contactName: "Noah Kim",
+        email: "noah@summitrobotics.com",
+        phone: "+1-512-555-0119",
+        plan: ClientPlan.TEAM_SPACE,
+        space: "Austin Central Labs",
+        startDate: daysAgo(210),
+        endDate: daysAgo(30),
+        status: ClientStatus.INACTIVE,
+        kycStatus: KycStatus.VERIFIED,
+      },
+      {
+        companyName: "Pulse Creative",
+        contactName: "Emma Johnson",
+        email: "emma@pulsecreative.com",
+        phone: "+1-415-555-0191",
+        plan: ClientPlan.VIRTUAL_OFFICE_STANDARD,
+        space: "Harbor Point Workspace",
+        startDate: daysAgo(15),
+        endDate: daysFromNow(75),
+        status: ClientStatus.ACTIVE,
         kycStatus: KycStatus.VERIFIED,
       },
     ];
@@ -246,6 +375,77 @@ async function seedSpacePortal() {
           },
         ],
       },
+      {
+        company: "BluePeak Ventures",
+        status: ClientKycStatus.VERIFIED,
+        documents: [
+          {
+            type: ClientKycDocumentType.PAN,
+            fileUrl: "https://example.com/kyc/bluepeak-pan.pdf",
+            uploadedAt: daysAgo(20),
+          },
+          {
+            type: ClientKycDocumentType.GST,
+            fileUrl: "https://example.com/kyc/bluepeak-gst.pdf",
+            uploadedAt: daysAgo(18),
+          },
+        ],
+      },
+      {
+        company: "Orion HealthTech",
+        status: ClientKycStatus.VERIFIED,
+        documents: [
+          {
+            type: ClientKycDocumentType.AADHAR,
+            fileUrl: "https://example.com/kyc/orion-aadhar.pdf",
+            uploadedAt: daysAgo(8),
+          },
+        ],
+      },
+      {
+        company: "Sunset Commerce",
+        status: ClientKycStatus.PENDING,
+        documents: [
+          {
+            type: ClientKycDocumentType.PAN,
+            fileUrl: "https://example.com/kyc/sunset-pan.pdf",
+            uploadedAt: daysAgo(12),
+          },
+        ],
+      },
+      {
+        company: "Aurora FinOps",
+        status: ClientKycStatus.PENDING,
+        documents: [
+          {
+            type: ClientKycDocumentType.GST,
+            fileUrl: "https://example.com/kyc/aurora-gst.pdf",
+            uploadedAt: daysAgo(3),
+          },
+        ],
+      },
+      {
+        company: "Summit Robotics",
+        status: ClientKycStatus.VERIFIED,
+        documents: [
+          {
+            type: ClientKycDocumentType.PAN,
+            fileUrl: "https://example.com/kyc/summit-pan.pdf",
+            uploadedAt: daysAgo(190),
+          },
+        ],
+      },
+      {
+        company: "Pulse Creative",
+        status: ClientKycStatus.VERIFIED,
+        documents: [
+          {
+            type: ClientKycDocumentType.GST,
+            fileUrl: "https://example.com/kyc/pulse-gst.pdf",
+            uploadedAt: daysAgo(12),
+          },
+        ],
+      },
     ];
 
     await SpacePortalClientKycModel.deleteMany({
@@ -285,6 +485,44 @@ async function seedSpacePortal() {
         agreementUrl: "https://example.com/agreements/greenleaf.pdf",
         signedAt: daysAgo(170),
         validTill: daysAgo(10),
+      },
+      {
+        company: "BluePeak Ventures",
+        status: ClientAgreementStatus.SIGNED,
+        agreementUrl: "https://example.com/agreements/bluepeak.pdf",
+        signedAt: daysAgo(22),
+        validTill: daysFromNow(180),
+      },
+      {
+        company: "Orion HealthTech",
+        status: ClientAgreementStatus.SIGNED,
+        agreementUrl: "https://example.com/agreements/orion.pdf",
+        signedAt: daysAgo(9),
+        validTill: daysFromNow(365),
+      },
+      {
+        company: "Sunset Commerce",
+        status: ClientAgreementStatus.PENDING,
+        agreementUrl: "https://example.com/agreements/sunset.pdf",
+      },
+      {
+        company: "Aurora FinOps",
+        status: ClientAgreementStatus.PENDING,
+        agreementUrl: "https://example.com/agreements/aurora.pdf",
+      },
+      {
+        company: "Summit Robotics",
+        status: ClientAgreementStatus.EXPIRED,
+        agreementUrl: "https://example.com/agreements/summit.pdf",
+        signedAt: daysAgo(205),
+        validTill: daysAgo(35),
+      },
+      {
+        company: "Pulse Creative",
+        status: ClientAgreementStatus.SIGNED,
+        agreementUrl: "https://example.com/agreements/pulse.pdf",
+        signedAt: daysAgo(14),
+        validTill: daysFromNow(80),
       },
     ];
 
@@ -336,6 +574,48 @@ async function seedSpacePortal() {
         status: ClientBookingStatus.CANCELLED,
         amount: 120,
       },
+      {
+        company: "BluePeak Ventures",
+        date: daysAgo(7),
+        slot: "13:00-16:00",
+        status: ClientBookingStatus.CONFIRMED,
+        amount: 520,
+      },
+      {
+        company: "Orion HealthTech",
+        date: daysFromNow(9),
+        slot: "09:00-11:00",
+        status: ClientBookingStatus.PENDING,
+        amount: 680,
+      },
+      {
+        company: "Sunset Commerce",
+        date: daysFromNow(3),
+        slot: "16:00-18:00",
+        status: ClientBookingStatus.CONFIRMED,
+        amount: 410,
+      },
+      {
+        company: "Aurora FinOps",
+        date: daysAgo(1),
+        slot: "10:00-12:00",
+        status: ClientBookingStatus.CONFIRMED,
+        amount: 220,
+      },
+      {
+        company: "Summit Robotics",
+        date: daysAgo(70),
+        slot: "14:00-16:00",
+        status: ClientBookingStatus.CANCELLED,
+        amount: 300,
+      },
+      {
+        company: "Pulse Creative",
+        date: daysFromNow(6),
+        slot: "11:00-13:00",
+        status: ClientBookingStatus.PENDING,
+        amount: 280,
+      },
     ];
 
     await SpacePortalClientBookingModel.deleteMany({
@@ -382,6 +662,54 @@ async function seedSpacePortal() {
         pdfUrl: "https://example.com/invoices/spc-inv-0003.pdf",
         createdAt: daysAgo(50),
       },
+      {
+        company: "BluePeak Ventures",
+        invoiceNumber: "SPC-INV-0004",
+        amount: 2200,
+        status: ClientInvoiceStatus.PAID,
+        pdfUrl: "https://example.com/invoices/spc-inv-0004.pdf",
+        createdAt: daysAgo(12),
+      },
+      {
+        company: "Orion HealthTech",
+        invoiceNumber: "SPC-INV-0005",
+        amount: 5400,
+        status: ClientInvoiceStatus.PAID,
+        pdfUrl: "https://example.com/invoices/spc-inv-0005.pdf",
+        createdAt: daysAgo(6),
+      },
+      {
+        company: "Sunset Commerce",
+        invoiceNumber: "SPC-INV-0006",
+        amount: 1500,
+        status: ClientInvoiceStatus.PENDING,
+        pdfUrl: "https://example.com/invoices/spc-inv-0006.pdf",
+        createdAt: daysAgo(3),
+      },
+      {
+        company: "Aurora FinOps",
+        invoiceNumber: "SPC-INV-0007",
+        amount: 650,
+        status: ClientInvoiceStatus.PAID,
+        pdfUrl: "https://example.com/invoices/spc-inv-0007.pdf",
+        createdAt: daysAgo(2),
+      },
+      {
+        company: "Summit Robotics",
+        invoiceNumber: "SPC-INV-0008",
+        amount: 900,
+        status: ClientInvoiceStatus.OVERDUE,
+        pdfUrl: "https://example.com/invoices/spc-inv-0008.pdf",
+        createdAt: daysAgo(80),
+      },
+      {
+        company: "Pulse Creative",
+        invoiceNumber: "SPC-INV-0009",
+        amount: 1100,
+        status: ClientInvoiceStatus.PENDING,
+        pdfUrl: "https://example.com/invoices/spc-inv-0009.pdf",
+        createdAt: daysAgo(8),
+      },
     ];
 
     await SpacePortalClientInvoiceModel.deleteMany({
@@ -425,6 +753,27 @@ async function seedSpacePortal() {
         requestedDate: daysAgo(2),
         requestedTime: "09:00-10:00",
         status: BookingRequestStatus.DECLINED,
+      },
+      {
+        clientName: "BluePeak Ventures",
+        space: "Brooklyn Bridge Studio",
+        requestedDate: daysFromNow(5),
+        requestedTime: "11:00-13:00",
+        status: BookingRequestStatus.APPROVED,
+      },
+      {
+        clientName: "Aurora FinOps",
+        space: "Seattle Sound Loft",
+        requestedDate: daysFromNow(9),
+        requestedTime: "16:00-18:00",
+        status: BookingRequestStatus.PENDING,
+      },
+      {
+        clientName: "Sunset Commerce",
+        space: "Miami Bayfront Suites",
+        requestedDate: daysFromNow(3),
+        requestedTime: "10:00-11:00",
+        status: BookingRequestStatus.PENDING,
       },
     ];
 
@@ -486,6 +835,46 @@ async function seedSpacePortal() {
         status: CalendarBookingStatus.CONFIRMED,
         createdAt: daysAgo(75),
       },
+      {
+        clientName: "BluePeak Ventures",
+        space: "Brooklyn Bridge Studio",
+        startTime: withTime(daysFromNow(2), 9),
+        endTime: addHours(withTime(daysFromNow(2), 9), 3),
+        planName: "Virtual Office Standard",
+        amount: 420,
+        status: CalendarBookingStatus.CONFIRMED,
+        createdAt: daysAgo(1),
+      },
+      {
+        clientName: "Orion HealthTech",
+        space: "Denver Peak Hub",
+        startTime: withTime(daysFromNow(6), 13),
+        endTime: addHours(withTime(daysFromNow(6), 13), 2),
+        planName: "Team Space",
+        amount: 780,
+        status: CalendarBookingStatus.PENDING,
+        createdAt: daysAgo(1),
+      },
+      {
+        clientName: "Sunset Commerce",
+        space: "Miami Bayfront Suites",
+        startTime: withTime(daysAgo(6), 15),
+        endTime: addHours(withTime(daysAgo(6), 15), 2),
+        planName: "Virtual Office Premium",
+        amount: 350,
+        status: CalendarBookingStatus.CANCELLED,
+        createdAt: daysAgo(6),
+      },
+      {
+        clientName: "Aurora FinOps",
+        space: "Seattle Sound Loft",
+        startTime: withTime(daysFromNow(1), 11),
+        endTime: addHours(withTime(daysFromNow(1), 11), 2),
+        planName: "Hot Desk Monthly",
+        amount: 180,
+        status: CalendarBookingStatus.CONFIRMED,
+        createdAt: daysAgo(1),
+      },
     ];
 
     await SpacePortalCalendarBookingModel.deleteMany({
@@ -522,6 +911,42 @@ async function seedSpacePortal() {
         requestedSpace: "Austin Central Labs",
         status: EnquiryStatus.CONVERTED,
       },
+      {
+        clientName: "Liam Carter",
+        companyName: "Carter Consulting",
+        phone: "+1-212-555-0164",
+        email: "liam@carterconsulting.com",
+        requestedPlan: "Virtual Office Standard",
+        requestedSpace: "Brooklyn Bridge Studio",
+        status: EnquiryStatus.NEW,
+      },
+      {
+        clientName: "Isabella Martinez",
+        companyName: "Sunset Commerce",
+        phone: "+1-305-555-0134",
+        email: "isabella@sunsetcommerce.com",
+        requestedPlan: "Virtual Office Premium",
+        requestedSpace: "Miami Bayfront Suites",
+        status: EnquiryStatus.IN_PROGRESS,
+      },
+      {
+        clientName: "Oliver Reed",
+        companyName: "Peak Labs",
+        phone: "+1-303-555-0195",
+        email: "oliver@peaklabs.com",
+        requestedPlan: "Team Space",
+        requestedSpace: "Denver Peak Hub",
+        status: EnquiryStatus.NEW,
+      },
+      {
+        clientName: "Zoe Williams",
+        companyName: "Aurora FinOps",
+        phone: "+1-206-555-0152",
+        email: "zoe@aurorafinops.com",
+        requestedPlan: "Hot Desk Monthly",
+        requestedSpace: "Seattle Sound Loft",
+        status: EnquiryStatus.CONVERTED,
+      },
     ];
 
     await SpacePortalEnquiryModel.deleteMany({
@@ -529,7 +954,9 @@ async function seedSpacePortal() {
     });
     const insertedEnquiries = await SpacePortalEnquiryModel.insertMany(enquiries);
 
-    await SpacePortalNotificationModel.deleteMany({ user: adminUser._id });
+    await SpacePortalNotificationModel.deleteMany({
+      user: { $in: [adminUser._id, partnerUser._id] },
+    });
     const notifications = [
       {
         user: adminUser._id,
@@ -559,13 +986,49 @@ async function seedSpacePortal() {
         href: "/spaceportal/clients",
         isNew: true,
       },
+      {
+        user: adminUser._id,
+        title: "New enquiry received",
+        description: "Carter Consulting asked about Virtual Office Standard.",
+        time: "4d ago",
+        read: false,
+        href: "/spaceportal/enquiries",
+        isNew: true,
+      },
+      {
+        user: partnerUser._id,
+        title: "Partner space occupancy",
+        description: "Seattle Sound Loft is at 84% occupancy this week.",
+        time: "6h ago",
+        read: false,
+        href: "/spaceportal/spaces",
+        isNew: true,
+      },
+      {
+        user: partnerUser._id,
+        title: "Upcoming booking",
+        description: "Aurora FinOps booked a Hot Desk slot for tomorrow.",
+        time: "1d ago",
+        read: true,
+        href: "/spaceportal/calendar",
+        isNew: false,
+      },
+      {
+        user: partnerUser._id,
+        title: "Invoice overdue",
+        description: "SPC-INV-0008 is overdue for Summit Robotics.",
+        time: "5d ago",
+        read: false,
+        href: "/spaceportal/invoices",
+        isNew: true,
+      },
     ];
     const insertedNotifications = await SpacePortalNotificationModel.insertMany(
       notifications
     );
 
-    const notificationPreferences =
-      await SpacePortalNotificationPreferenceModel.findOneAndUpdate(
+    const notificationPreferences = await Promise.all([
+      SpacePortalNotificationPreferenceModel.findOneAndUpdate(
         { user: adminUser._id },
         {
           $set: {
@@ -576,19 +1039,45 @@ async function seedSpacePortal() {
           },
         },
         { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-
-    const profile = await SpacePortalProfileModel.findOneAndUpdate(
-      { user: adminUser._id },
-      {
-        $set: {
-          user: adminUser._id,
-          company: "Flashspace Ops",
-          location: "San Francisco, CA",
+      ),
+      SpacePortalNotificationPreferenceModel.findOneAndUpdate(
+        { user: partnerUser._id },
+        {
+          $set: {
+            user: partnerUser._id,
+            emailUpdates: true,
+            bookingAlerts: true,
+            smsAlerts: true,
+          },
         },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ),
+    ]);
+
+    const profiles = await Promise.all([
+      SpacePortalProfileModel.findOneAndUpdate(
+        { user: adminUser._id },
+        {
+          $set: {
+            user: adminUser._id,
+            company: "Flashspace Ops",
+            location: "San Francisco, CA",
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ),
+      SpacePortalProfileModel.findOneAndUpdate(
+        { user: partnerUser._id },
+        {
+          $set: {
+            user: partnerUser._id,
+            company: "Sound Loft Partners",
+            location: "Seattle, WA",
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      ),
+    ]);
 
     const bookingSeeds = [
       {
@@ -643,6 +1132,84 @@ async function seedSpacePortal() {
         endDate: daysFromNow(170),
         features: ["Mail Handling", "Meeting Room Credits"],
       },
+      {
+        bookingNumber: "BK-SP-1003",
+        user: partnerUser._id,
+        type: "coworking_space",
+        spaceId: "Seattle Sound Loft",
+        spaceSnapshot: {
+          name: "Seattle Sound Loft",
+          address: "Pike/Pine Corridor",
+          city: "Seattle",
+          area: "Capitol Hill",
+          image: "https://example.com/spaces/seattle-sound.jpg",
+        },
+        plan: {
+          name: "Hot Desk Monthly",
+          price: 650,
+          originalPrice: 720,
+          discount: 10,
+          tenure: 3,
+          tenureUnit: "months",
+        },
+        status: "active",
+        kycStatus: "approved",
+        startDate: daysAgo(5),
+        endDate: daysFromNow(85),
+        features: ["Community Access", "Phone Booths", "Café Credits"],
+      },
+      {
+        bookingNumber: "BK-SP-1004",
+        user: partnerUser._id,
+        type: "virtual_office",
+        spaceId: "Brooklyn Bridge Studio",
+        spaceSnapshot: {
+          name: "Brooklyn Bridge Studio",
+          address: "DUMBO, Brooklyn",
+          city: "New York",
+          area: "DUMBO",
+          image: "https://example.com/spaces/brooklyn-bridge.jpg",
+        },
+        plan: {
+          name: "Virtual Office Standard",
+          price: 900,
+          originalPrice: 1050,
+          discount: 14,
+          tenure: 6,
+          tenureUnit: "months",
+        },
+        status: "pending_payment",
+        kycStatus: "pending",
+        startDate: daysFromNow(7),
+        endDate: daysFromNow(190),
+        features: ["Business Address", "Mail Forwarding"],
+      },
+      {
+        bookingNumber: "BK-SP-1005",
+        user: adminUser._id,
+        type: "meeting_room",
+        spaceId: "Denver Peak Hub",
+        spaceSnapshot: {
+          name: "Denver Peak Hub",
+          address: "RiNo Art District",
+          city: "Denver",
+          area: "RiNo",
+          image: "https://example.com/spaces/denver-peak.jpg",
+        },
+        plan: {
+          name: "Meeting Room Bundle",
+          price: 480,
+          originalPrice: 600,
+          discount: 20,
+          tenure: 1,
+          tenureUnit: "months",
+        },
+        status: "active",
+        kycStatus: "approved",
+        startDate: daysAgo(2),
+        endDate: daysFromNow(28),
+        features: ["AV Setup", "Catering Credits"],
+      },
     ];
 
     await BookingModel.deleteMany({
@@ -694,6 +1261,50 @@ async function seedSpacePortal() {
             createdAt: daysAgo(3),
           },
         ],
+      },
+      {
+        ticketNumber: "TCK-SP-9003",
+        user: partnerUser._id,
+        bookingId: insertedBookings[2]?._id?.toString(),
+        subject: "Need extra access cards",
+        category: "other",
+        priority: "low",
+        status: "open",
+        messages: [
+          {
+            sender: "user",
+            senderName: "Space Portal Partner",
+            senderId: partnerUser._id,
+            message: "We need two additional access cards for new hires.",
+            createdAt: daysAgo(2),
+          },
+        ],
+      },
+      {
+        ticketNumber: "TCK-SP-9004",
+        user: partnerUser._id,
+        bookingId: insertedBookings[3]?._id?.toString(),
+        subject: "KYC status update request",
+        category: "kyc",
+        priority: "medium",
+        status: "waiting_customer",
+        messages: [
+          {
+            sender: "user",
+            senderName: "Space Portal Partner",
+            senderId: partnerUser._id,
+            message: "Can you confirm the KYC timeline for our new booking?",
+            createdAt: daysAgo(4),
+          },
+          {
+            sender: "support",
+            senderName: "Space Portal Support",
+            senderId: supportUser._id,
+            message: "Please share the requested documents for verification.",
+            createdAt: daysAgo(3),
+          },
+        ],
+        assignedTo: supportUser._id,
       },
     ];
 
@@ -762,6 +1373,95 @@ async function seedSpacePortal() {
         },
         pdfUrl: "https://example.com/invoices/inv-sp-2002.pdf",
       },
+      {
+        invoiceNumber: "INV-SP-2003",
+        user: partnerUser._id,
+        bookingNumber: "BK-SP-1003",
+        description: "Hot Desk Monthly - Partner booking",
+        lineItems: [
+          {
+            description: "Hot Desk Monthly",
+            quantity: 1,
+            rate: 650,
+            amount: 650,
+          },
+        ],
+        subtotal: 650,
+        taxRate: 18,
+        taxAmount: 117,
+        total: 767,
+        status: "paid",
+        dueDate: daysAgo(3),
+        paidAt: daysAgo(1),
+        billingAddress: {
+          name: "Lila Patel",
+          company: "Aurora FinOps",
+          address: "Pike/Pine Corridor",
+          city: "Seattle",
+          state: "WA",
+          pincode: "98101",
+        },
+        pdfUrl: "https://example.com/invoices/inv-sp-2003.pdf",
+      },
+      {
+        invoiceNumber: "INV-SP-2004",
+        user: partnerUser._id,
+        bookingNumber: "BK-SP-1004",
+        description: "Virtual Office Standard - Setup",
+        lineItems: [
+          {
+            description: "Virtual Office Standard",
+            quantity: 1,
+            rate: 900,
+            amount: 900,
+          },
+        ],
+        subtotal: 900,
+        taxRate: 18,
+        taxAmount: 162,
+        total: 1062,
+        status: "pending",
+        dueDate: daysFromNow(12),
+        billingAddress: {
+          name: "Ava Thompson",
+          company: "BluePeak Ventures",
+          address: "DUMBO, Brooklyn",
+          city: "New York",
+          state: "NY",
+          pincode: "11201",
+        },
+        pdfUrl: "https://example.com/invoices/inv-sp-2004.pdf",
+      },
+      {
+        invoiceNumber: "INV-SP-2005",
+        user: adminUser._id,
+        bookingNumber: "BK-SP-1005",
+        description: "Meeting Room Bundle",
+        lineItems: [
+          {
+            description: "Meeting Room Bundle",
+            quantity: 1,
+            rate: 480,
+            amount: 480,
+          },
+        ],
+        subtotal: 480,
+        taxRate: 18,
+        taxAmount: 86.4,
+        total: 566.4,
+        status: "paid",
+        dueDate: daysAgo(1),
+        paidAt: daysAgo(1),
+        billingAddress: {
+          name: "Maya Gupta",
+          company: "Orion HealthTech",
+          address: "RiNo Art District",
+          city: "Denver",
+          state: "CO",
+          pincode: "80205",
+        },
+        pdfUrl: "https://example.com/invoices/inv-sp-2005.pdf",
+      },
     ];
 
     await InvoiceModel.deleteMany({
@@ -771,7 +1471,7 @@ async function seedSpacePortal() {
 
     console.log("\n✅ Space portal seed completed successfully!");
     console.log("\nSummary:");
-    console.log(`- Users: 2`);
+    console.log(`- Users: 3`);
     console.log(`- Spaces: ${insertedSpaces.length}`);
     console.log(`- Clients: ${insertedClients.length}`);
     console.log(`- Client KYC: ${kycSeeds.length}`);
@@ -783,9 +1483,11 @@ async function seedSpacePortal() {
     console.log(`- Enquiries: ${insertedEnquiries.length}`);
     console.log(`- Notifications: ${insertedNotifications.length}`);
     console.log(
-      `- Notification Preferences: ${notificationPreferences ? 1 : 0}`
+      `- Notification Preferences: ${
+        notificationPreferences.filter(Boolean).length
+      }`
     );
-    console.log(`- Profiles: ${profile ? 1 : 0}`);
+    console.log(`- Profiles: ${profiles.filter(Boolean).length}`);
     console.log(`- Dashboard Bookings: ${insertedBookings.length}`);
     console.log(`- Dashboard Tickets: ${insertedTickets.length}`);
     console.log(`- Dashboard Invoices: ${insertedInvoices.length}`);
