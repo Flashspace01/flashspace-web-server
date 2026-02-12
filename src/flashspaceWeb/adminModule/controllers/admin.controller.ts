@@ -15,6 +15,16 @@ export class AdminController {
         }
     }
 
+    // GET /api/admin/revenue/dashboard
+    static async getRevenueDashboard(req: Request, res: Response) {
+        const result = await adminService.getRevenueDashboard(req.user);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            res.status(500).json(result);
+        }
+    }
+
     // GET /api/admin/users
     static async getUsers(req: Request, res: Response) {
         const page = parseInt(req.query.page as string) || 1;
