@@ -1,0 +1,508 @@
+{
+  "info": {
+    "_postman_id": "62db39e4-6e87-4ac3-a1ef-0578dd71496f",
+    "name": "FlashSpace Affiliate Module API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "End-to-end Newman tests for affiliate module routes."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('testRunId')) {",
+          "  pm.environment.set('testRunId', Date.now().toString());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{affiliateEmail}}\",\n  \"password\": \"{{affiliatePassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "  return;",
+              "}",
+              "const contentType = pm.response.headers.get('Content-Type') || '';",
+              "pm.test('Response is JSON', function () {",
+              "  pm.expect(contentType.toLowerCase()).to.include('application/json');",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test('Login success', function () {",
+              "  pm.expect(json.success).to.eql(true);",
+              "});",
+              "pm.test('Role is admin or affiliate', function () {",
+              "  pm.expect(['admin', 'affiliate']).to.include(json.data.user.role);",
+              "});",
+              "if (json.data && json.data.tokens && json.data.tokens.accessToken) {",
+              "  pm.environment.set('accessToken', json.data.tokens.accessToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Get Leads",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leads",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leads"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Create Lead",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Newman Lead {{testRunId}}\",\n  \"phone\": \"+91 90000{{testRunId}}\",\n  \"email\": \"newman.{{testRunId}}@example.com\",\n  \"company\": \"Newman QA\",\n  \"interest\": \"Virtual Office\",\n  \"status\": \"Warm\",\n  \"notes\": \"Created by Newman\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leads",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leads"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.expect(pm.response.code, pm.response.text()).to.eql(201);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "const id = (json.data && (json.data.id || json.data._id)) || '';",
+              "pm.expect(id).to.not.eql('');",
+              "pm.environment.set('leadId', id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Get Lead By ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leads/{{leadId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leads",
+            "{{leadId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Update Lead",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Hot\",\n  \"notes\": \"Updated by Newman\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leads/{{leadId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leads",
+            "{{leadId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Delete Lead",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leads/{{leadId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leads",
+            "{{leadId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Create Quotation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clientDetails\": {\n    \"name\": \"Quotation Client {{testRunId}}\",\n    \"email\": \"quote.{{testRunId}}@example.com\",\n    \"phone\": \"+91 9888877777\",\n    \"companyName\": \"Newman Corp\"\n  },\n  \"spaceRequirements\": {\n    \"spaceType\": \"Private Office\",\n    \"city\": \"Bangalore\",\n    \"location\": \"HSR Layout\",\n    \"numberOfSeats\": 6,\n    \"duration\": \"6 Months\",\n    \"startDate\": \"2026-03-01T00:00:00.000Z\"\n  },\n  \"price\": 54000,\n  \"status\": \"Sent\",\n  \"additionalNotes\": \"Generated by Newman\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/quotations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "quotations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(201);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "const qid = json.data && json.data.quotationId;",
+              "pm.expect(qid).to.be.a('string');",
+              "pm.environment.set('quotationId', qid);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Get All Quotations",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/quotations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "quotations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Get Recent Quotations",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/quotations/recent",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "quotations",
+            "recent"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Get Quotation Stats",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/quotations/stats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "quotations",
+            "stats"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data).to.be.an('object');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Support Chat",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"hello, I need help with commission\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/support/chat",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "support",
+            "chat"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.reply).to.be.a('string');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate - Leaderboard",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/affiliate/leaderboard",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "affiliate",
+            "leaderboard"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);",
+              "pm.expect(json.data).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth - Logout",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.response.to.have.status(200);",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(true);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
