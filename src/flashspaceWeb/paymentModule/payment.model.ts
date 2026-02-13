@@ -1,4 +1,5 @@
 import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import { Types } from "mongoose";
 
 export enum PaymentStatus {
   PENDING = "pending",
@@ -8,7 +9,6 @@ export enum PaymentStatus {
   REFUNDED = "refunded",
   CANCELLED = "cancelled"
 }
-
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
   COWORKING_SPACE = "coworking_space",
@@ -26,7 +26,7 @@ export enum PaymentType {
 @index({ createdAt: -1 })
 export class Payment {
   @prop({ required: true })
-  public userId!: string;
+  public userId!: Types.ObjectId;
 
   @prop({ required: true })
   public userEmail!: string;
@@ -62,7 +62,7 @@ export class Payment {
   public paymentType!: PaymentType;
 
   @prop({ required: true })
-  public spaceId!: string;
+  public spaceId!: Types.ObjectId;
 
   @prop({ required: true })
   public spaceName!: string;
