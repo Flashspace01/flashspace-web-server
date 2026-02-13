@@ -14,12 +14,22 @@ export class AdminController {
     }
   }
 
-  // GET /api/admin/users
-  static async getUsers(req: Request, res: Response) {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const search = req.query.search as string;
-    const deleted = String(req.query.deleted) === "true";
+    // GET /api/admin/revenue/dashboard
+    static async getRevenueDashboard(req: Request, res: Response) {
+        const result = await adminService.getRevenueDashboard(req.user);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            res.status(500).json(result);
+        }
+    }
+
+    // GET /api/admin/users
+    static async getUsers(req: Request, res: Response) {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const search = req.query.search as string;
+        const deleted = String(req.query.deleted) === 'true';
 
     const result = await adminService.getUsers(page, limit, search, deleted);
     if (result.success) {
