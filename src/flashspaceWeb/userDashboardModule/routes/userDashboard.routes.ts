@@ -7,6 +7,7 @@ import {
   getBookingById,
   toggleAutoRenew,
   getKYCStatus,
+  getPartnerKYCStatus,
   updateBusinessInfo,
   uploadKYCDocument,
   deleteKYCDocument,
@@ -35,7 +36,6 @@ router.patch("/bookings/:bookingId/auto-renew", toggleAutoRenew);
 router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
 
 // ============ KYC ============
-// ============ KYC ============
 router.get("/kyc", getKYCStatus);
 router.put("/kyc/business-info", updateBusinessInfo);
 router.post("/kyc/upload", (req, res, next) => {
@@ -54,6 +54,9 @@ router.post("/kyc/upload", (req, res, next) => {
   });
 }, uploadKYCDocument);
 router.delete("/kyc/upload", deleteKYCDocument);
+
+// ============ PARTNER KYC SNAPSHOTS ============
+router.get("/kyc/partners", getPartnerKYCStatus);
 
 // ============ INVOICES ============
 router.get("/invoices", getAllInvoices);

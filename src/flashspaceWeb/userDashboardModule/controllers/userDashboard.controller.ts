@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { BookingModel } from "../models/booking.model";
 import { KYCDocumentModel } from "../models/kyc.model";
+import KycPartnerDocuments, { IKycPartnerDocuments } from "../models/kycPartnerDocument.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
@@ -298,12 +299,14 @@ export const getKYCStatus = async (req: Request, res: Response) => {
         console.log("[getKYCStatus] Profile not found for ID:", profileId);
         return res.status(404).json({ success: false, message: "Profile not found" });
       }
-      return res.status(200).json({ success: true, data: kyc });
+      const normalized = await applyPartnerVerificationOverrides(userId, kyc);
+      return res.status(200).json({ success: true, data: normalized });
     }
 
     // Get all user's KYC profiles
     const profiles = await KYCDocumentModel.find({ user: userId, isDeleted: false });
-    res.status(200).json({ success: true, data: profiles });
+    const normalizedProfiles = await applyPartnerVerificationOverrides(userId, profiles);
+    res.status(200).json({ success: true, data: normalizedProfiles });
   } catch (error) {
     console.error("Get KYC error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch KYC status" });
@@ -396,6 +399,13 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
 
     await kyc.save();
     console.log("[updateBusinessInfo] Saved profile:", kyc._id);
+
+    // Sync partner profiles into KycPartnerDocuments for this user
+    try {
+      await syncKycPartnerDocumentsForUser(userId!);
+    } catch (syncError) {
+      console.error("[updateBusinessInfo] Failed to sync KYC partner documents:", syncError);
+    }
 
     res.status(200).json({ success: true, message: "Profile updated", data: kyc });
   } catch (error) {
@@ -494,6 +504,15 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     kyc.updatedAt = new Date();
 
     await kyc.save();
+
+    // After any document upload, resync partner KYC snapshot for this user
+    try {
+      if (userId) {
+        await syncKycPartnerDocumentsForUser(userId);
+      }
+    } catch (syncError) {
+      console.error("[uploadKYCDocument] Failed to sync KYC partner documents:", syncError);
+    }
 
     res.status(201).json({
       success: true,
@@ -596,6 +615,187 @@ function calculateKYCProgress(kyc: any): number {
   }
 
   return Math.min(progress, 100);
+}
+// ============ PARTNER KYC SNAPSHOTS ============
+
+export const getPartnerKYCStatus = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { snapshotId, profileId } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const query: any = { user: userId, isDeleted: false };
+
+    if (snapshotId) {
+      const idStr = String(snapshotId);
+      if (!mongoose.Types.ObjectId.isValid(idStr)) {
+        return res.status(400).json({ success: false, message: "Invalid snapshotId format" });
+      }
+      query._id = idStr;
+    }
+
+    if (profileId) {
+      const profileStr = String(profileId);
+      if (!mongoose.Types.ObjectId.isValid(profileStr)) {
+        return res.status(400).json({ success: false, message: "Invalid profileId format" });
+      }
+      query.partnerProfileId = profileStr;
+    }
+
+    const records: IKycPartnerDocuments[] = await KycPartnerDocuments.find(query);
+
+    if ((snapshotId || profileId) && records.length === 0) {
+      return res.status(404).json({ success: false, message: "Partner KYC record not found" });
+    }
+
+    // If a specific snapshot/profile is requested, return single record for convenience
+    const data = snapshotId || profileId ? records[0] : records;
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Get partner KYC error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch partner KYC status" });
+  }
+};
+
+// Normalize KYC status for individual/partner profiles using KycPartnerDocuments.
+// If a partner snapshot is missing or not approved, we downgrade the
+// profile's overallStatus from "approved" to a non-approved state so
+// the frontend shows "Verification in Progress" / "Action Required"
+// instead of a stale "Verified" badge.
+async function applyPartnerVerificationOverrides(
+  userId: string | undefined,
+  profiles: any[] | any
+): Promise<any[] | any> {
+  if (!userId) return profiles;
+
+  const list = Array.isArray(profiles) ? profiles : [profiles];
+
+  const ids = list
+    .map((p) => (p && p._id ? p._id.toString() : undefined))
+    .filter((id): id is string => !!id);
+
+  if (ids.length === 0) return profiles;
+
+  const partnerDocs = await KycPartnerDocuments.find({
+    user: userId,
+    isDeleted: false,
+    partnerProfileId: { $in: ids },
+  });
+
+  const byProfileId = new Map<string, IKycPartnerDocuments>();
+  partnerDocs.forEach((doc) => {
+    if (doc.partnerProfileId) {
+      byProfileId.set(doc.partnerProfileId.toString(), doc);
+    }
+  });
+
+  const normalizedList = list.map((p) => {
+    if (!p) return p;
+    const obj = typeof p.toObject === "function" ? p.toObject() : p;
+    const id = obj._id ? obj._id.toString() : undefined;
+    if (!id) return obj;
+
+    const snap = byProfileId.get(id);
+
+    // Only adjust individual/partner profiles
+    if (obj.kycType === "individual") {
+      if (snap) {
+        obj.overallStatus = snap.overallStatus;
+        if (typeof snap.progress === "number") {
+          obj.progress = snap.progress;
+        }
+      } else if (obj.overallStatus === "approved") {
+        // Snapshot missing but profile marked approved -> treat as pending
+        obj.overallStatus = "pending";
+      }
+    }
+
+    return obj;
+  });
+
+  return Array.isArray(profiles) ? normalizedList : normalizedList[0];
+}
+
+// ============ KYC PARTNER DOCUMENTS SYNC ============
+
+async function syncKycPartnerDocumentsForUser(userId: string) {
+  if (!userId) return;
+
+  // Find all individual KYC profiles for this user that look like partner profiles
+  const partnerProfiles = await KYCDocumentModel.find({
+    user: userId,
+    kycType: "individual",
+    isDeleted: false,
+  });
+
+  // Build a map of existing partner docs by partnerProfileId for quick upsert
+  const existingPartnerDocs = await KycPartnerDocuments.find({ user: userId, isDeleted: false });
+  const existingByProfileId = new Map<string, IKycPartnerDocuments>();
+  existingPartnerDocs.forEach((doc) => {
+    if (doc.partnerProfileId) {
+      existingByProfileId.set(doc.partnerProfileId.toString(), doc);
+    }
+  });
+
+  for (const profile of partnerProfiles) {
+    const profileId = (profile as any)._id.toString();
+  
+    // Only sync profiles that have minimal personal info
+    const pInfo = profile.personalInfo || {};
+    if (!pInfo.fullName || !pInfo.phone || !pInfo.panNumber || !pInfo.aadhaarNumber) {
+      continue;
+    }
+
+    const partnerInfo = {
+      fullName: pInfo.fullName,
+      email: pInfo.email || "",
+      phone: pInfo.phone,
+      panNumber: pInfo.panNumber,
+      aadhaarNumber: pInfo.aadhaarNumber,
+      verified: profile.overallStatus === "approved",
+    };
+
+    const overallStatus: "pending" | "approved" | "rejected" =
+      profile.overallStatus === "approved"
+        ? "approved"
+        : profile.overallStatus === "rejected"
+        ? "rejected"
+        : "pending";
+
+    const documents = (profile.documents || []).map((d: any) => ({
+      type: d.type,
+      name: d.name,
+      fileUrl: d.fileUrl,
+      status: (d.status as "pending" | "approved" | "rejected") || "pending",
+      uploadedAt: d.uploadedAt || new Date(),
+      verifiedAt: d.verifiedAt,
+    }));
+
+    const existing = existingByProfileId.get(profileId);
+
+    if (existing) {
+      existing.partnerInfo = partnerInfo;
+      existing.overallStatus = overallStatus;
+      existing.progress = profile.progress || 0;
+      existing.documents = documents;
+      await existing.save();
+    } else {
+      await KycPartnerDocuments.create({
+        user: userId,
+        partnerProfileId: profile._id,
+        partnerInfo,
+        overallStatus,
+        progress: profile.progress || 0,
+        documents,
+      });
+    }
+  }
 }
 
 // ============ INVOICES ============

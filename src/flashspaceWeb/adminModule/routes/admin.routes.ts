@@ -20,4 +20,8 @@ adminRoutes.get("/bookings", AdminController.getAllBookings);
 
 // KYC Management Routes
 adminRoutes.get("/kyc/pending", AdminController.getPendingKYC);
+adminRoutes.get("/kyc/partners", AdminController.getPartnerKYCList);
+adminRoutes.get("/kyc/partners/:id", AdminController.getPartnerKYCById);
 adminRoutes.put("/kyc/:id/review", AdminController.reviewKYC);
+adminRoutes.get("/kyc/:id", AdminController.getKYCById);
+adminRoutes.put("/kyc/:id/documents/:docId/review", AdminController.reviewKYCDocument);

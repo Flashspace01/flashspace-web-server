@@ -1,6 +1,7 @@
 ﻿import { UserModel } from "../../authModule/models/user.model";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
+import KycPartnerDocuments, { IKycPartnerDocuments } from "../../userDashboardModule/models/kycPartnerDocument.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
 import { ApiResponse } from "../../authModule/types/auth.types"; // Assuming generic ApiResponse type exists or compatible structure
@@ -139,6 +140,110 @@ export class AdminService {
         }
     }
 
+    // Get partner KYC snapshots (admin view)
+    async getPartnerKYCList(userId?: string, profileId?: string): Promise<ApiResponse<IKycPartnerDocuments[]>> {
+        try {
+            const query: any = { isDeleted: false };
+
+            if (userId) {
+                const mongoose = require("mongoose");
+                if (!mongoose.Types.ObjectId.isValid(userId)) {
+                    return {
+                        success: false,
+                        message: "Invalid userId format",
+                    };
+                }
+                query.user = userId;
+            }
+
+            if (profileId) {
+                const mongoose = require("mongoose");
+                if (!mongoose.Types.ObjectId.isValid(profileId)) {
+                    return {
+                        success: false,
+                        message: "Invalid profileId format",
+                    };
+                }
+                query.partnerProfileId = profileId;
+            }
+
+            const records = await KycPartnerDocuments.find(query).populate("user", "fullName email phoneNumber");
+
+            return {
+                success: true,
+                message: "Partner KYC records fetched successfully",
+                data: records,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to fetch partner KYC records",
+                error: error.message,
+            };
+        }
+    }
+
+    // Get single partner KYC snapshot by its ID
+    async getPartnerKYCById(id: string): Promise<ApiResponse<IKycPartnerDocuments>> {
+        try {
+            const mongoose = require("mongoose");
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return {
+                    success: false,
+                    message: "Invalid partner KYC id format",
+                };
+            }
+
+            const record = await KycPartnerDocuments.findById(id).populate("user", "fullName email phoneNumber");
+
+            if (!record) {
+                return {
+                    success: false,
+                    message: "Partner KYC record not found",
+                };
+            }
+
+            return {
+                success: true,
+                message: "Partner KYC record fetched successfully",
+                data: record,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to fetch partner KYC record",
+                error: error.message,
+            };
+        }
+    }
+
+    // Get single KYC by id
+    async getKYCById(kycId: string): Promise<ApiResponse<any>> {
+        try {
+            const kyc = await KYCDocumentModel.findById(kycId)
+                .populate('user', 'fullName email phoneNumber');
+
+            if (!kyc) {
+                return {
+                    success: false,
+                    message: "KYC document not found",
+                };
+            }
+
+            return {
+                success: true,
+                message: "KYC document fetched successfully",
+                data: kyc,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to fetch KYC document",
+                error: error.message,
+            };
+        }
+    }
+
     // Delete / Restore user
     async deleteUser(userId: string, restore: boolean = false): Promise<ApiResponse<any>> {
         try {
@@ -265,6 +370,67 @@ export class AdminService {
                 success: false,
                 message: "Failed to review KYC",
                 error: error.message
+            };
+        }
+    }
+
+    // Review single KYC document item (approve/reject at document level)
+    async reviewKYCDocument(
+        kycId: string,
+        documentId: string,
+        action: 'approve' | 'reject',
+        rejectionReason?: string
+    ): Promise<ApiResponse<any>> {
+        try {
+            const kyc = await KYCDocumentModel.findById(kycId);
+
+            if (!kyc) {
+                return {
+                    success: false,
+                    message: "KYC document not found",
+                };
+            }
+
+            if (!kyc.documents || kyc.documents.length === 0) {
+                return {
+                    success: false,
+                    message: "No documents found on this KYC record",
+                };
+            }
+
+            const doc: any = kyc.documents.id(documentId);
+
+            if (!doc) {
+                return {
+                    success: false,
+                    message: "Document not found",
+                };
+            }
+
+            doc.status = action === 'approve' ? 'approved' : 'rejected';
+            if (action === 'reject' && rejectionReason) {
+                doc.rejectionReason = rejectionReason;
+            }
+            doc.verifiedAt = new Date();
+
+            // Recalculate simple progress based on approved documents
+            const totalDocs = kyc.documents.length;
+            const approvedDocs = kyc.documents.filter((d: any) => d.status === 'approved').length;
+            kyc.progress = totalDocs > 0 ? Math.round((approvedDocs / totalDocs) * 100) : 0;
+
+            // Do not change overallStatus here; leave it for full KYC review endpoint
+            await kyc.save();
+
+            return {
+                success: true,
+                message: `Document ${action}ed successfully`,
+                data: kyc,
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                message: "Failed to review KYC document",
+                error: error.message,
             };
         }
     }

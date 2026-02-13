@@ -39,6 +39,50 @@ export class AdminController {
             res.status(500).json(result);
         }
     }
+
+    // GET /api/admin/kyc/partners
+    static async getPartnerKYCList(req: Request, res: Response) {
+        console.log("[AdminController] getPartnerKYCList called");
+        const userId = req.query.userId as string | undefined;
+        const profileId = req.query.profileId as string | undefined;
+
+        const result = await adminService.getPartnerKYCList(userId, profileId);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode =
+                result.message === "Invalid userId format" || result.message === "Invalid profileId format"
+                    ? 400
+                    : 500;
+            res.status(statusCode).json(result);
+        }
+    }
+
+    // GET /api/admin/kyc/partners/:id
+    static async getPartnerKYCById(req: Request, res: Response) {
+        console.log("[AdminController] getPartnerKYCById called");
+        const { id } = req.params;
+        const result = await adminService.getPartnerKYCById(id);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode = result.message === "Partner KYC record not found" ? 404 : 500;
+            res.status(statusCode).json(result);
+        }
+    }
+
+    // GET /api/admin/kyc/:id
+    static async getKYCById(req: Request, res: Response) {
+        console.log("[AdminController] getKYCById called");
+        const { id } = req.params;
+        const result = await adminService.getKYCById(id);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode = result.message === "KYC document not found" ? 404 : 500;
+            res.status(statusCode).json(result);
+        }
+    }
     // DELETE /api/admin/users/:id
     static async deleteUser(req: Request, res: Response) {
         const { id } = req.params;
@@ -84,6 +128,30 @@ export class AdminController {
             res.status(200).json(result);
         } else {
             const statusCode = result.message === "KYC document not found" ? 404 : 500;
+            res.status(statusCode).json(result);
+        }
+    }
+
+    // PUT /api/admin/kyc/:id/documents/:docId/review
+    static async reviewKYCDocument(req: Request, res: Response) {
+        const { id, docId } = req.params;
+        const { action, rejectionReason } = req.body;
+
+        if (!action || !["approve", "reject"].includes(action)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid action. Must be 'approve' or 'reject'",
+            });
+        }
+
+        const result = await adminService.reviewKYCDocument(id, docId, action, rejectionReason);
+        if (result.success) {
+            res.status(200).json(result);
+        } else {
+            const statusCode =
+                result.message === "KYC document not found" || result.message === "Document not found"
+                    ? 404
+                    : 500;
             res.status(statusCode).json(result);
         }
     }
