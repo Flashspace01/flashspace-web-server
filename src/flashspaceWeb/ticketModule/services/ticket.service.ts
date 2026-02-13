@@ -1,6 +1,8 @@
 import { TicketModel, Ticket, TicketStatus, TicketPriority, TicketCategory } from "../models/Ticket";
 import { UserModel } from "../../authModule/models/user.model";
 import { Types } from "mongoose";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
 
 export interface CreateTicketDTO {
   subject: string;
@@ -30,7 +32,7 @@ export class TicketService {
   static async createTicket(userId: string, data: CreateTicketDTO): Promise<any> {
     const ticketNumber = Ticket.generateTicketNumber();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-    
+
     const ticket = await TicketModel.create({
       ticketNumber,
       subject: data.subject,
@@ -52,6 +54,14 @@ export class TicketService {
     const populatedTicket = await TicketModel.findById(ticket._id)
       .populate('user', 'fullName email phoneNumber')
       .lean();
+
+    // Notify Admins
+    NotificationService.notifyAdmin(
+      `New Ticket: ${ticketNumber}`,
+      `A new ticket "${data.subject}" has been created.`,
+      NotificationType.INFO,
+      { ticketId: ticket._id }
+    );
 
     return populatedTicket;
   }
@@ -82,7 +92,7 @@ export class TicketService {
   static async getTicketById(ticketId: string, userId?: string) {
     try {
       const query: any = { _id: new Types.ObjectId(ticketId) };
-      
+
       // If userId is provided, ensure user can only access their own tickets
       if (userId) {
         query.user = new Types.ObjectId(userId);
@@ -102,7 +112,7 @@ export class TicketService {
 
   static async addReply(ticketId: string, data: ReplyDTO) {
     const query: any = { _id: new Types.ObjectId(ticketId) };
-    
+
     // If sender is user, ensure they own the ticket
     if (data.sender === 'user') {
       query.user = new Types.ObjectId(data.userId);
@@ -123,8 +133,8 @@ export class TicketService {
     });
 
     // Update status if it was closed/resolved and user is replying
-    if (data.sender === 'user' && 
-        (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.RESOLVED)) {
+    if (data.sender === 'user' &&
+      (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.RESOLVED)) {
       ticket.status = TicketStatus.OPEN;
     }
 
@@ -132,7 +142,17 @@ export class TicketService {
     ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     await ticket.save();
-    
+
+    // Notify Admins if user relied
+    if (data.sender === 'user') {
+      NotificationService.notifyAdmin(
+        `New Reply on Ticket: ${ticket.ticketNumber}`,
+        `User replied: ${data.message.substring(0, 50)}...`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id }
+      );
+    }
+
     // Return populated ticket
     return await TicketModel.findById(ticket._id)
       .populate('user', 'fullName email phoneNumber')
@@ -190,7 +210,7 @@ export class TicketService {
   static async getTicketStats() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const [
       statusCounts,
       priorityCounts,
@@ -225,13 +245,13 @@ export class TicketService {
 
   static async updateTicket(ticketId: string, data: UpdateTicketDTO) {
     const updateObj: any = {};
-    
+
     if (data.status) updateObj.status = data.status;
     if (data.assignee) updateObj.assignee = new Types.ObjectId(data.assignee);
     if (data.priority) updateObj.priority = data.priority;
     if (data.category) updateObj.category = data.category;
     if (data.deadline) updateObj.deadline = data.deadline;
-    
+
     // If status is resolved, set resolvedAt
     if (data.status === TicketStatus.RESOLVED) {
       updateObj.resolvedAt = new Date();
@@ -246,8 +266,8 @@ export class TicketService {
       updateObj,
       { new: true }
     )
-    .populate('user', 'fullName email phoneNumber')
-    .populate('assignee', 'fullName email');
+      .populate('user', 'fullName email phoneNumber')
+      .populate('assignee', 'fullName email');
 
     if (!ticket) {
       throw new Error('Ticket not found');
@@ -258,7 +278,7 @@ export class TicketService {
 
   static async addAdminReply(ticketId: string, adminId: string, message: string, attachments?: string[]) {
     const ticket = await TicketModel.findById(ticketId);
-    
+
     if (!ticket) {
       throw new Error('Ticket not found');
     }
@@ -282,7 +302,16 @@ export class TicketService {
     }
 
     await ticket.save();
-    
+
+    // Notify User
+    NotificationService.notifyUser(
+      ticket.user.toString(),
+      `Update on Ticket: ${ticket.ticketNumber}`,
+      `Admin replied: ${message.substring(0, 50)}...`,
+      NotificationType.TICKET_UPDATE,
+      { ticketId: ticket._id }
+    );
+
     // Return populated ticket
     return await TicketModel.findById(ticket._id)
       .populate('user', 'fullName email phoneNumber')
@@ -299,8 +328,8 @@ export class TicketService {
       },
       { new: true }
     )
-    .populate('user', 'fullName email phoneNumber')
-    .populate('assignee', 'fullName email');
+      .populate('user', 'fullName email phoneNumber')
+      .populate('assignee', 'fullName email');
 
     if (!ticket) {
       throw new Error('Ticket not found');
@@ -315,8 +344,8 @@ export class TicketService {
       { status: TicketStatus.ESCALATED },
       { new: true }
     )
-    .populate('user', 'fullName email phoneNumber')
-    .populate('assignee', 'fullName email');
+      .populate('user', 'fullName email phoneNumber')
+      .populate('assignee', 'fullName email');
 
     if (!ticket) {
       throw new Error('Ticket not found');
@@ -328,18 +357,27 @@ export class TicketService {
   static async resolveTicket(ticketId: string) {
     const ticket = await TicketModel.findByIdAndUpdate(
       ticketId,
-      { 
+      {
         status: TicketStatus.RESOLVED,
         resolvedAt: new Date()
       },
       { new: true }
     )
-    .populate('user', 'fullName email phoneNumber')
-    .populate('assignee', 'fullName email');
+      .populate('user', 'fullName email phoneNumber')
+      .populate('assignee', 'fullName email');
 
     if (!ticket) {
       throw new Error('Ticket not found');
     }
+
+    // Notify User
+    NotificationService.notifyUser(
+      ticket.user._id.toString(), // user is populated
+      `Ticket Resolved: ${ticket.ticketNumber}`,
+      `Your ticket has been marked as resolved.`,
+      NotificationType.SUCCESS,
+      { ticketId: ticket._id }
+    );
 
     return ticket;
   }
@@ -347,18 +385,27 @@ export class TicketService {
   static async closeTicket(ticketId: string) {
     const ticket = await TicketModel.findByIdAndUpdate(
       ticketId,
-      { 
+      {
         status: TicketStatus.CLOSED,
         closedAt: new Date()
       },
       { new: true }
     )
-    .populate('user', 'fullName email phoneNumber')
-    .populate('assignee', 'fullName email');
+      .populate('user', 'fullName email phoneNumber')
+      .populate('assignee', 'fullName email');
 
     if (!ticket) {
       throw new Error('Ticket not found');
     }
+
+    // Notify User
+    NotificationService.notifyUser(
+      ticket.user._id.toString(),
+      `Ticket Closed: ${ticket.ticketNumber}`,
+      `Your ticket has been closed.`,
+      NotificationType.INFO,
+      { ticketId: ticket._id }
+    );
 
     return ticket;
   }

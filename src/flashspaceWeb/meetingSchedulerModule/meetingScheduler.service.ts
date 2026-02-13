@@ -2,6 +2,8 @@ import { DateTime } from 'luxon';
 import { MeetingModel, MeetingStatus } from './meeting.model';
 import { GoogleCalendarService } from './googleCalendar.service';
 import { MeetingEmailUtil } from './email.util';
+import { NotificationService } from '../notificationModule/services/notification.service';
+import { NotificationType } from '../notificationModule/models/Notification';
 
 interface TimeSlot {
     startTime: Date;
@@ -259,6 +261,14 @@ export class MeetingSchedulerService {
             });
         }
 
+        // Notify Admins
+        NotificationService.notifyAdmin(
+            `New Meeting Booked`,
+            `${request.fullName} has booked a meeting on ${slotTime.toFormat('DD HH:mm')}`,
+            NotificationType.MEETING_BOOKED,
+            { meetingId: meeting._id }
+        );
+
         return {
             success: true,
             meeting: {
@@ -297,3 +307,4 @@ export class MeetingSchedulerService {
         };
     }
 }
+

@@ -1,6 +1,8 @@
 
 import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient } from "redis";
 import jwt from "jsonwebtoken";
 
 let io: Server;
@@ -17,6 +19,18 @@ export const initSocket = (httpServer: HttpServer) => {
         "https://flashspace.ai",
         "https://www.flashspace.ai"
     ].filter(Boolean) as string[];
+
+    const redisHost = process.env.REDIS_HOST || 'localhost';
+    const redisPort = parseInt(process.env.REDIS_PORT || '6379');
+
+    // Create Redis client
+    const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
+    const subClient = pubClient.duplicate();
+
+    Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log(`Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`);
+    });
 
     io = new Server(httpServer, {
         cors: {
