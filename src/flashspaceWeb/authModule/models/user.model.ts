@@ -10,7 +10,8 @@ export enum AuthProvider {
 export enum UserRole {
   USER = "user",
   ADMIN = "admin",
-  VENDOR = "vendor",
+  PARTNER = "partner",
+  SALES = "sales",
 }
 
 @modelOptions({

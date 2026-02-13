@@ -91,3 +91,20 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
 }
+
+export interface AuthUser {
+  _id: string;
+  id: string;
+  email: string;
+  role: string;
+  fullName?: string;
+}
+
+// Extend Express Request globally
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+    }
+  }
+}

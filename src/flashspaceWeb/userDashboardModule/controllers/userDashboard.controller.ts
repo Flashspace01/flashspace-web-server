@@ -333,10 +333,12 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       // Create new profile
       console.log("[updateBusinessInfo] Creating NEW profile");
       const user = await UserModel.findById(userId);
+      const isPartnerProfile = kycType === "individual" && personalFullName && personalFullName !== user?.fullName;
       kyc = new KYCDocumentModel({
         user: userId,
         profileName: profileName || (kycType === "business" ? companyName : "Personal Profile"),
         kycType: kycType || "individual",
+        isPartner: isPartnerProfile,
         personalInfo: {
           fullName: personalFullName || user?.fullName, // Allow custom name or default to user
           email: user?.email,
@@ -375,7 +377,14 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
       if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
       if (personalPan) kyc.personalInfo.panNumber = personalPan;
-      if (personalFullName) kyc.personalInfo.fullName = personalFullName;
+      if (personalFullName) {
+        kyc.personalInfo.fullName = personalFullName;
+        // Update isPartner flag if changing fullName on existing individual profile
+        if (kyc.kycType === 'individual') {
+          const user = await UserModel.findById(userId);
+          kyc.isPartner = personalFullName !== user?.fullName;
+        }
+      }
     }
 
     if (kycType && !kyc.kycType) {
@@ -390,8 +399,10 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     kyc.progress = calculateKYCProgress(kyc);
     kyc.updatedAt = new Date();
 
-    if (kyc.overallStatus === "not_started") {
-      kyc.overallStatus = "pending";
+    // Only set to pending if status was not_started and user is making progress
+    // Don't auto-set to pending - let user explicitly submit
+    if (kyc.overallStatus === "not_started" && kyc.progress > 0) {
+      kyc.overallStatus = "in_progress";
     }
 
     await kyc.save();
@@ -490,7 +501,10 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
 
     // Update progress
     kyc.progress = calculateKYCProgress(kyc);
-    kyc.overallStatus = "pending";
+    // Don't auto-set to pending on document upload - let user explicitly submit
+    if (kyc.overallStatus === "not_started") {
+      kyc.overallStatus = "in_progress";
+    }
     kyc.updatedAt = new Date();
 
     await kyc.save();
@@ -553,7 +567,10 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
 
     // Update progress
     kyc.progress = calculateKYCProgress(kyc);
-    kyc.overallStatus = "pending"; // Revert to pending if deleting a doc
+    // If was approved/pending and user deletes doc, revert to in_progress
+    if (kyc.overallStatus === "approved" || kyc.overallStatus === "pending") {
+      kyc.overallStatus = "in_progress";
+    }
     kyc.updatedAt = new Date();
 
     await kyc.save();
@@ -565,12 +582,97 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
   }
 };
 
+export const submitKYCForReview = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { profileId } = req.body;
+
+    if (!profileId) {
+      return res.status(400).json({ success: false, message: "Profile ID is required" });
+    }
+
+    const kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+
+    if (!kyc) {
+      return res.status(404).json({ success: false, message: "KYC profile not found" });
+    }
+
+    // Check if already submitted or approved
+    if (kyc.overallStatus === "pending" || kyc.overallStatus === "approved") {
+      return res.status(400).json({ 
+        success: false, 
+        message: kyc.overallStatus === "approved" 
+          ? "KYC is already approved" 
+          : "KYC is already under review" 
+      });
+    }
+
+    // Validate all requirements are met
+    const isBusiness = kyc.kycType === "business";
+    const isPartner = kyc.isPartner === true;
+
+    // Check personal info
+    if (!kyc.personalInfo?.fullName || !kyc.personalInfo?.aadhaarNumber || !kyc.personalInfo?.panNumber) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please complete all personal information before submitting" 
+      });
+    }
+
+    // Check business info for business type
+    if (isBusiness && (!kyc.businessInfo?.companyName || !kyc.businessInfo?.gstNumber)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please complete all business information before submitting" 
+      });
+    }
+
+    // Check required documents
+    const uploadedDocs = kyc.documents?.map(d => d.type) || [];
+    let requiredDocs: string[];
+
+    if (isBusiness) {
+      requiredDocs = ["pan_card", "gst_certificate", "address_proof", "video_kyc"];
+    } else if (isPartner) {
+      requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
+    } else {
+      requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
+    }
+
+    const missingDocs = requiredDocs.filter(doc => !uploadedDocs.includes(doc));
+    if (missingDocs.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Please upload all required documents: ${missingDocs.join(", ")}` 
+      });
+    }
+
+    // All validations passed - submit for review
+    kyc.overallStatus = "pending";
+    kyc.progress = calculateKYCProgress(kyc);
+    kyc.updatedAt = new Date();
+
+    await kyc.save();
+
+    res.status(200).json({ 
+      success: true, 
+      message: "KYC submitted for review successfully. Our team will review it shortly.",
+      data: kyc 
+    });
+  } catch (error) {
+    console.error("Submit KYC error:", error);
+    res.status(500).json({ success: false, message: "Failed to submit KYC for review" });
+  }
+};
+
 function calculateKYCProgress(kyc: any): number {
   let progress = 0;
   const isBusiness = kyc.kycType === "business";
+  const isPartner = kyc.isPartner === true;
 
   // Weights based on type
   // Individual: Personal(30), Docs(50), Status(20)
+  // Partner: Personal(50), Docs(50) - no video KYC
   // Business: Personal(25), Business(25), Docs(40), Status(10)
 
   if (isBusiness) {
@@ -583,8 +685,16 @@ function calculateKYCProgress(kyc: any): number {
     progress += Math.round((hasRequiredCount / requiredDocs.length) * 40);
 
     if (kyc.overallStatus === "approved") progress += 10;
+  } else if (isPartner) {
+    // Partner profile - no video KYC required
+    if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 50;
+
+    const requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 50);
   } else {
-    // Individual
+    // Individual (non-partner)
     if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 30;
 
     const requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
