@@ -10,7 +10,10 @@
     "seed": "ts-node src/scripts/seedData.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
-    "test:otp": "ts-node src/scripts/test-otp-system.ts"
+    "test:otp": "ts-node src/scripts/test-otp-system.ts",
+    "seed:affiliate": "ts-node src/scripts/seedAffiliateData.ts",
+    "test:affiliate:api": "bash src/scripts/testAffiliateModuleApis.sh",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -42,6 +45,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.1",
     "multer": "^2.0.2",
+    "newman": "^6.2.2",
     "nodemailer": "^7.0.10",
     "razorpay": "^2.9.6",
     "ts-node-dev": "^2.0.0"
@@ -51,9 +55,14 @@
     "@types/dotenv": "^6.1.1",
     "@types/express": "^5.0.3",
     "@types/helmet": "^0.0.48",
+    "@types/jest": "^30.0.0",
     "@types/mongoose": "^5.11.96",
     "@types/node": "^24.3.1",
+    "@types/supertest": "^6.0.3",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }

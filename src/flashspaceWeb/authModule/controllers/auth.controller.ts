@@ -91,6 +91,7 @@ export class AuthController {
           },
           error: {}
         });
+        console.log("JWT Token: ", result.tokens);
       } else {
         res.status(401).json({
           success: false,

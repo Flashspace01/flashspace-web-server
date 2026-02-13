@@ -5,7 +5,8 @@ export const dbConnection = async () => {
         if (!process.env.DB_URI) {
             throw new Error("DB_URI is not defined in environment variables");
         }
-        await mongoose.connect(process.env.DB_URI as string, {
+        const dbUri = process.env.DB_URI.trim();
+        await mongoose.connect(dbUri, {
             // connection options to help with stability
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,

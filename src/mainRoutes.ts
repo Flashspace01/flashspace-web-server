@@ -8,11 +8,14 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
 
 export const mainRoutes = Router();
 
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
+// /api/affiliate (Affiliate Portal APIs)
+mainRoutes.use("/affiliate", affiliateRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/spaceProvider
