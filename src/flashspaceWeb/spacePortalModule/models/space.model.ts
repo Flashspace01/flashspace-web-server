@@ -39,6 +39,9 @@ export class SpacePortalSpace {
   @prop({ required: true, enum: SpacePortalSpaceStatus })
   public status!: SpacePortalSpaceStatus;
 
+  @prop({ type: () => [String], default: [] })
+  public photos!: string[];
+
   @prop({ default: false })
   public isDeleted?: boolean;
 }

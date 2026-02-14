@@ -247,4 +247,40 @@ export class SpacePortalSpacesService {
       };
     }
   }
+
+  async uploadSpacePhotos(spaceId: string, photoUrls: string[]): Promise<ApiResponse> {
+    try {
+      if (!Types.ObjectId.isValid(spaceId)) {
+        return {
+          success: false,
+          message: "Invalid space ID format",
+        };
+      }
+
+      const updated = await SpacePortalSpaceModel.findByIdAndUpdate(
+        spaceId,
+        { $push: { photos: { $each: photoUrls } } },
+        { new: true }
+      );
+
+      if (!updated) {
+        return {
+          success: false,
+          message: "Space not found",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Photos uploaded successfully",
+        data: updated,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to upload photos",
+        error: error?.message,
+      };
+    }
+  }
 }
