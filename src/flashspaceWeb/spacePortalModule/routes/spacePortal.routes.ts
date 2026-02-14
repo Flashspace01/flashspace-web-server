@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
+import { uploadSpacePhoto } from "../config/multer.config";
 import {
   createSpace,
   deleteSpace,
   getSpaceById,
   getSpaces,
   updateSpace,
+  uploadSpacePhotos,
 } from "../controllers/spaces.controller";
 import {
   createClient,
@@ -95,6 +97,11 @@ spacePortalRoutes.get("/spaces", validateListSpaces, getSpaces);
 spacePortalRoutes.get("/spaces/:spaceId", getSpaceById);
 spacePortalRoutes.patch("/spaces/:spaceId", validateUpdateSpace, updateSpace);
 spacePortalRoutes.delete("/spaces/:spaceId", deleteSpace);
+spacePortalRoutes.post(
+  "/spaces/:spaceId/photos",
+  uploadSpacePhoto.array("photos", 10), // Allow up to 10 photos
+  uploadSpacePhotos
+);
 
 // Clients
 spacePortalRoutes.post("/clients", validateCreateClient, createClient);

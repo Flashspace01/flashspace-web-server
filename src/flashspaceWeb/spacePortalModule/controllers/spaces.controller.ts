@@ -42,3 +42,22 @@ export const deleteSpace = async (req: Request, res: Response) => {
   const result = await spacesService.deleteSpace(spaceId, restore);
   res.status(result.success ? 200 : 400).json(result);
 };
+
+export const uploadSpacePhotos = async (req: Request, res: Response) => {
+  const { spaceId } = req.params;
+  const files = req.files as Express.Multer.File[];
+
+  if (!files || files.length === 0) {
+    res.status(400).json({
+      success: false,
+      message: "No files uploaded",
+    });
+    return;
+  }
+
+  const { getSpacePhotoUrl } = require("../config/multer.config");
+  const photoUrls = files.map((file) => getSpacePhotoUrl(file.filename));
+
+  const result = await spacesService.uploadSpacePhotos(spaceId, photoUrls);
+  res.status(result.success ? 200 : 400).json(result);
+};

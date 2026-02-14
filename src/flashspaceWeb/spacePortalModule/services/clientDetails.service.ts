@@ -51,19 +51,23 @@ export class SpacePortalClientDetailsService {
       if (!clientObj.phone) clientObj.phone = "";
 
       const mappedKycDocuments =
-        clientObj.kyc?.documents?.map((doc: any) => ({
+        kyc?.documents?.map((doc: any) => ({
           ...(doc.toObject ? doc.toObject() : doc),
           id: doc._id?.toString?.() || doc.id,
         })) || [];
 
       const mappedBookings =
-        clientObj.bookings?.map((booking: any) => ({
+        bookings?.map((booking: any) => ({
           ...(booking.toObject ? booking.toObject() : booking),
           id: booking._id?.toString?.() || booking.id,
+          date: booking.date,
+          slot: booking.slot,
+          status: booking.status,
+          amount: booking.amount,
         })) || [];
 
       const mappedInvoices =
-        clientObj.invoices?.map((invoice: any) => ({
+        invoices?.map((invoice: any) => ({
           ...(invoice.toObject ? invoice.toObject() : invoice),
           id: invoice._id?.toString?.() || invoice.id,
         })) || [];

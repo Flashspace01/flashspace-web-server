@@ -64,19 +64,12 @@ const corsOptions = {
     console.error('CORS blocked origin:', origin);
     return callback(new Error("CORS not allowed"), false);
   }
-<<<<<<< HEAD
 };
 
 app.use(cors(corsOptions));
 // Express 5 + path-to-regexp: avoid "*" string, use regex for catch-all
 app.options(/.*/, cors(corsOptions));
 console.log(`CORS enabled for allowed origins: ${Array.from(allowedOrigins).join(', ')}`);
-=======
-}));
-console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
-console.log(process.env.MONGODB_URI)
-
->>>>>>> 0ff5f5189e63c46054f002c58e323f9020604a3f
 
 // Middleware
 app.use(express.json());
