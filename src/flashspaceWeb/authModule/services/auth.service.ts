@@ -4,9 +4,9 @@ import { JwtUtil } from '../utils/jwt.util';
 import { EmailUtil } from '../utils/email.util';
 import { OTPUtil } from '../utils/otp.util';
 import { User } from '../models/user.model';
-import { 
-  SignupRequest, 
-  LoginRequest, 
+import {
+  SignupRequest,
+  LoginRequest,
   AuthResponse,
   ForgotPasswordRequest,
   ResetPasswordRequest,
@@ -28,7 +28,7 @@ export class AuthService {
 
   async signup(signupData: SignupRequest): Promise<AuthResponse> {
     try {
-      const { email, password, confirmPassword, fullName, phoneNumber } = signupData;
+      const { email, password, confirmPassword, fullName, phoneNumber, role } = signupData;
 
       // Validate passwords match
       if (password !== confirmPassword) {
@@ -46,6 +46,10 @@ export class AuthService {
           message: passwordValidation.errors.join(', ')
         };
       }
+
+      // Validate role (only allow 'user' or 'partner', default to 'user')
+      const allowedRoles: string[] = [UserRole.USER, UserRole.PARTNER];
+      const selectedRole: UserRole = (role && allowedRoles.includes(role) ? role : UserRole.USER) as UserRole;
 
       // Check if user already exists
       const existingUser = await this.userRepository.findByEmail(email);
@@ -69,7 +73,7 @@ export class AuthService {
         fullName,
         phoneNumber,
         authProvider: AuthProvider.LOCAL,
-        role: UserRole.USER,
+        role: selectedRole,
         isEmailVerified: false,
         emailVerificationOTP: otpData.otp,
         emailVerificationOTPExpiry: otpData.expiresAt,
@@ -199,10 +203,10 @@ export class AuthService {
     try {
       // Import GoogleUtil
       const { GoogleUtil } = await import('../utils/google.util');
-      
+
       // Verify the token with Google
       const profile = await GoogleUtil.verifyIdToken(idToken);
-      
+
       if (!profile) {
         return {
           success: false,
@@ -305,7 +309,7 @@ export class AuthService {
   async verifyEmail(token: string): Promise<AuthResponse> {
     try {
       const user = await this.userRepository.verifyEmail(token);
-      
+
       if (!user) {
         return {
           success: false,
@@ -514,7 +518,7 @@ export class AuthService {
     try {
       // Verify refresh token
       const decoded = JwtUtil.verifyRefreshToken(refreshToken);
-      
+
       // Find user with this refresh token
       const user = await this.userRepository.findByRefreshToken(refreshToken);
       if (!user || user._id.toString() !== decoded.userId) {
@@ -601,7 +605,7 @@ export class AuthService {
 
       // Find user with OTP data
       const user = await this.userRepository.findByEmailWithOTP(email);
-      
+
       if (!user) {
         return {
           success: false,
@@ -656,7 +660,7 @@ export class AuthService {
         // Increment attempts
         await this.userRepository.incrementOTPAttempts(user._id.toString());
         const remainingAttempts = 3 - (user.emailVerificationOTPAttempts + 1);
-        
+
         return {
           success: false,
           message: `Invalid OTP. You have ${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining.`
@@ -719,7 +723,7 @@ export class AuthService {
 
       // Find user
       const user = await this.userRepository.findByEmail(email);
-      
+
       if (!user) {
         return {
           success: false,

@@ -110,6 +110,7 @@ export class Ticket extends TimeStamps {
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    // Generate 4-digit random number
     const random = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${year}${month}${random}`;
   }

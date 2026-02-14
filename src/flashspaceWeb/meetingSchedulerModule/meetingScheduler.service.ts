@@ -1,7 +1,9 @@
-import { DateTime } from "luxon";
-import { MeetingModel, MeetingStatus } from "./meeting.model";
-import { GoogleCalendarService } from "./googleCalendar.service";
-import { MeetingEmailUtil } from "./email.util";
+import { DateTime } from 'luxon';
+import { MeetingModel, MeetingStatus } from './meeting.model';
+import { GoogleCalendarService } from './googleCalendar.service';
+import { MeetingEmailUtil } from './email.util';
+import { NotificationService } from '../notificationModule/services/notification.service';
+import { NotificationType } from '../notificationModule/models/Notification';
 
 interface TimeSlot {
   startTime: Date;
@@ -255,8 +257,6 @@ export class MeetingSchedulerService {
       expiresAt,
     });
 
-    // Sending Email is disabled for now
-
     // Send confirmation email
     if (calendarEvent?.meetLink) {
       await MeetingEmailUtil.sendMeetingConfirmation({
@@ -267,6 +267,14 @@ export class MeetingSchedulerService {
         duration: this.SLOT_DURATION_MINUTES,
       });
     }
+
+    // Notify Admins
+    NotificationService.notifyAdmin(
+      `New Meeting Booked`,
+      `${request.fullName} has booked a meeting on ${slotTime.toFormat("DD HH:mm")}`,
+      NotificationType.MEETING_BOOKED,
+      { meetingId: meeting._id },
+    );
 
     return {
       success: true,
@@ -313,3 +321,4 @@ export class MeetingSchedulerService {
     return await MeetingModel.find(filter).sort({ startTime: 1 });
   }
 }
+

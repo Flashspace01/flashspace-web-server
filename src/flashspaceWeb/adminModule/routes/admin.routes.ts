@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
-import { RoleMiddleware } from "../../authModule/middleware/role.middleware";
-import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
+import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
+
 
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
@@ -62,11 +62,23 @@ adminRoutes.delete("/users/:id",
     AdminController.deleteUser
 );
 
-// KYC Management Routes
-adminRoutes.get("/kyc/pending", AdminController.getPendingKYC);
-adminRoutes.put("/kyc/:id/review", AdminController.reviewKYC);
+// 5. KYC Management
+adminRoutes.get("/kyc/pending",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS, // Admin
+        Permission.MANAGE_OWN_SPACES // Partner/Manager (needs refinement later)
+    ]),
+    AdminController.getPendingKYC
+);
+adminRoutes.put("/kyc/:id/review",
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    AdminController.reviewKYC
+);
 
-// Ticket Management Routes (from ticket module)
+// 6. Ticket Management Routes (from ticket module)
 adminRoutes.use("/tickets", ticketRoutes);
 
 // Note: The ticket routes from ticketModule already have /admin prefix

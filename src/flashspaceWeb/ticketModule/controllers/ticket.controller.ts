@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { TicketService } from '../services/ticket.service';
-import { Types } from 'mongoose';
+import { TicketCategory, TicketModel, TicketStatus } from '../models/Ticket';
+import { getIO } from '../../../socket';
 
 // Extend Request type locally if needed
 interface AuthenticatedRequest extends Request {
@@ -16,7 +17,7 @@ interface AuthenticatedRequest extends Request {
 export const createTicket = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id;
-    
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -27,6 +28,13 @@ export const createTicket = async (req: AuthenticatedRequest, res: Response) => 
 
     const { subject, description, category, priority, attachments } = req.body;
 
+    if (!description || description.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Description must be at least 10 characters long.'
+      });
+    }
+
     const ticket = await TicketService.createTicket(userId, {
       subject,
       description,
@@ -34,6 +42,10 @@ export const createTicket = async (req: AuthenticatedRequest, res: Response) => 
       priority,
       attachments
     });
+
+    // Notify admins
+    console.log(`Emitting new_ticket_created to admin_feed for ticket: ${ticket._id}`);
+    getIO().to('admin_feed').emit('new_ticket_created', ticket);
 
     res.status(201).json({
       success: true,
@@ -98,7 +110,7 @@ export const getTicketById = async (req: AuthenticatedRequest, res: Response) =>
     // If user is admin, they can access any ticket
     // If user is regular user, they can only access their own tickets
     const ticket = await TicketService.getTicketById(
-      ticketId, 
+      ticketId,
       userRole === 'admin' ? undefined : userId
     );
 
@@ -141,13 +153,18 @@ export const replyToTicket = async (req: AuthenticatedRequest, res: Response) =>
     }
 
     const sender = userRole === 'admin' ? 'admin' : 'user';
-    
+
     const ticket = await TicketService.addReply(ticketId, {
       userId,
       sender,
       message,
       attachments
     });
+
+    // Emit socket event
+    if (ticket && ticket.messages && ticket.messages.length > 0) {
+      getIO().to(ticketId).emit('new_message', { ticketId, message: ticket.messages[ticket.messages.length - 1] });
+    }
 
     res.status(200).json({
       success: true,
@@ -262,7 +279,7 @@ export const assignTicket = async (req: AuthenticatedRequest, res: Response) => 
 
     // Use provided assigneeId or assign to self if not provided
     const assignTo = assigneeId || adminId;
-    
+
     const ticket = await TicketService.assignTicket(ticketId, assignTo);
 
     res.status(200).json({
@@ -300,6 +317,11 @@ export const addAdminReply = async (req: AuthenticatedRequest, res: Response) =>
       message,
       attachments
     );
+
+    // Emit socket event
+    if (ticket && ticket.messages && ticket.messages.length > 0) {
+      getIO().to(ticketId).emit('new_message', { ticketId, message: ticket.messages[ticket.messages.length - 1] });
+    }
 
     res.status(200).json({
       success: true,
@@ -343,6 +365,11 @@ export const resolveTicket = async (req: Request, res: Response) => {
 
     const ticket = await TicketService.resolveTicket(ticketId);
 
+    // Emit socket event
+    if (ticket) {
+      getIO().to(ticketId).emit('ticket_updated', { ticketId, ticket });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Ticket resolved successfully',
@@ -363,6 +390,11 @@ export const closeTicket = async (req: Request, res: Response) => {
     const { ticketId } = req.params;
 
     const ticket = await TicketService.closeTicket(ticketId);
+
+    // Emit socket event
+    if (ticket) {
+      getIO().to(ticketId).emit('ticket_updated', { ticketId, ticket });
+    }
 
     res.status(200).json({
       success: true,
