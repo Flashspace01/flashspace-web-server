@@ -7,6 +7,10 @@ import { GoogleCalendarService } from "./googleCalendar.service";
 
 export const initiateGoogleAuth = async (_req: Request, res: Response) => {
   try {
+    console.log("DEBUG: initiateGoogleAuth called");
+    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_ID status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_ID ? "Present" : "Missing");
+    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET ? "Present" : "Missing");
+
     if (!GoogleCalendarService.isConfigured()) {
       return res.status(500).json({
         success: false,
