@@ -1,6 +1,9 @@
-// Load environment variables FIRST before any other imports
 import dotenv from "dotenv";
-dotenv.config();
+import path from 'path';
+
+// Explicitly define path to ensure it's found
+const envPath = path.resolve(__dirname, "../.env");
+dotenv.config({ path: envPath });
 
 import express, { Application } from "express";
 import http from "http"; // Import http module
@@ -115,7 +118,6 @@ dbConnection()
 
 // Serve uploaded files statically
 // Serve uploaded files statically
-import path from 'path';
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Main API routes

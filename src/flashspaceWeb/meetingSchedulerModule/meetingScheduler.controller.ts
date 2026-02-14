@@ -12,7 +12,7 @@ export const initiateGoogleAuth = async (_req: Request, res: Response) => {
         success: false,
         message: "Google OAuth not configured",
         data: {},
-        error: "Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET",
+        error: "Missing MEETING_SCHEDULER_GOOGLE_CLIENT_ID or MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET",
       });
     }
 
