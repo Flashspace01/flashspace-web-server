@@ -64,6 +64,25 @@ export class Ticket extends TimeStamps {
   @prop({ required: true, unique: true })
   public ticketNumber!: string;
 
+  // Optional linkage to a booking and space (for partner routing)
+  @prop()
+  public bookingId?: string;
+
+  @prop()
+  public spaceId?: string;
+
+  @prop({ type: () => Object })
+  public spaceSnapshot?: {
+    name?: string;
+    address?: string;
+    city?: string;
+    area?: string;
+  };
+
+  // Partner who owns the related space/booking (for Space Portal scoping)
+  @prop({ ref: () => User })
+  public partner?: Ref<User>;
+
   @prop({ required: true, trim: true })
   public subject!: string;
 

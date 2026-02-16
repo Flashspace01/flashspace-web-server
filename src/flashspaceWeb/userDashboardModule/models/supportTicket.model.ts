@@ -26,6 +26,10 @@ export class SupportTicket {
   @prop({ required: true, unique: true })
   ticketNumber!: string;
 
+  // Partner who owns the related space/booking (for Space Portal scoping)
+  @prop({ ref: () => User })
+  partner?: Ref<User>;
+
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 

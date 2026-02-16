@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import { ApiResponse } from "../../authModule/types/auth.types";
-import { SupportTicketModel } from "../../userDashboardModule/models/supportTicket.model";
+import { TicketModel } from "../../ticketModule/models/Ticket";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { UserModel } from "../../authModule/models/user.model";
 
@@ -11,6 +11,7 @@ export type ListTicketsParams = {
   page?: number;
   limit?: number;
   includeDeleted?: boolean;
+  partnerId?: string;
 };
 
 const escapeRegex = (value: string) =>
@@ -45,6 +46,7 @@ const toUiStatus = (value?: string) => {
       return "OPEN";
     case "in_progress":
     case "waiting_customer":
+    case "escalated":
       return "IN_PROGRESS";
     case "resolved":
       return "RESOLVED";
@@ -67,14 +69,20 @@ const mapTicketToUi = (ticket: any, spaceFromBooking?: string) => {
       : undefined;
 
   const assignedName =
-    typeof ticket.assignedTo === "object" && ticket.assignedTo
+    typeof ticket.assignee === "object" && ticket.assignee
+      ? ticket.assignee.fullName
+      : typeof ticket.assignedTo === "object" && ticket.assignedTo
       ? ticket.assignedTo.fullName
       : undefined;
 
   return {
     id: ticket.ticketNumber || ticket._id?.toString(),
     title: ticket.subject,
-    description: ticket.messages?.[0]?.message || ticket.subject || "",
+    description:
+      ticket.messages?.[0]?.message ||
+      ticket.description ||
+      ticket.subject ||
+      "",
     clientName: userName || "",
     space: spaceFromBooking || ticket.bookingId || "",
     createdAt: ticket.createdAt ? new Date(ticket.createdAt).toISOString() : "",
@@ -130,11 +138,20 @@ export class SpacePortalTicketsService {
         page = 1,
         limit = 10,
         includeDeleted = false,
+        partnerId,
       } = params;
 
-      const query: any = {
-        isDeleted: includeDeleted ? { $in: [true, false] } : false,
-      };
+      const query: any = {};
+
+      // Older tickets might not have an isDeleted flag; treat anything not explicitly deleted as active.
+      if (!includeDeleted) {
+        query.isDeleted = { $ne: true };
+      }
+
+      // Scope to partner-owned tickets when provided
+      if (partnerId) {
+        query.partner = partnerId;
+      }
 
       const normalizedStatus = normalizeStatus(status);
       const normalizedPriority = normalizePriority(priority);
@@ -146,10 +163,10 @@ export class SpacePortalTicketsService {
 
       const skip = (page - 1) * limit;
 
-      const baseQuery = SupportTicketModel.find(query)
+      const baseQuery = TicketModel.find(query)
         .sort({ createdAt: -1 })
         .populate("user", "fullName email")
-        .populate("assignedTo", "fullName email");
+        .populate("assignee", "fullName email");
 
       const tickets = hasSearch
         ? await baseQuery
@@ -157,7 +174,7 @@ export class SpacePortalTicketsService {
 
       const total = hasSearch
         ? tickets.length
-        : await SupportTicketModel.countDocuments(query);
+        : await TicketModel.countDocuments(query);
 
       const bookingSpaceMap = await buildBookingSpaceMap(tickets);
       const mappedTickets = tickets.map((ticket: any) =>
@@ -205,7 +222,7 @@ export class SpacePortalTicketsService {
     }
   }
 
-  async getTicketById(ticketId: string): Promise<ApiResponse> {
+  async getTicketById(ticketId: string, partnerId?: string): Promise<ApiResponse> {
     try {
       if (!Types.ObjectId.isValid(ticketId)) {
         return {
@@ -214,12 +231,13 @@ export class SpacePortalTicketsService {
         };
       }
 
-      const ticket = await SupportTicketModel.findOne({
+      const ticket = await TicketModel.findOne({
         _id: ticketId,
         isDeleted: false,
+        ...(partnerId ? { partner: partnerId } : {}),
       })
         .populate("user", "fullName email")
-        .populate("assignedTo", "fullName email");
+        .populate("assignee", "fullName email");
 
       if (!ticket) {
         return {
@@ -252,7 +270,8 @@ export class SpacePortalTicketsService {
 
   async updateTicket(
     ticketId: string,
-    payload: { status?: string; priority?: string; assignedTo?: string }
+    payload: { status?: string; priority?: string; assignedTo?: string },
+    partnerId?: string
   ): Promise<ApiResponse> {
     try {
       if (!Types.ObjectId.isValid(ticketId)) {
@@ -275,15 +294,18 @@ export class SpacePortalTicketsService {
 
       if (payload.status) updatePayload.status = normalizedStatus;
       if (payload.priority) updatePayload.priority = normalizedPriority;
-      if (payload.assignedTo) updatePayload.assignedTo = assignedToId;
+      if (payload.assignedTo) {
+        updatePayload.assignee = assignedToId;
+        delete updatePayload.assignedTo;
+      }
 
-      const updated = await SupportTicketModel.findOneAndUpdate(
-        { _id: ticketId, isDeleted: false },
+      const updated = await TicketModel.findOneAndUpdate(
+        { _id: ticketId, isDeleted: false, ...(partnerId ? { partner: partnerId } : {}) },
         updatePayload,
         { new: true }
       )
         .populate("user", "fullName email")
-        .populate("assignedTo", "fullName email");
+        .populate("assignee", "fullName email");
 
       if (!updated) {
         return {

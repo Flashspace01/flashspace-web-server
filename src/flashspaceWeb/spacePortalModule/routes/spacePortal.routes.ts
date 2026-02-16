@@ -128,7 +128,7 @@ spacePortalRoutes.patch(
 spacePortalRoutes.delete("/enquiries/:enquiryId", deleteEnquiry);
 
 // Tickets
-spacePortalRoutes.get("/tickets", validateListTickets, getTickets);
+spacePortalRoutes.get("/tickets",  getTickets);
 spacePortalRoutes.get("/tickets/:ticketId", getTicketById);
 spacePortalRoutes.patch("/tickets/:ticketId", validateUpdateTicket, updateTicket);
 

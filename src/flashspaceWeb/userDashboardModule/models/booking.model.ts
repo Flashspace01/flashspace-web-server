@@ -87,10 +87,11 @@ export class Booking {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop({
-    required: true,
-    enum: ["virtual_office", "coworking_space", "meeting_room"],
-  })
+  // Space partner (owner) for scoping in partner portal
+  @prop({ ref: () => User })
+  partner?: Ref<User>;
+
+  @prop({ required: true, enum: ["virtual_office", "coworking_space", "meeting_room"] })
   type!: string;
 
   @prop({ required: true })

@@ -1,5 +1,7 @@
 import { TicketModel, Ticket, TicketStatus, TicketPriority, TicketCategory } from "../models/Ticket";
 import { UserModel } from "../../authModule/models/user.model";
+import { BookingModel } from "../../userDashboardModule/models/booking.model";
+import { SpacePortalSpaceModel } from "../../spacePortalModule/models/space.model";
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -10,6 +12,9 @@ export interface CreateTicketDTO {
   category: TicketCategory;
   priority?: TicketPriority;
   attachments?: string[];
+  bookingId?: string;
+  spaceId?: string;
+  partner?: string;
 }
 
 export interface UpdateTicketDTO {
@@ -33,11 +38,51 @@ export class TicketService {
     const ticketNumber = Ticket.generateTicketNumber();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
+    let partnerId: string | undefined = data.partner;
+    let spaceId: string | undefined = data.spaceId;
+    let spaceSnapshot: any = undefined;
+
+    if (data.bookingId) {
+      const booking = await BookingModel.findById(data.bookingId).lean();
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+      if (booking.user?.toString() !== userId) {
+        throw new Error("Booking does not belong to user");
+      }
+      partnerId = partnerId || booking.partner?.toString();
+      spaceId = spaceId || booking.spaceId;
+      spaceSnapshot = booking.spaceSnapshot;
+    } else if (data.spaceId) {
+      // Look up space to determine partner and snapshot
+      const space = await SpacePortalSpaceModel.findOne({
+        _id: Types.ObjectId.isValid(data.spaceId) ? data.spaceId : undefined,
+        isDeleted: false,
+      }).lean();
+      if (space) {
+        partnerId = partnerId || (space.partner as any)?.toString?.();
+        spaceId = spaceId || space._id?.toString();
+        spaceSnapshot = {
+          name: space.name,
+          address: space.location,
+          city: space.city,
+        };
+      }
+    }
+
+    if (!partnerId) {
+      throw new Error("Unable to determine space partner for ticket");
+    }
+
     const ticket = await TicketModel.create({
       ticketNumber,
       subject: data.subject,
       description: data.description,
+      bookingId: data.bookingId,
+      spaceId,
+      spaceSnapshot,
       user: new Types.ObjectId(userId),
+      partner: partnerId ? new Types.ObjectId(partnerId) : undefined,
       category: data.category,
       priority: data.priority || TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,

@@ -41,6 +41,8 @@ export class AuthMiddleware {
           decoded.userId,
         );
         if (!user) {
+          // Token is valid but user no longer exists (DB reset or account deleted) – clear cookies and force re-auth
+          AuthMiddleware.clearTokenCookies(res);
           res.status(401).json({
             success: false,
             message: "User not found",
@@ -162,10 +164,8 @@ export class AuthMiddleware {
           };
           console.log("✅ User authenticated:", user.email);
         } else {
-          console.log(
-            "⚠️ User not found in database for userId:",
-            decoded.userId,
-          );
+          console.log('⚠️ User not found in database for userId:', decoded.userId, '— clearing auth cookies');
+          AuthMiddleware.clearTokenCookies(res);
         }
       } catch (tokenError: any) {
         console.log("⚠️ Access token verification failed:", tokenError.message);
@@ -206,17 +206,13 @@ export class AuthMiddleware {
                 user.email,
               );
             } else {
-              console.log(
-                "⚠️ User not found for refresh token userId:",
-                decoded.userId,
-              );
+              console.log('⚠️ User not found for refresh token userId:', decoded.userId, '— clearing auth cookies');
+              AuthMiddleware.clearTokenCookies(res);
             }
           } catch (refreshError: any) {
             // Both tokens invalid, continue without auth
-            console.log(
-              "⚠️ Refresh token verification failed:",
-              refreshError.message,
-            );
+            console.log('⚠️ Refresh token verification failed:', refreshError.message);
+            AuthMiddleware.clearTokenCookies(res);
           }
         } else {
           console.log("⚠️ No refresh token available");

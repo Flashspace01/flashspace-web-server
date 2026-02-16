@@ -1,4 +1,5 @@
-import { prop, getModelForClass, modelOptions, index } from "@typegoose/typegoose";
+import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import { User } from "../../authModule/models/user.model";
 
 export enum SpacePortalSpaceStatus {
   ACTIVE = "ACTIVE",
@@ -44,6 +45,10 @@ export class SpacePortalSpace {
 
   @prop({ default: false })
   public isDeleted?: boolean;
+
+  // Owner (space partner) reference
+  @prop({ ref: () => User, required: true })
+  public partner!: Ref<User>;
 }
 
 export const SpacePortalSpaceModel = getModelForClass(SpacePortalSpace);

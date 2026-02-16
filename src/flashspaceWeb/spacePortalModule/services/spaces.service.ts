@@ -29,7 +29,10 @@ const escapeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export class SpacePortalSpacesService {
-  async createSpace(payload: CreateSpaceInput): Promise<ApiResponse> {
+  async createSpace(
+    payload: CreateSpaceInput,
+    partnerId: string
+  ): Promise<ApiResponse> {
     try {
       if (payload.availableSeats > payload.totalSeats) {
         return {
@@ -38,7 +41,10 @@ export class SpacePortalSpacesService {
         };
       }
 
-      const createdSpace = await SpacePortalSpaceModel.create(payload);
+      const createdSpace = await SpacePortalSpaceModel.create({
+        ...payload,
+        partner: partnerId,
+      });
 
       return {
         success: true,
@@ -54,7 +60,10 @@ export class SpacePortalSpacesService {
     }
   }
 
-  async getSpaces(params: ListSpacesParams): Promise<ApiResponse> {
+  async getSpaces(
+    params: ListSpacesParams,
+    partnerId?: string
+  ): Promise<ApiResponse> {
     try {
       const {
         search,
@@ -68,6 +77,8 @@ export class SpacePortalSpacesService {
       const query: any = {
         isDeleted: includeDeleted ? { $in: [true, false] } : false,
       };
+
+      if (partnerId) query.partner = partnerId;
 
       if (status) query.status = status;
       if (city) query.city = new RegExp(`^${escapeRegex(city)}$`, "i");
@@ -121,7 +132,7 @@ export class SpacePortalSpacesService {
     }
   }
 
-  async getSpaceById(spaceId: string): Promise<ApiResponse> {
+  async getSpaceById(spaceId: string, partnerId?: string): Promise<ApiResponse> {
     try {
       if (!Types.ObjectId.isValid(spaceId)) {
         return {
@@ -133,6 +144,7 @@ export class SpacePortalSpacesService {
       const space = await SpacePortalSpaceModel.findOne({
         _id: spaceId,
         isDeleted: false,
+        ...(partnerId ? { partner: partnerId } : {}),
       });
 
       if (!space) {
@@ -163,7 +175,8 @@ export class SpacePortalSpacesService {
 
   async updateSpace(
     spaceId: string,
-    payload: Partial<CreateSpaceInput>
+    payload: Partial<CreateSpaceInput>,
+    partnerId?: string
   ): Promise<ApiResponse> {
     try {
       if (!Types.ObjectId.isValid(spaceId)) {
@@ -185,7 +198,7 @@ export class SpacePortalSpacesService {
       }
 
       const updated = await SpacePortalSpaceModel.findOneAndUpdate(
-        { _id: spaceId, isDeleted: false },
+        { _id: spaceId, isDeleted: false, ...(partnerId ? { partner: partnerId } : {}) },
         payload,
         { new: true }
       );
