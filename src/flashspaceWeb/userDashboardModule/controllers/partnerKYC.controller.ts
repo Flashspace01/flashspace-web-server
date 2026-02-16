@@ -91,17 +91,23 @@ export const getPartners = async (req: Request, res: Response) => {
     }
 
     // Verify KYC Profile access
+    console.log(`[getPartners] ID: ${profileId}, User: ${userId}`);
     const kycProfile = await KYCDocumentModel.findOne({
       _id: profileId,
       user: userId,
     });
 
     if (!kycProfile) {
+      console.log(
+        `[getPartners] KYC Profile NOT FOUND for ID: ${profileId}, User: ${userId}`,
+      );
       return res.status(404).json({
         success: false,
         message: "KYC profile not found",
       });
     }
+
+    console.log(`[getPartners] Found profile: ${kycProfile._id}`);
 
     const partners = await PartnerKYCModel.find({
       kycProfile: profileId,
