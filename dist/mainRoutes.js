@@ -14,9 +14,10 @@ const partnerInquiry_routes_1 = require("./flashspaceWeb/partnerInquiryModule/pa
 const payment_routes_1 = require("./flashspaceWeb/paymentModule/payment.routes");
 const userDashboard_routes_1 = __importDefault(require("./flashspaceWeb/userDashboardModule/routes/userDashboard.routes"));
 const admin_routes_1 = require("./flashspaceWeb/adminModule/routes/admin.routes");
+const spacePortal_routes_1 = require("./flashspaceWeb/spacePortalModule/routes/spacePortal.routes");
 const ticket_routes_1 = require("./flashspaceWeb/ticketModule/routes/ticket.routes");
 const meetingScheduler_routes_1 = require("./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes");
-const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
+// import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
 const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
 exports.mainRoutes = (0, express_1.Router)();
@@ -40,8 +41,10 @@ exports.mainRoutes.use("/payment", payment_routes_1.paymentRoutes);
 exports.mainRoutes.use("/user", userDashboard_routes_1.default);
 // /api/admin (Admin Dashboard APIs)
 exports.mainRoutes.use("/admin", admin_routes_1.adminRoutes);
+// /api/spaceportal (Space Portal APIs)
+exports.mainRoutes.use("/spaceportal", spacePortal_routes_1.spacePortalRoutes);
 // /api/spacePartner
-exports.mainRoutes.use("/spacePartner", spacePartner_routes_1.spacePartnerRoutes);
+// mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 exports.mainRoutes.use("/meetings", meetingScheduler_routes_1.meetingSchedulerRoutes);
 // /api/coupon

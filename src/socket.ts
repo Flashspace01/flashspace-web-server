@@ -27,10 +27,15 @@ export const initSocket = (httpServer: HttpServer) => {
     const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
     const subClient = pubClient.duplicate();
 
-    Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-        io.adapter(createAdapter(pubClient, subClient));
-        console.log(`Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`);
-    });
+    Promise.all([pubClient.connect(), subClient.connect()])
+        .then(() => {
+            io.adapter(createAdapter(pubClient, subClient));
+            console.log(`Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`);
+        })
+        .catch((err) => {
+            console.warn(`Redis connection failed: ${err.message}`);
+            console.warn("Falling back to in-memory adapter");
+        });
 
     io = new Server(httpServer, {
         cors: {

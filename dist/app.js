@@ -3,9 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// Load environment variables FIRST before any other imports
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const path_1 = __importDefault(require("path"));
+// Explicitly define path to ensure it's found
+const envPath = path_1.default.resolve(__dirname, "../.env");
+dotenv_1.default.config({ path: envPath });
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http")); // Import http module
 const cors_1 = __importDefault(require("cors"));
@@ -25,18 +27,9 @@ email_util_1.EmailUtil.initialize();
 google_util_1.GoogleUtil.initialize();
 // Initialize Socket.IO
 (0, socket_1.initSocket)(server);
-// CORS configuration with credentials support (MUST be FIRST) 
-// Updated to fix wildcard CORS issue
-const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Set-Cookie'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-};
-const allowedOrigins = [
+// CORS configuration with credentials support (MUST be FIRST)
+// Avoid wildcard origin when credentials are included
+const allowedOrigins = new Set([
     'https://flash-space-web-client.vercel.app',
     'https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app',
     'https://flash-space-web-client-rkjsstvnb-darkopers-projects.vercel.app',
@@ -49,24 +42,35 @@ const allowedOrigins = [
     'https://www.flashspace.ai',
     'http://72.60.219.115:8080',
     'http://72.60.219.115'
-];
-app.use((0, cors_1.default)({
-    ...corsOptions,
+]);
+const envOrigins = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+envOrigins.forEach((origin) => allowedOrigins.add(origin));
+const corsOptions = {
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl)
+        // Allow requests with no origin (like mobile apps or curl) without setting CORS headers
         if (!origin) {
-            return callback(null, true);
+            return callback(null, false);
         }
-        if (allowedOrigins.includes(origin)) {
-            callback(null, origin);
+        if (allowedOrigins.has(origin)) {
+            return callback(null, origin);
         }
-        else {
-            console.error('CORS blocked origin:', origin);
-            callback(new Error("CORS not allowed"), false);
-        }
+        console.error('CORS blocked origin:', origin);
+        return callback(new Error("CORS not allowed"), false);
     }
-}));
-console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
+};
+app.use((0, cors_1.default)(corsOptions));
+// Express 5 + path-to-regexp: avoid "*" string, use regex for catch-all
+app.options(/.*/, (0, cors_1.default)(corsOptions));
+console.log(`CORS enabled for allowed origins: ${Array.from(allowedOrigins).join(', ')}`);
 console.log(process.env.MONGODB_URI);
 // Middleware
 app.use(express_1.default.json());
@@ -105,7 +109,13 @@ app.use((req, res, next) => {
 });
 // Serve uploaded files statically
 // Serve uploaded files statically
-const path_1 = __importDefault(require("path"));
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
+// Health check
+app.get('/health', (_req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString()
+    });
+});
 // Main API routes
 app.use("/api", mainRoutes_1.mainRoutes);

@@ -39,7 +39,7 @@ const run = async () => {
       const booking = await BookingModel.findById(t.bookingId).lean();
       if (booking) {
         partner = booking.partner as any;
-        spaceId = spaceId || booking.spaceId;
+        spaceId = spaceId || booking.spaceId?.toString();
         spaceSnapshot = spaceSnapshot || booking.spaceSnapshot;
       }
     }

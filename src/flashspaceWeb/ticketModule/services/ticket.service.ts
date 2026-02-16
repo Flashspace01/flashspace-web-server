@@ -51,7 +51,7 @@ export class TicketService {
         throw new Error("Booking does not belong to user");
       }
       partnerId = partnerId || booking.partner?.toString();
-      spaceId = spaceId || booking.spaceId;
+      spaceId = spaceId || booking.spaceId?.toString();
       spaceSnapshot = booking.spaceSnapshot;
     } else if (data.spaceId) {
       // Look up space to determine partner and snapshot

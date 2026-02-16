@@ -251,7 +251,7 @@ export class SpacePortalTicketsService {
         const booking = await BookingModel.findById(ticket.bookingId).select(
           "spaceSnapshot.name spaceId"
         );
-        space = booking?.spaceSnapshot?.name || booking?.spaceId || "";
+        space = booking?.spaceSnapshot?.name || booking?.spaceId?.toString() || "";
       }
 
       return {
