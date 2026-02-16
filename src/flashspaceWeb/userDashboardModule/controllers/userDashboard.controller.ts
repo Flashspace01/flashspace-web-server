@@ -144,7 +144,11 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     const { spaceId } = req.params;
     const { month, year } = req.query;
     console.log("spaceId", spaceId);
-    if (!spaceId || !mongoose.Types.ObjectId.isValid(spaceId)) {
+    if (
+      !spaceId ||
+      typeof spaceId !== "string" ||
+      !mongoose.Types.ObjectId.isValid(spaceId)
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid space ID",
@@ -184,25 +188,29 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
 
     // Date Filtering
     let startDate: Date, endDate: Date;
-    const now = new Date();
-    const currentYear = year ? parseInt(year as string) : now.getFullYear();
 
-    if (month) {
-      const monthIndex = parseInt(month as string) - 1;
-      startDate = new Date(currentYear, monthIndex, 1);
-      endDate = new Date(currentYear, monthIndex + 1, 0, 23, 59, 59);
+    if (req.query.startDate && req.query.endDate) {
+      startDate = new Date(req.query.startDate as string);
+      endDate = new Date(req.query.endDate as string);
     } else {
-      // Full Year
-      startDate = new Date(currentYear, 0, 1);
-      endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+      const now = new Date();
+      const currentYear = year ? parseInt(year as string) : now.getFullYear();
+
+      if (month) {
+        const monthIndex = parseInt(month as string) - 1;
+        startDate = new Date(currentYear, monthIndex, 1);
+        endDate = new Date(currentYear, monthIndex + 1, 0, 23, 59, 59);
+      } else {
+        // Full Year
+        startDate = new Date(currentYear, 0, 1);
+        endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+      }
     }
 
     // Filter bookings that overlap with the date range
-    filter.$or = [
-      { startDate: { $gte: startDate, $lte: endDate } },
-      { endDate: { $gte: startDate, $lte: endDate } },
-      { startDate: { $lte: startDate }, endDate: { $gte: endDate } },
-    ];
+    // A booking overlaps if (Start < QueryEnd) AND (End > QueryStart)
+    filter.startDate = { $lt: endDate };
+    filter.endDate = { $gt: startDate };
 
     const bookings = await BookingModel.find(filter)
       .populate("user", "fullName email phone")
@@ -401,7 +409,7 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
 export const linkBookingToProfile = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId as string;
     const { profileId } = req.body;
 
     if (!profileId) {
@@ -554,7 +562,10 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       // Create new profile
       console.log("[updateBusinessInfo] Creating NEW profile");
       const user = await UserModel.findById(userId);
-      const isPartnerProfile = kycType === "individual" && personalFullName && personalFullName !== user?.fullName;
+      const isPartnerProfile =
+        kycType === "individual" &&
+        personalFullName &&
+        personalFullName !== user?.fullName;
       kyc = new KYCDocumentModel({
         user: userId,
         profileName:
@@ -610,7 +621,7 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       if (personalFullName) {
         kyc.personalInfo.fullName = personalFullName;
         // Update isPartner flag if changing fullName on existing individual profile
-        if (kyc.kycType === 'individual') {
+        if (kyc.kycType === "individual") {
           const user = await UserModel.findById(userId);
           kyc.isPartner = personalFullName !== user?.fullName;
         }
@@ -874,22 +885,30 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
     const { profileId } = req.body;
 
     if (!profileId) {
-      return res.status(400).json({ success: false, message: "Profile ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Profile ID is required" });
     }
 
-    const kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+    const kyc = await KYCDocumentModel.findOne({
+      _id: profileId,
+      user: userId,
+    });
 
     if (!kyc) {
-      return res.status(404).json({ success: false, message: "KYC profile not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "KYC profile not found" });
     }
 
     // Check if already submitted or approved
     if (kyc.overallStatus === "pending" || kyc.overallStatus === "approved") {
-      return res.status(400).json({ 
-        success: false, 
-        message: kyc.overallStatus === "approved" 
-          ? "KYC is already approved" 
-          : "KYC is already under review" 
+      return res.status(400).json({
+        success: false,
+        message:
+          kyc.overallStatus === "approved"
+            ? "KYC is already approved"
+            : "KYC is already under review",
       });
     }
 
@@ -898,38 +917,52 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
     const isPartner = kyc.isPartner === true;
 
     // Check personal info
-    if (!kyc.personalInfo?.fullName || !kyc.personalInfo?.aadhaarNumber || !kyc.personalInfo?.panNumber) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please complete all personal information before submitting" 
+    if (
+      !kyc.personalInfo?.fullName ||
+      !kyc.personalInfo?.aadhaarNumber ||
+      !kyc.personalInfo?.panNumber
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please complete all personal information before submitting",
       });
     }
 
     // Check business info for business type
-    if (isBusiness && (!kyc.businessInfo?.companyName || !kyc.businessInfo?.gstNumber)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please complete all business information before submitting" 
+    if (
+      isBusiness &&
+      (!kyc.businessInfo?.companyName || !kyc.businessInfo?.gstNumber)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please complete all business information before submitting",
       });
     }
 
     // Check required documents
-    const uploadedDocs = kyc.documents?.map(d => d.type) || [];
+    const uploadedDocs = kyc.documents?.map((d) => d.type) || [];
     let requiredDocs: string[];
 
     if (isBusiness) {
-      requiredDocs = ["pan_card", "gst_certificate", "address_proof", "video_kyc"];
+      requiredDocs = [
+        "pan_card",
+        "gst_certificate",
+        "address_proof",
+        "video_kyc",
+      ];
     } else if (isPartner) {
       requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
     } else {
       requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
     }
 
-    const missingDocs = requiredDocs.filter(doc => !uploadedDocs.includes(doc));
+    const missingDocs = requiredDocs.filter(
+      (doc) => !uploadedDocs.includes(doc),
+    );
     if (missingDocs.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Please upload all required documents: ${missingDocs.join(", ")}` 
+      return res.status(400).json({
+        success: false,
+        message: `Please upload all required documents: ${missingDocs.join(", ")}`,
       });
     }
 
@@ -940,14 +973,17 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
 
     await kyc.save();
 
-    res.status(200).json({ 
-      success: true, 
-      message: "KYC submitted for review successfully. Our team will review it shortly.",
-      data: kyc 
+    res.status(200).json({
+      success: true,
+      message:
+        "KYC submitted for review successfully. Our team will review it shortly.",
+      data: kyc,
     });
   } catch (error) {
     console.error("Submit KYC error:", error);
-    res.status(500).json({ success: false, message: "Failed to submit KYC for review" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to submit KYC for review" });
   }
 };
 
@@ -980,11 +1016,18 @@ function calculateKYCProgress(kyc: any): number {
     if (kyc.overallStatus === "approved") progress += 10;
   } else if (isPartner) {
     // Partner profile - no video KYC required
-    if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 50;
+    if (
+      kyc.personalInfo?.fullName &&
+      kyc.personalInfo?.aadhaarNumber &&
+      kyc.personalInfo?.panNumber
+    )
+      progress += 50;
 
     const requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
     const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
-    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    const hasRequiredCount = requiredDocs.filter((d) =>
+      uploadedDocs.includes(d),
+    ).length;
     progress += Math.round((hasRequiredCount / requiredDocs.length) * 50);
   } else {
     // Individual
