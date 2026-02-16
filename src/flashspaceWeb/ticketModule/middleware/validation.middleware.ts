@@ -25,7 +25,8 @@ export class TicketValidation {
         'any.required': 'Category is required'
       }),
       priority: Joi.string().valid('low', 'medium', 'high').default('medium'),
-      attachments: Joi.array().items(Joi.string()).optional()
+      attachments: Joi.array().items(Joi.string()).optional(),
+      bookingId: Joi.string().optional()
     });
 
     const { error, value } = schema.validate(req.body, { abortEarly: false });
