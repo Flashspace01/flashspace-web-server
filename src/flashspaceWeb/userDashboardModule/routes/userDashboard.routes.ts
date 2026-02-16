@@ -41,7 +41,6 @@ router.get("/bookings/:bookingId", getBookingById);
 router.patch("/bookings/:bookingId/auto-renew", toggleAutoRenew);
 router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
 
-
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);
 router.put("/kyc/business-info", updateBusinessInfo);
@@ -93,5 +92,18 @@ router.post("/support/tickets/:ticketId/reply", replyToTicket);
 // ============ CREDITS & REWARDS ============
 router.get("/credits", getCredits);
 router.post("/credits/redeem", redeemReward);
+
+// ============ PARTNER KYC ============
+import {
+  addPartner,
+  getPartners,
+  removePartner,
+  getPartnerDetails,
+} from "../controllers/partnerKYC.controller";
+
+router.post("/kyc/partner", addPartner);
+router.get("/kyc/partner/:profileId", getPartners);
+router.get("/kyc/partner-details/:partnerId", getPartnerDetails);
+router.delete("/kyc/partner/:partnerId", removePartner);
 
 export default router;

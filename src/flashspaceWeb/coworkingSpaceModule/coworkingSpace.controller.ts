@@ -101,7 +101,7 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
 
 export const getCoworkingSpaceById = async (req: Request, res: Response) => {
   try {
-    const { coworkingSpaceId } = req.params;
+    const coworkingSpaceId = req.params.coworkingSpaceId as string;
 
     if (!Types.ObjectId.isValid(coworkingSpaceId)) {
       return res.status(400).json({
@@ -144,7 +144,7 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
 
 export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
   try {
-    const { city } = req.params;
+    const city = req.params.city as string;
 
     const spaces = await CoworkingSpaceModel.find({
       city: new RegExp(`^${city}$`, "i"), // Case-insensitive match
@@ -178,7 +178,7 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
 
 export const updateCoworkingSpace = async (req: Request, res: Response) => {
   try {
-    const { coworkingSpaceId } = req.params;
+    const coworkingSpaceId = req.params.coworkingSpaceId as string;
     const {
       name,
       address,
@@ -255,7 +255,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
 
 export const deleteCoworkingSpace = async (req: Request, res: Response) => {
   try {
-    const { coworkingSpaceId } = req.params;
+    const coworkingSpaceId = req.params.coworkingSpaceId as string;
     const { restore } = req.query;
 
     if (!Types.ObjectId.isValid(coworkingSpaceId)) {
