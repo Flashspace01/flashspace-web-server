@@ -18,10 +18,17 @@ const razorpay = new Razorpay({
 
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
+  console.log("Starting createBookingAndInvoice for payment:", payment._id);
   try {
-    // Generate booking number
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    // Check for existing booking (Idempotency)
+    let booking = await BookingModel.findOne({ paymentId: payment._id });
+
+    // Generate booking number (Only if creating new)
+    let bookingNumber = booking?.bookingNumber;
+    if (!booking) {
+      const bookingCount = await BookingModel.countDocuments();
+      bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    }
 
     // Get space details for snapshot
     let spaceSnapshot: any = {
@@ -57,87 +64,121 @@ async function createBookingAndInvoice(payment: any) {
       }
     }
     // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
-    // or we could add specific MeetingRoomModel lookup later.
 
     // Calculate dates
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + (payment.tenure * 12)); // tenure in years
 
-    // Create booking
-    const booking = await BookingModel.create({
+    let tenureValue = payment.tenure * 12; // Default to months (years * 12)
+    let tenureUnit = "months";
+    let bookingStatus = "pending_kyc";
+    let kycStatus = "not_started";
+
+    if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      // Tenure is in hours for meeting rooms
+      endDate.setHours(endDate.getHours() + payment.tenure);
+      tenureValue = payment.tenure;
+      tenureUnit = "hours";
+      bookingStatus = "active"; // Meeting rooms are active immediately
+    } else {
+      // Virtual Office & Coworking (in years)
+      endDate.setMonth(endDate.getMonth() + (payment.tenure * 12));
+    }
+
+    console.log("Creating Booking with data:", {
       bookingNumber,
-      user: payment.userId,
-      type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : payment.paymentType === PaymentType.MEETING_ROOM ? "meeting_room" : "coworking_space",
-      spaceId: payment.spaceId,
-      spaceSnapshot,
-      plan: {
-        name: payment.planName,
-        price: payment.totalAmount,
-        originalPrice: payment.yearlyPrice * payment.tenure,
-        discount: payment.discountAmount || 0,
-        tenure: payment.tenure * 12,
-        tenureUnit: "months",
-      },
-      paymentId: payment._id?.toString(),
-      razorpayOrderId: payment.razorpayOrderId,
-      razorpayPaymentId: payment.razorpayPaymentId,
-      status: "pending_kyc",
-      kycStatus: "not_started",
-      timeline: [
-        {
-          status: "payment_received",
-          date: new Date(),
-          note: `Payment of ₹${payment.totalAmount} received`,
-          by: "System",
-        },
-      ],
-      documents: [],
-      startDate,
-      endDate,
-      autoRenew: false,
-      features: ["Business Address", "Mail Handling", "GST Registration Support"],
+      type: payment.paymentType,
+      range: `${startDate.toISOString()} - ${endDate.toISOString()}`
     });
 
-    // Generate invoice number
-    const invoiceCount = await InvoiceModel.countDocuments();
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+    const originalPrice = payment.paymentType === PaymentType.MEETING_ROOM
+      ? payment.yearlyPrice
+      : (payment.yearlyPrice * payment.tenure);
 
-    // Calculate tax (18% GST)
-    const subtotal = payment.totalAmount;
-    const taxRate = 18;
-    const taxAmount = Math.round((subtotal * taxRate) / 118); // Extract GST from inclusive price
-    const baseAmount = subtotal - taxAmount;
-
-    // Create invoice
-    await InvoiceModel.create({
-      invoiceNumber,
-      user: payment.userId,
-      bookingId: booking._id?.toString(),
-      bookingNumber,
-      paymentId: payment._id?.toString(),
-      description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
-      lineItems: [
-        {
-          description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
-          quantity: 1,
-          rate: baseAmount,
-          amount: baseAmount,
+    // Create booking if doesn't exist
+    if (!booking) {
+      booking = await BookingModel.create({
+        bookingNumber,
+        user: payment.userId,
+        type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : payment.paymentType === PaymentType.MEETING_ROOM ? "meeting_room" : "coworking_space",
+        spaceId: payment.spaceId,
+        spaceSnapshot,
+        plan: {
+          name: payment.planName,
+          price: payment.totalAmount,
+          originalPrice: originalPrice || payment.totalAmount,
+          discount: payment.discountAmount || 0,
+          tenure: tenureValue,
+          tenureUnit: tenureUnit,
         },
-      ],
-      subtotal: baseAmount,
-      taxRate,
-      taxAmount,
-      total: subtotal,
-      status: "paid",
-      paidAt: new Date(),
-      billingAddress: {
-        name: payment.userName,
-        company: "",
-        address: "",
-        city: spaceSnapshot.city || "",
-      },
-    });
+        paymentId: payment._id?.toString(),
+        razorpayOrderId: payment.razorpayOrderId,
+        razorpayPaymentId: payment.razorpayPaymentId,
+        status: bookingStatus,
+        kycStatus: kycStatus,
+        timeline: [
+          {
+            status: "payment_received",
+            date: new Date(),
+            note: `Payment of ₹${payment.totalAmount} received`,
+            by: "System",
+          },
+        ],
+        documents: [],
+        startDate,
+        endDate,
+        autoRenew: false,
+        features: payment.paymentType === PaymentType.MEETING_ROOM
+          ? ["WiFi Access", "Projector", "Whiteboard"]
+          : ["Business Address", "Mail Handling", "GST Registration Support"],
+      });
+    }
+
+    // Check for existing invoice
+    let invoice = await InvoiceModel.findOne({ paymentId: payment._id });
+    let invoiceNumber = invoice?.invoiceNumber;
+
+    if (!invoice) {
+      // Generate invoice number
+      const invoiceCount = await InvoiceModel.countDocuments();
+      invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+
+      // Calculate tax (18% GST)
+      const subtotal = payment.totalAmount;
+      const taxRate = 18;
+      const taxAmount = Math.round((subtotal * taxRate) / 118); // Extract GST from inclusive price
+      const baseAmount = subtotal - taxAmount;
+
+      // Create invoice
+      invoice = await InvoiceModel.create({
+        invoiceNumber,
+        user: payment.userId,
+        bookingId: booking._id?.toString(),
+        bookingNumber: booking.bookingNumber,
+        paymentId: payment._id?.toString(),
+        description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
+        lineItems: [
+          {
+            description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
+            quantity: 1,
+            rate: baseAmount,
+            amount: baseAmount,
+          },
+        ],
+        subtotal: baseAmount,
+        taxRate,
+        taxAmount,
+        total: subtotal,
+        status: "paid",
+        paidAt: new Date(),
+        billingAddress: {
+          name: payment.userName,
+          company: "",
+          address: "",
+          city: spaceSnapshot.city || "",
+        },
+      });
+    }
 
     // Create/update KYC record
     let kyc = await KYCDocumentModel.findOne({ user: payment.userId });
@@ -157,30 +198,76 @@ async function createBookingAndInvoice(payment: any) {
     }
 
     // Credits & Rewards Logic (Only for Meeting Rooms)
+    console.log("Checking for credit rewards. Payment Type:", payment.paymentType, "Expected:", PaymentType.MEETING_ROOM);
     if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const creditPercentage = 0.5; // 50%
-      const creditsEarned = Math.floor(payment.totalAmount * creditPercentage); // totalAmount is in INR (not paise here, wait. Payment model says totalAmount is in paise? No. Payment model says amount is in paise, totalAmount is number. let's check creating order.
-      // In createOrder: amount: totalAmount * 100. payment.totalAmount is raw amount.
-      // So if 1200 INR, totalAmount is 1200.
+      const creditPercentage = 0.01; // 1 credit per 100 spent
+      const creditsEarned = Math.floor(payment.totalAmount * creditPercentage);
+      console.log("Credits Calculation:", { totalAmount: payment.totalAmount, creditPercentage, creditsEarned });
 
       if (creditsEarned > 0) {
-        // Update User
-        await UserModel.findByIdAndUpdate(payment.userId, {
-          $inc: { credits: creditsEarned }
+        // Check if credits already awarded for this booking
+        const existingLedger = await CreditLedgerModel.findOne({
+          referenceId: booking._id?.toString(),
+          source: CreditSource.BOOKING
         });
 
-        // Get updated user to get new balance
+        if (!existingLedger) {
+          console.log(`Awarding ${creditsEarned} credits for booking ${booking.bookingNumber}`);
+          // Update User
+          const updateResult = await UserModel.findByIdAndUpdate(payment.userId, {
+            $inc: { credits: creditsEarned }
+          });
+          console.log("User Update Result (Credits):", updateResult ? "Success" : "Failed");
+
+          // Get updated user to get new balance
+          const user = await UserModel.findById(payment.userId);
+
+          // Create Ledger Entry
+          await CreditLedgerModel.create({
+            user: payment.userId,
+            amount: creditsEarned,
+            source: CreditSource.BOOKING,
+            description: `Earned ${creditsEarned} credits for meeting room booking #${booking.bookingNumber}`,
+            referenceId: booking._id?.toString(),
+            balanceAfter: user?.credits || 0
+          });
+          console.log("Credit Ledger Entry Created");
+        } else {
+          console.log(`Credits already awarded for booking ${booking.bookingNumber}, skipping.`);
+        }
+      } else {
+        console.log("Credits Earned is 0. Skipping award.");
+      }
+    } else {
+      console.log("Not a meeting room payment. Skipping credits.");
+    }
+
+    // Deduct Redeemed Credits (If any)
+    if (payment.redeemedCredits && payment.redeemedCredits > 0) {
+      // Check if deduction already happened
+      const existingDeduction = await CreditLedgerModel.findOne({
+        referenceId: booking._id?.toString(),
+        source: CreditSource.REDEEM
+      });
+
+      if (!existingDeduction) {
+        console.log(`Deducting ${payment.redeemedCredits} credits for booking ${booking.bookingNumber}`);
+        await UserModel.findByIdAndUpdate(payment.userId, {
+          $inc: { credits: -payment.redeemedCredits }
+        });
+
         const user = await UserModel.findById(payment.userId);
 
-        // Create Ledger Entry
         await CreditLedgerModel.create({
           user: payment.userId,
-          amount: creditsEarned,
-          source: CreditSource.BOOKING,
-          description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
+          amount: -payment.redeemedCredits,
+          source: CreditSource.REDEEM, // Correct enum value
+          description: `Redeemed ${payment.redeemedCredits} credits for meeting room booking #${booking.bookingNumber}`,
           referenceId: booking._id?.toString(),
           balanceAfter: user?.credits || 0
         });
+      } else {
+        console.log(`Credits already deducted for booking ${booking.bookingNumber}, skipping.`);
       }
     }
 
@@ -215,7 +302,7 @@ export const createOrder = async (req: Request, res: Response) => {
     } = req.body;
 
     // Validation
-    if (!userId || !userEmail || !spaceId || !planName || !tenure || !totalAmount) {
+    if (!userId || !userEmail || !spaceId || !planName || !tenure || totalAmount === undefined) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -226,7 +313,15 @@ export const createOrder = async (req: Request, res: Response) => {
     // Check Razorpay Keys
     let razorpayOrder;
 
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    // Special handling for 0 amount (full redemption)
+    if (totalAmount === 0) {
+      razorpayOrder = {
+        id: `order_free_${Date.now()}`,
+        amount: 0,
+        currency: "INR",
+        status: "paid"
+      };
+    } else if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
       console.warn("Razorpay keys missing - Switching to DEV MODE (Mock Order)");
       razorpayOrder = {
         id: `order_mock_${Date.now()}`,
@@ -268,7 +363,7 @@ export const createOrder = async (req: Request, res: Response) => {
       razorpayOrderId: razorpayOrder.id,
       amount: razorpayOrder.amount, // matches created amount
       currency: "INR",
-      status: PaymentStatus.PENDING,
+      status: totalAmount === 0 ? PaymentStatus.COMPLETED : PaymentStatus.PENDING,
       paymentType,
       spaceId,
       spaceName,
@@ -279,7 +374,13 @@ export const createOrder = async (req: Request, res: Response) => {
       totalAmount,
       discountPercent: discountPercent || 0,
       discountAmount: discountAmount || 0,
+      redeemedCredits: req.body.redeemedCredits || 0
     });
+
+    // Auto-create booking if free
+    if (totalAmount === 0) {
+      await createBookingAndInvoice(payment);
+    }
 
     res.status(201).json({
       success: true,
@@ -291,6 +392,7 @@ export const createOrder = async (req: Request, res: Response) => {
         paymentId: payment._id,
         keyId: process.env.RAZORPAY_KEY_ID,
         devMode: false,
+        status: payment.status
       },
     });
   } catch (error: any) {

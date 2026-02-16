@@ -88,6 +88,9 @@ export class Payment {
   @prop({ default: 0 })
   public discountAmount!: number;
 
+  @prop({ default: 0 })
+  public redeemedCredits?: number;
+
   // Metadata
   @prop()
   public notes?: string;

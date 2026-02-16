@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { AuthMiddleware } from '../middleware/auth.middleware';
-import { 
-  SignupRequest, 
-  LoginRequest, 
+import {
+  SignupRequest,
+  LoginRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  ChangePasswordRequest 
+  ChangePasswordRequest
 } from '../types/auth.types';
 
 export class AuthController {
@@ -260,7 +260,7 @@ export class AuthController {
       if (result.success) {
         // Clear cookies to force re-login with new password
         AuthMiddleware.clearTokenCookies(res);
-        
+
         res.status(200).json({
           success: true,
           message: result.message,
@@ -347,7 +347,7 @@ export class AuthController {
       }
 
       const refreshToken = AuthMiddleware.extractRefreshToken(req);
-      
+
       if (refreshToken) {
         await this.authService.logout(req.user.id, refreshToken);
       }
@@ -434,7 +434,8 @@ export class AuthController {
             isEmailVerified: user.isEmailVerified,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt
+            updatedAt: user.updatedAt,
+            credits: user.credits // Added credits
           },
           error: {}
         });
@@ -463,7 +464,7 @@ export class AuthController {
       if (req.user) {
         // Fetch full user details
         const user = await this.authService.getUserProfile(req.user.id);
-        
+
         if (user) {
           res.status(200).json({
             success: true,
@@ -481,7 +482,8 @@ export class AuthController {
                 isEmailVerified: user.isEmailVerified,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
-                updatedAt: user.updatedAt
+                updatedAt: user.updatedAt,
+                credits: user.credits // Added credits
               }
             },
             error: {}
