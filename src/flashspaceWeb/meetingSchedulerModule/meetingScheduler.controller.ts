@@ -8,15 +8,24 @@ import { GoogleCalendarService } from "./googleCalendar.service";
 export const initiateGoogleAuth = async (_req: Request, res: Response) => {
   try {
     console.log("DEBUG: initiateGoogleAuth called");
-    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_ID status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_ID ? "Present" : "Missing");
-    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET ? "Present" : "Missing");
+    console.log(
+      "DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_ID status:",
+      process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_ID ? "Present" : "Missing",
+    );
+    console.log(
+      "DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET status:",
+      process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET
+        ? "Present"
+        : "Missing",
+    );
 
     if (!GoogleCalendarService.isConfigured()) {
       return res.status(500).json({
         success: false,
         message: "Google OAuth not configured",
         data: {},
-        error: "Missing MEETING_SCHEDULER_GOOGLE_CLIENT_ID or MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET",
+        error:
+          "Missing MEETING_SCHEDULER_GOOGLE_CLIENT_ID or MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET",
       });
     }
 
@@ -189,7 +198,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
 
 export const getMeetingDetails = async (req: Request, res: Response) => {
   try {
-    const { meetingId } = req.params;
+    const meetingId = req.params.meetingId as string;
 
     if (!Types.ObjectId.isValid(meetingId)) {
       return res.status(400).json({

@@ -4,40 +4,41 @@ import { PartnerInquiryModel } from "./partnerInquiry.model";
 import { EmailUtil } from "../authModule/utils/email.util";
 
 export const createPartnerInquiry = async (req: Request, res: Response) => {
-    try {
-        const { name, email, phone, company, partnershipType, message } = req.body;
+  try {
+    const { name, email, phone, company, partnershipType, message } = req.body;
 
-        // Validate required fields
-        if (!name || !email || !phone || !partnershipType) {
-            return res.status(400).json({
-                success: false,
-                message: "Please provide all required fields (name, email, phone, partnershipType)",
-                data: {},
-                error: "Missing required fields",
-            });
-        }
+    // Validate required fields
+    if (!name || !email || !phone || !partnershipType) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please provide all required fields (name, email, phone, partnershipType)",
+        data: {},
+        error: "Missing required fields",
+      });
+    }
 
-        const inquiry = await PartnerInquiryModel.create({
-            name,
-            email,
-            phone,
-            company,
-            partnershipType,
-            message,
-            status: 'pending'
-        });
+    const inquiry = await PartnerInquiryModel.create({
+      name,
+      email,
+      phone,
+      company,
+      partnershipType,
+      message,
+      status: "pending",
+    });
 
-        if (!inquiry) {
-            return res.status(400).json({
-                success: false,
-                message: "Failed to save inquiry",
-                data: {},
-                error: "Database error",
-            });
-        }
+    if (!inquiry) {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to save inquiry",
+        data: {},
+        error: "Database error",
+      });
+    }
 
-        // Admin Email
-        const adminEmailContent = `
+    // Admin Email
+    const adminEmailContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -70,7 +71,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                         <!-- Company/Partner Highlight -->
                         <div style="background: linear-gradient(135deg, #EDB003 0%, #F5C842 100%); padding: 25px; border-radius: 12px; margin-bottom: 25px; text-align: center; box-shadow: 0 4px 15px rgba(237,176,3,0.2);">
                             <h2 style="color: #000000; margin: 0; font-size: 24px; font-weight: 700;">
-                                ${company || 'Individual Partner'}
+                                ${company || "Individual Partner"}
                             </h2>
                             <p style="color: #000000; margin: 10px 0 0 0; font-size: 14px; opacity: 0.8; font-weight: 600;">
                                 ${partnershipType}
@@ -116,7 +117,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                         Company:
                                     </td>
                                     <td style="padding: 12px 10px; color: #212529; font-size: 15px; font-weight: 600;">
-                                        ${company || 'Not Provided'}
+                                        ${company || "Not Provided"}
                                     </td>
                                 </tr>
                             </table>
@@ -133,7 +134,9 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                         </div>
 
                         <!-- Message Card -->
-                        ${message ? `
+                        ${
+                          message
+                            ? `
                         <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid #000000;">
                             <h3 style="color: #000000; margin: 0 0 15px 0; font-size: 18px; font-weight: 600;">
                                 Partner's Message
@@ -144,7 +147,9 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                 </p>
                             </div>
                         </div>
-                        ` : ''}
+                        `
+                            : ""
+                        }
 
                         <!-- Submission Details -->
                         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #dee2e6;">
@@ -154,10 +159,10 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                         Submitted On:
                                     </td>
                                     <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 700; text-align: right;">
-                                        ${new Date().toLocaleString('en-IN', { 
-                                            timeZone: 'Asia/Kolkata',
-                                            dateStyle: 'full',
-                                            timeStyle: 'medium'
+                                        ${new Date().toLocaleString("en-IN", {
+                                          timeZone: "Asia/Kolkata",
+                                          dateStyle: "full",
+                                          timeStyle: "medium",
                                         })}
                                     </td>
                                 </tr>
@@ -208,8 +213,8 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
             </html>
         `;
 
-        // Partner Confirmation Email
-        const partnerEmailContent = `
+    // Partner Confirmation Email
+    const partnerEmailContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -278,15 +283,18 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                 </tr>
                                 <tr style="border-bottom: 1px solid #e0e0e0;">
                                     <td style="padding: 15px 0; color: #666; font-size: 15px;">Company:</td>
-                                    <td style="padding: 15px 0; color: #000; font-size: 15px; font-weight: 700;">${company || 'Individual Partner'}</td>
+                                    <td style="padding: 15px 0; color: #000; font-size: 15px; font-weight: 700;">${company || "Individual Partner"}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid #e0e0e0;">
                                     <td style="padding: 15px 0; color: #666; font-size: 15px;">Submitted:</td>
-                                    <td style="padding: 15px 0; color: #000; font-size: 15px; font-weight: 700;">${new Date().toLocaleString('en-IN', { 
-                                        timeZone: 'Asia/Kolkata',
-                                        dateStyle: 'long',
-                                        timeStyle: 'short'
-                                    })}</td>
+                                    <td style="padding: 15px 0; color: #000; font-size: 15px; font-weight: 700;">${new Date().toLocaleString(
+                                      "en-IN",
+                                      {
+                                        timeZone: "Asia/Kolkata",
+                                        dateStyle: "long",
+                                        timeStyle: "short",
+                                      },
+                                    )}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 15px 0; color: #666; font-size: 15px;">Reference ID:</td>
@@ -365,108 +373,113 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
 </html>
         `;
 
-        // Send emails (non-blocking)
-        Promise.all([
-            EmailUtil.sendEmail({
-                to: process.env.ADMIN_EMAIL || 'admin@flashspace.com',
-                subject: `🤝 New Partnership Inquiry - ${partnershipType} from ${name}`,
-                html: adminEmailContent
-            }),
-            EmailUtil.sendEmail({
-                to: email,
-                subject: '🎉 Partnership Inquiry Received - FlashSpace',
-                html: partnerEmailContent
-            })
-        ]).catch(emailError => {
-            console.error('Error sending emails:', emailError);
-        });
+    // Send emails (non-blocking)
+    Promise.all([
+      EmailUtil.sendEmail({
+        to: process.env.ADMIN_EMAIL || "admin@flashspace.com",
+        subject: `🤝 New Partnership Inquiry - ${partnershipType} from ${name}`,
+        html: adminEmailContent,
+      }),
+      EmailUtil.sendEmail({
+        to: email,
+        subject: "🎉 Partnership Inquiry Received - FlashSpace",
+        html: partnerEmailContent,
+      }),
+    ]).catch((emailError) => {
+      console.error("Error sending emails:", emailError);
+    });
 
-        res.status(201).json({
-            success: true,
-            message: "Thank you for your interest! Our partnership team will contact you within 24 hours.",
-            data: inquiry,
-            error: {},
-        });
-
-    } catch (err) {
-        console.error('Partner inquiry error:', err);
-        res.status(500).json({
-            success: false,
-            message: "Something went wrong. Please try again.",
-            data: {},
-            error: err,
-        });
-    }
+    res.status(201).json({
+      success: true,
+      message:
+        "Thank you for your interest! Our partnership team will contact you within 24 hours.",
+      data: inquiry,
+      error: {},
+    });
+  } catch (err) {
+    console.error("Partner inquiry error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong. Please try again.",
+      data: {},
+      error: err,
+    });
+  }
 };
 
 export const getAllPartnerInquiries = async (req: Request, res: Response) => {
-    try {
-        const { status } = req.query;
-        let query: any = { isDeleted: false };
-        
-        if (status) {
-            query.status = status;
-        }
+  try {
+    const { status } = req.query;
+    let query: any = { isDeleted: false };
 
-        const inquiries = await PartnerInquiryModel.find(query).sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            message: "Inquiries retrieved successfully",
-            data: inquiries,
-            error: {},
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: "Failed to retrieve inquiries",
-            data: {},
-            error: err,
-        });
+    if (status) {
+      query.status = status;
     }
+
+    const inquiries = await PartnerInquiryModel.find(query).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Inquiries retrieved successfully",
+      data: inquiries,
+      error: {},
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve inquiries",
+      data: {},
+      error: err,
+    });
+  }
 };
 
-export const updatePartnerInquiryStatus = async (req: Request, res: Response) => {
-    try {
-        const { inquiryId } = req.params;
-        const { status } = req.body;
+export const updatePartnerInquiryStatus = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const inquiryId = req.params.inquiryId as string;
+    const { status } = req.body;
 
-        if (!Types.ObjectId.isValid(inquiryId)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid inquiry ID",
-                data: {},
-                error: "Invalid ObjectId",
-            });
-        }
-
-        const updatedInquiry = await PartnerInquiryModel.findByIdAndUpdate(
-            inquiryId,
-            { status },
-            { new: true }
-        );
-
-        if (!updatedInquiry) {
-            return res.status(404).json({
-                success: false,
-                message: "Inquiry not found",
-                data: {},
-                error: "Not found",
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Inquiry status updated",
-            data: updatedInquiry,
-            error: {},
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: "Failed to update inquiry",
-            data: {},
-            error: err,
-        });
+    if (!Types.ObjectId.isValid(inquiryId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid inquiry ID",
+        data: {},
+        error: "Invalid ObjectId",
+      });
     }
+
+    const updatedInquiry = await PartnerInquiryModel.findByIdAndUpdate(
+      inquiryId,
+      { status },
+      { new: true },
+    );
+
+    if (!updatedInquiry) {
+      return res.status(404).json({
+        success: false,
+        message: "Inquiry not found",
+        data: {},
+        error: "Not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Inquiry status updated",
+      data: updatedInquiry,
+      error: {},
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update inquiry",
+      data: {},
+      error: err,
+    });
+  }
 };

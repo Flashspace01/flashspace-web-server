@@ -20,7 +20,7 @@ export const createSpace = async (req: Request, res: Response) => {
     if (mediaIds && Array.isArray(mediaIds)) {
       await spaceMediaService.assignMediaToSpace(
         mediaIds,
-        space._id as string,
+        space._id as unknown as string,
         partnerId,
       );
       // Reload space to Populate if needed, or just update the references in Space model if we decide to keep references there too (we have `images` and `videos` arrays in the model).
@@ -53,7 +53,7 @@ export const getSpaces = async (req: Request, res: Response) => {
 export const getSpaceById = async (req: Request, res: Response) => {
   try {
     const partnerId = (req as any).user.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const space = await Space.findOne({ _id: id, partnerId })
       .populate("images")
       .populate("videos");
@@ -72,7 +72,7 @@ export const getSpaceById = async (req: Request, res: Response) => {
 export const updateSpace = async (req: Request, res: Response) => {
   try {
     const partnerId = (req as any).user.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const updates = req.body;
 
     const space = await Space.findOne({ _id: id, partnerId });
@@ -93,7 +93,7 @@ export const updateSpace = async (req: Request, res: Response) => {
 export const deleteSpace = async (req: Request, res: Response) => {
   try {
     const partnerId = (req as any).user.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const space = await Space.findOne({ _id: id, partnerId });
     if (!space) {
