@@ -85,7 +85,7 @@ export class NotificationService {
             .limit(limit);
     }
 
-    static async getAdminNotifications(limit = 1000000) {
+    static async getAdminNotifications(limit = 10000) {
         return await NotificationModel.find({ recipientType: NotificationRecipientType.ADMIN })
             .sort({ createdAt: -1 })
             .limit(limit);
