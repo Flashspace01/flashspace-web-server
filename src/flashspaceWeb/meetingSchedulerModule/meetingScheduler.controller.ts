@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { MeetingSchedulerService } from "./meetingScheduler.service";
 import { GoogleCalendarService } from "./googleCalendar.service";
+import { NotificationService } from "../notificationModule/services/notification.service";
+import { NotificationType } from "../notificationModule/models/Notification";
 
 // ============ Google OAuth2 Controllers ============
 
@@ -176,6 +178,9 @@ export const bookMeeting = async (req: Request, res: Response) => {
       data: result.meeting,
       error: {},
     });
+
+
+
   } catch (err) {
     console.error("Error booking meeting:", err);
     res.status(500).json({
