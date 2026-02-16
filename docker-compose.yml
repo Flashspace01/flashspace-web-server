@@ -14,6 +14,8 @@ services:
       - DB_URI=mongodb://mongo:27017/myapp # Connect to mongo container
     env_file:
       - .env
+    volumes:
+      - ./src/flashspaceWeb/meetingSchedulerModule/google-tokens.json:/app/dist/flashspaceWeb/meetingSchedulerModule/google-tokens.json
     depends_on:
       - redis
       - mongo
