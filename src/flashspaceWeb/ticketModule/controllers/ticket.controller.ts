@@ -26,7 +26,14 @@ export const createTicket = async (req: AuthenticatedRequest, res: Response) => 
       });
     }
 
-    const { subject, description, category, priority, attachments } = req.body;
+    const { subject, description, category, priority, attachments, bookingId, spaceId } = req.body;
+
+    if (!bookingId && !spaceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'bookingId or spaceId is required to create a ticket'
+      });
+    }
 
     if (!description || description.trim().length < 10) {
       return res.status(400).json({
@@ -40,7 +47,9 @@ export const createTicket = async (req: AuthenticatedRequest, res: Response) => 
       description,
       category,
       priority,
-      attachments
+      attachments,
+      bookingId,
+      spaceId
     });
 
     // Notify admins
