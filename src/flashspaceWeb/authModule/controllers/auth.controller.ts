@@ -435,7 +435,8 @@ export class AuthController {
             isEmailVerified: user.isEmailVerified,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt
+            updatedAt: user.updatedAt,
+            credits: user.credits // Added credits
           },
           error: {}
         });
@@ -482,7 +483,8 @@ export class AuthController {
                 isEmailVerified: user.isEmailVerified,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
-                updatedAt: user.updatedAt
+                updatedAt: user.updatedAt,
+                credits: user.credits // Added credits
               }
             },
             error: {}
