@@ -5,6 +5,8 @@ import { SpacePortalSpaceModel } from "../../spacePortalModule/models/space.mode
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
+import { Space } from "../../spacePartnerModule/models/space.model";
+import { BookingModel } from "../../userDashboardModule/models/booking.model";
 
 export interface CreateTicketDTO {
   subject: string;
@@ -13,8 +15,6 @@ export interface CreateTicketDTO {
   priority?: TicketPriority;
   attachments?: string[];
   bookingId?: string;
-  spaceId?: string;
-  partner?: string;
 }
 
 export interface UpdateTicketDTO {
@@ -87,6 +87,7 @@ export class TicketService {
       priority: data.priority || TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
       attachments: data.attachments || [],
+      bookingId: data.bookingId ? new Types.ObjectId(data.bookingId) : undefined,
       messages: [{
         sender: 'user',
         message: data.description,
@@ -453,5 +454,133 @@ export class TicketService {
     );
 
     return ticket;
+  }
+
+  // ============ PARTNER METHODS ============
+
+  /**
+   * Helper: get all bookingIds for a partner's spaces.
+   */
+  private static async getPartnerBookingIds(partnerId: string): Promise<Types.ObjectId[]> {
+    // 1. Find all spaces owned by this partner
+    const spaces = await Space.find({ partnerId: new Types.ObjectId(partnerId) }).select('_id').lean();
+    const spaceIds = spaces.map(s => s._id);
+    if (spaceIds.length === 0) return [];
+
+    // 2. Find all bookings for those spaces
+    const bookings = await BookingModel.find({ spaceId: { $in: spaceIds } }).select('_id').lean();
+    return bookings.map(b => b._id as Types.ObjectId);
+  }
+
+  /**
+   * Helper: validate that a ticket belongs to one of partner's spaces.
+   */
+  private static async validatePartnerOwnership(ticketId: string, partnerId: string) {
+    const bookingIds = await this.getPartnerBookingIds(partnerId);
+    if (bookingIds.length === 0) return null;
+
+    return TicketModel.findOne({
+      _id: new Types.ObjectId(ticketId),
+      bookingId: { $in: bookingIds }
+    });
+  }
+
+  /**
+   * Get all tickets that belong to bookings on partner's listings.
+   */
+  static async getPartnerTickets(partnerId: string, page: number = 1, limit: number = 20) {
+    const bookingIds = await this.getPartnerBookingIds(partnerId);
+    if (bookingIds.length === 0) {
+      return { tickets: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false };
+    }
+
+    const skip = (page - 1) * limit;
+    const query = { bookingId: { $in: bookingIds } };
+
+    const [tickets, total] = await Promise.all([
+      TicketModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('user', 'fullName email phoneNumber')
+        .populate('bookingId', 'bookingNumber spaceSnapshot type')
+        .lean(),
+      TicketModel.countDocuments(query)
+    ]);
+
+    return {
+      tickets,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1
+    };
+  }
+
+  /**
+   * Partner replies to a ticket.
+   */
+  static async addPartnerReply(ticketId: string, partnerId: string, message: string, attachments?: string[]) {
+    const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
+    if (!ticket) {
+      throw new Error('Ticket not found or access denied');
+    }
+
+    ticket.messages.push({
+      sender: 'partner',
+      message,
+      attachments,
+      createdAt: new Date()
+    });
+
+    if (ticket.status === TicketStatus.OPEN) {
+      ticket.status = TicketStatus.IN_PROGRESS;
+    }
+
+    ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await ticket.save();
+
+    // Notify user
+    NotificationService.notifyUser(
+      ticket.user.toString(),
+      `Reply on Query: ${ticket.ticketNumber}`,
+      `Partner replied: ${message.substring(0, 50)}...`,
+      NotificationType.TICKET_UPDATE,
+      { ticketId: ticket._id }
+    );
+
+    return TicketModel.findById(ticket._id)
+      .populate('user', 'fullName email phoneNumber')
+      .populate('bookingId', 'bookingNumber spaceSnapshot type')
+      .lean();
+  }
+
+  /**
+   * Partner resolves (directly closes) a ticket.
+   */
+  static async partnerCloseTicket(ticketId: string, partnerId: string) {
+    const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
+    if (!ticket) {
+      throw new Error('Ticket not found or access denied');
+    }
+
+    ticket.status = TicketStatus.CLOSED;
+    ticket.closedAt = new Date();
+    await ticket.save();
+
+    // Notify user
+    NotificationService.notifyUser(
+      ticket.user.toString(),
+      `Query Closed: ${ticket.ticketNumber}`,
+      `Your query has been closed by the partner.`,
+      NotificationType.INFO,
+      { ticketId: ticket._id }
+    );
+
+    return TicketModel.findById(ticket._id)
+      .populate('user', 'fullName email phoneNumber')
+      .populate('bookingId', 'bookingNumber spaceSnapshot type')
+      .lean();
   }
 }

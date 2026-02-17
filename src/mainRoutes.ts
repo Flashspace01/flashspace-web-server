@@ -50,4 +50,10 @@ mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
 mainRoutes.use("/coupon", couponRoutes);
 
+
+
 mainRoutes.use('/tickets', ticketRoutes);
+
+// /api/notifications
+import { notificationRoutes } from "./flashspaceWeb/notificationModule/routes/notification.routes";
+mainRoutes.use('/notifications', notificationRoutes);

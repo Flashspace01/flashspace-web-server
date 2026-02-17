@@ -419,3 +419,91 @@ export const closeTicket = async (req: Request, res: Response) => {
     });
   }
 };
+
+// ============ PARTNER CONTROLLERS ============
+
+export const getPartnerTickets = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const partnerId = req.user?._id || req.user?.id;
+    if (!partnerId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await TicketService.getPartnerTickets(partnerId, page, limit);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('Error fetching partner tickets:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch tickets', error: error.message });
+  }
+};
+
+export const addPartnerReply = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const partnerId = req.user?._id || req.user?.id;
+    if (!partnerId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { ticketId } = req.params;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required' });
+    }
+
+    const ticket = await TicketService.addPartnerReply(ticketId, partnerId, message);
+
+    // Emit socket event
+    if (ticket) {
+      getIO().to(ticketId).emit('new_message', { ticketId, ticket });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Reply sent successfully',
+      data: ticket
+    });
+  } catch (error: any) {
+    console.error('Error sending partner reply:', error);
+    res.status(error.message.includes('access denied') ? 403 : 500).json({
+      success: false,
+      message: error.message || 'Failed to send reply'
+    });
+  }
+};
+
+export const partnerCloseTicket = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const partnerId = req.user?._id || req.user?.id;
+    if (!partnerId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const { ticketId } = req.params;
+    const ticket = await TicketService.partnerCloseTicket(ticketId, partnerId);
+
+    // Emit socket event
+    if (ticket) {
+      getIO().to(ticketId).emit('ticket_updated', { ticketId, ticket });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Ticket closed successfully',
+      data: ticket
+    });
+  } catch (error: any) {
+    console.error('Error closing ticket (partner):', error);
+    res.status(error.message.includes('access denied') ? 403 : 500).json({
+      success: false,
+      message: error.message || 'Failed to close ticket'
+    });
+  }
+};
