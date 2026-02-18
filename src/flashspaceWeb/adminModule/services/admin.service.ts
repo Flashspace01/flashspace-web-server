@@ -289,7 +289,7 @@ export class AdminService {
     restore: boolean = false,
   ): Promise<ApiResponse<any>> {
     try {
-      const mongoose = require("mongoose");
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
@@ -851,7 +851,7 @@ export class AdminService {
   // Update user details
   async updateUser(userId: string, updates: any): Promise<ApiResponse<any>> {
     try {
-      const mongoose = require("mongoose");
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
