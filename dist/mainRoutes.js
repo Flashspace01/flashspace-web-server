@@ -16,6 +16,7 @@ const userDashboard_routes_1 = __importDefault(require("./flashspaceWeb/userDash
 const admin_routes_1 = require("./flashspaceWeb/adminModule/routes/admin.routes");
 const ticket_routes_1 = require("./flashspaceWeb/ticketModule/routes/ticket.routes");
 const meetingScheduler_routes_1 = require("./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes");
+const affiliate_routes_1 = require("./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes");
 const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
 const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
@@ -24,6 +25,8 @@ exports.mainRoutes = (0, express_1.Router)();
 exports.mainRoutes.use("/auth", auth_routes_1.authRoutes);
 // /api/contactForm
 exports.mainRoutes.use("/contactForm", contactForm_routes_1.contactFormRoutes);
+// /api/affiliate (Affiliate Portal APIs)
+exports.mainRoutes.use("/affiliate", affiliate_routes_1.affiliateRoutes);
 // /api/feeback
 exports.mainRoutes.use("/feedback", feedback_routes_1.feedbackRoutes);
 // /api/spaceProvider
@@ -47,3 +50,6 @@ exports.mainRoutes.use("/meetings", meetingScheduler_routes_1.meetingSchedulerRo
 // /api/coupon
 exports.mainRoutes.use("/coupon", coupon_routes_1.couponRoutes);
 exports.mainRoutes.use('/tickets', ticket_routes_1.ticketRoutes);
+// /api/notifications
+const notification_routes_1 = require("./flashspaceWeb/notificationModule/routes/notification.routes");
+exports.mainRoutes.use('/notifications', notification_routes_1.notificationRoutes);
