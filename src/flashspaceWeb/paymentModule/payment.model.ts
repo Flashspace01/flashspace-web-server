@@ -88,6 +88,10 @@ export class Payment {
   @prop({ default: 0 })
   public discountAmount!: number;
 
+  // Booking Start Date (user-selected)
+  @prop()
+  public startDate?: Date;
+
   // Metadata
   @prop()
   public notes?: string;

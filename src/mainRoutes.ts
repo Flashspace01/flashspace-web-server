@@ -10,7 +10,7 @@ import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/user
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 import { ticketRoutes } from './flashspaceWeb/ticketModule/routes/ticket.routes';
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
-
+import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
 import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
@@ -21,6 +21,8 @@ export const mainRoutes = Router();
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
+// /api/affiliate (Affiliate Portal APIs)
+mainRoutes.use("/affiliate", affiliateRoutes);
 // /api/feeback
 mainRoutes.use("/feedback", feedbackRoutes)
 // /api/spaceProvider
