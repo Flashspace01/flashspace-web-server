@@ -257,7 +257,7 @@ export class AdminService {
 
       const query: any = {
         isDeleted: false,
-        overallStatus: { $ne: "in_progress" },
+        overallStatus: { $nin: ["in_progress", "not_started"] },
       };
 
       // If partner, filter KYC docs by linkedBookings
@@ -1097,7 +1097,7 @@ export class AdminService {
       const skip = (page - 1) * limit;
       const query: any = {
         isDeleted: false,
-        status: { $ne: "in_progress" },
+        status: { $nin: ["in_progress", "not_started"] },
       };
 
       if (userId) {

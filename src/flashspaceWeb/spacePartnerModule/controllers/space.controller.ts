@@ -20,7 +20,7 @@ export const createSpace = async (req: Request, res: Response) => {
     if (mediaIds && Array.isArray(mediaIds)) {
       await spaceMediaService.assignMediaToSpace(
         mediaIds,
-        space._id as unknown as string,
+        (space._id as any).toString(),
         partnerId,
       );
       // Reload space to Populate if needed, or just update the references in Space model if we decide to keep references there too (we have `images` and `videos` arrays in the model).
