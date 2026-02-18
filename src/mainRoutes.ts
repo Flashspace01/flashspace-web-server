@@ -15,6 +15,7 @@ import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/sp
 import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 
+import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 export const mainRoutes = Router();
 
 // /api/auth
@@ -42,7 +43,10 @@ mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
+// /api/coupon
 mainRoutes.use("/coupon", couponRoutes);
+// /api/mail
+mainRoutes.use("/mail", mailRoutes);
 
 
 
@@ -51,3 +55,7 @@ mainRoutes.use('/tickets', ticketRoutes);
 // /api/notifications
 import { notificationRoutes } from "./flashspaceWeb/notificationModule/routes/notification.routes";
 mainRoutes.use('/notifications', notificationRoutes);
+
+// /api/visit
+import visitRoutes from "./flashspaceWeb/visitModule/routes/visit.routes";
+mainRoutes.use('/visit', visitRoutes);
