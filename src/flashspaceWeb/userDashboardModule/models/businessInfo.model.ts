@@ -9,33 +9,36 @@ import { User } from "../../authModule/models/user.model";
 import { KYCDocument, KYCDocumentItem } from "./kyc.model";
 
 @modelOptions({ options: { allowMixed: Severity.ALLOW } })
-export class PartnerKYC {
+export class BusinessInfo {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop({ ref: () => KYCDocument, required: true })
-  kycProfile!: Ref<KYCDocument>;
+  @prop({ ref: () => KYCDocument })
+  kycProfile?: Ref<KYCDocument>;
+
+  @prop()
+  profileName?: string;
 
   @prop({ required: true })
-  fullName!: string;
+  companyName!: string;
 
-  @prop({ required: true })
-  email!: string;
+  @prop()
+  companyType?: string;
 
-  @prop({ required: true })
-  phone!: string;
+  @prop()
+  gstNumber?: string;
 
   @prop()
   panNumber?: string;
 
   @prop()
-  aadhaarNumber?: string;
+  cinNumber?: string;
 
   @prop()
-  dob?: Date;
+  registeredAddress?: string;
 
   @prop()
-  address?: string;
+  industry?: string;
 
   @prop({ default: false })
   isDeleted?: boolean;
@@ -59,4 +62,4 @@ export class PartnerKYC {
   updatedAt?: Date;
 }
 
-export const PartnerKYCModel = getModelForClass(PartnerKYC);
+export const BusinessInfoModel = getModelForClass(BusinessInfo);

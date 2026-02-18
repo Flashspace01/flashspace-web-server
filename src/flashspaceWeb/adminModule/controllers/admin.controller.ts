@@ -97,6 +97,58 @@ export class AdminController {
       res.status(statusCode).json(result);
     }
   }
+
+  // GET /api/admin/kyc/:id
+  static async getKYCDetails(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const result = await adminService.getKYCDetails(id);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode =
+        result.message === "KYC document not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
+  // GET /api/admin/kyc/partner/:id
+  static async getPartnerDetails(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const result = await adminService.getPartnerDetails(id);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message === "Partner KYC not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
+  // PUT /api/admin/kyc/:id/document/:docId/review
+  static async reviewKYCDocument(req: Request, res: Response) {
+    const { id, docId } = req.params as { id: string; docId: string };
+    const { action, rejectionReason } = req.body;
+
+    if (!action || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Must be 'approve' or 'reject'",
+      });
+    }
+
+    const result = await adminService.reviewKYCDocument(
+      id,
+      docId as string,
+      action,
+      rejectionReason,
+    );
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message.includes("not found") ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
   // POST /api/admin/users
   static async createUser(req: Request, res: Response) {
     const { fullName, email, password, role } = req.body;
@@ -188,6 +240,60 @@ export class AdminController {
       res.status(200).json(result);
     } else {
       res.status(500).json(result);
+    }
+  }
+
+  // GET /api/admin/kyc/user/:userId/business-info
+  static async getBusinessInfoByUser(req: Request, res: Response) {
+    const userId = req.params.userId as string;
+    const result = await adminService.getBusinessInfoByUser(userId);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      if (result.message === "Business info not found") {
+        res.status(200).json({ success: true, data: null });
+      } else {
+        res.status(500).json(result);
+      }
+    }
+  }
+
+  // GET /api/admin/kyc/business-info/:id
+  static async getBusinessInfoById(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const result = await adminService.getBusinessInfoById(id);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode =
+        result.message === "Business info not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
+  // PUT /api/admin/kyc/business-info/:id/status
+  static async updateBusinessInfoStatus(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const { action, rejectionReason } = req.body;
+
+    if (!action || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Must be 'approve' or 'reject'",
+      });
+    }
+
+    const result = await adminService.updateBusinessInfoStatus(
+      id,
+      action,
+      rejectionReason,
+    );
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode =
+        result.message === "Business info not found" ? 404 : 500;
+      res.status(statusCode).json(result);
     }
   }
 }

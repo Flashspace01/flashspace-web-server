@@ -87,6 +87,34 @@ adminRoutes.put(
   AdminController.reviewKYC,
 );
 
+// Get Partner KYC Details
+adminRoutes.get(
+  "/kyc/partner/:id",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getPartnerDetails,
+);
+
+adminRoutes.get(
+  "/kyc/:id",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getKYCDetails,
+);
+
+adminRoutes.put(
+  "/kyc/:id/document/:docId/review",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.reviewKYCDocument,
+);
+
 // Partner KYC Management - List all requests
 adminRoutes.get(
   "/kyc-requests",
@@ -114,6 +142,35 @@ adminRoutes.put(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.updatePartnerStatus,
+  AdminController.updatePartnerStatus,
+);
+
+// Business Info Management
+adminRoutes.get(
+  "/kyc/user/:userId/business-info",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getBusinessInfoByUser,
+);
+
+adminRoutes.get(
+  "/kyc/business-info/:id",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getBusinessInfoById,
+);
+
+adminRoutes.put(
+  "/kyc/business-info/:id/status",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.updateBusinessInfoStatus,
 );
 
 // 6. Ticket Management Routes (from ticket module)

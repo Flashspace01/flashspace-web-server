@@ -49,6 +49,9 @@ class BusinessInfo {
   @prop()
   registeredAddress?: string;
 
+  @prop()
+  industry?: string;
+
   @prop({ default: false })
   verified?: boolean;
 
@@ -126,6 +129,9 @@ export class KYCDocument {
 
   @prop({ default: 0 })
   partnerCount?: number;
+
+  @prop({ default: 0 })
+  businessInfoCount?: number;
 
   @prop({ default: false })
   isDeleted?: boolean;

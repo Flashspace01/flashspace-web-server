@@ -58,8 +58,13 @@ export const addPartner = async (req: Request, res: Response) => {
       });
     }
 
-    // Increment partnerCount in KYC Profile
-    kycProfile.partnerCount = (kycProfile.partnerCount || 0) + 1;
+    // Recalculate partnerCount in KYC Profile
+    const pendingPartnerCount = await PartnerKYCModel.countDocuments({
+      user: userId,
+      status: "pending",
+    });
+
+    kycProfile.partnerCount = pendingPartnerCount;
     await kycProfile.save();
 
     res.status(201).json({
