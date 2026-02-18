@@ -55,5 +55,11 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.VIEW_LEADS,
         Permission.VIEW_DASHBOARD
     ],
-    [UserRole.USER]: [] // Basic user permissions (booking, etc.) are public/authenticated scope
+    [UserRole.USER]: [], // Basic user permissions (booking, etc.) are public/authenticated scope
+
+    [UserRole.AFFILIATE]: [
+        Permission.MANAGE_LEADS,
+        Permission.VIEW_LEADS,
+        Permission.VIEW_DASHBOARD
+    ],
 };

@@ -60,8 +60,8 @@ async function createBookingAndInvoice(payment: any) {
     // or we could add specific MeetingRoomModel lookup later.
 
     // Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
+    const startDate = payment.startDate ? new Date(payment.startDate) : new Date();
+    const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + (payment.tenure * 12)); // tenure in years
 
     // Create booking
@@ -212,6 +212,7 @@ export const createOrder = async (req: Request, res: Response) => {
       discountPercent,
       discountAmount,
       paymentType = PaymentType.VIRTUAL_OFFICE,
+      startDate,
     } = req.body;
 
     // Validation
@@ -279,6 +280,7 @@ export const createOrder = async (req: Request, res: Response) => {
       totalAmount,
       discountPercent: discountPercent || 0,
       discountAmount: discountAmount || 0,
+      startDate: startDate ? new Date(startDate) : undefined,
     });
 
     res.status(201).json({
