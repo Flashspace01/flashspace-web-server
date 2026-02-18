@@ -5,7 +5,7 @@ const mongoose_1 = require("mongoose");
 const contactForm_model_1 = require("./contactForm.model");
 const createContactForm = async (req, res) => {
     try {
-        let { fullName, email, phoneNumber, companyName, serviceInterest, message } = req.body;
+        let { fullName, email, phoneNumber, companyName, serviceInterest, message, } = req.body;
         // const user = await ContactFormModel.findOne({
         //     email,
         //     phoneNumber
@@ -24,7 +24,7 @@ const createContactForm = async (req, res) => {
             phoneNumber,
             companyName,
             serviceInterest,
-            message
+            message,
         });
         if (!createdContact) {
             return res.status(400).json({
@@ -54,7 +54,9 @@ exports.createContactForm = createContactForm;
 const getAllContactForm = async (req, res) => {
     try {
         let query = { isDeleted: false };
-        const allContacts = await contactForm_model_1.ContactFormModel.find(query).sort({ createdAt: -1 });
+        const allContacts = await contactForm_model_1.ContactFormModel.find(query).sort({
+            createdAt: -1,
+        });
         if (allContacts.length === 0) {
             return res.status(500).json({
                 success: false,
@@ -82,7 +84,7 @@ const getAllContactForm = async (req, res) => {
 exports.getAllContactForm = getAllContactForm;
 const getContactFormById = async (req, res) => {
     try {
-        const { contactId } = req.params;
+        const contactId = req.params.contactId;
         if (!mongoose_1.Types.ObjectId.isValid(contactId)) {
             return res.status(400).json({
                 success: false,
@@ -93,7 +95,7 @@ const getContactFormById = async (req, res) => {
         }
         const contact = await contactForm_model_1.ContactFormModel.findOne({
             _id: contactId,
-            isDeleted: false
+            isDeleted: false,
         });
         if (!contact) {
             return res.status(404).json({
@@ -122,8 +124,8 @@ const getContactFormById = async (req, res) => {
 exports.getContactFormById = getContactFormById;
 const updateContactForm = async (req, res) => {
     try {
-        const { contactId } = req.params;
-        const { fullName, email, phoneNumber, companyName, serviceInterest, message, isActive } = req.body;
+        const contactId = req.params.contactId;
+        const { fullName, email, phoneNumber, companyName, serviceInterest, message, isActive, } = req.body;
         if (!mongoose_1.Types.ObjectId.isValid(contactId)) {
             return res.status(400).json({
                 success: false,
@@ -139,7 +141,7 @@ const updateContactForm = async (req, res) => {
             ...(companyName && { companyName }),
             ...(serviceInterest && { serviceInterest }),
             ...(message !== undefined && { message }),
-            ...(isActive !== undefined && { isActive })
+            ...(isActive !== undefined && { isActive }),
         }, { new: true, runValidators: true });
         if (!updatedContact) {
             return res.status(404).json({
@@ -168,7 +170,7 @@ const updateContactForm = async (req, res) => {
 exports.updateContactForm = updateContactForm;
 const deleteContactForm = async (req, res) => {
     try {
-        const { contactId } = req.params;
+        const contactId = req.params.contactId;
         if (!mongoose_1.Types.ObjectId.isValid(contactId)) {
             return res.status(400).json({
                 success: false,
@@ -179,7 +181,7 @@ const deleteContactForm = async (req, res) => {
         }
         const deletedContact = await contactForm_model_1.ContactFormModel.findOneAndUpdate({ _id: contactId, isDeleted: false }, {
             isDeleted: true,
-            isActive: false
+            isActive: false,
         }, { new: true });
         if (!deletedContact) {
             return res.status(404).json({
