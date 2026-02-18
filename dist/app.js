@@ -3,9 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// Load environment variables FIRST before any other imports
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const path_1 = __importDefault(require("path"));
+// Explicitly define path to ensure it's found
+const envPath = path_1.default.resolve(__dirname, "../.env");
+dotenv_1.default.config({ path: envPath });
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http")); // Import http module
 const cors_1 = __importDefault(require("cors"));
@@ -105,7 +107,6 @@ app.use((req, res, next) => {
 });
 // Serve uploaded files statically
 // Serve uploaded files statically
-const path_1 = __importDefault(require("path"));
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 // Main API routes
 app.use("/api", mainRoutes_1.mainRoutes);
