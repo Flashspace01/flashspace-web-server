@@ -97,6 +97,7 @@ export class AdminController {
       res.status(statusCode).json(result);
     }
   }
+<<<<<<< HEAD
 
   // GET /api/admin/kyc/:id
   static async getKYCDetails(req: Request, res: Response) {
@@ -221,6 +222,80 @@ export class AdminController {
     }
   }
 
+=======
+  // POST /api/admin/users
+  static async createUser(req: Request, res: Response) {
+    const { fullName, email, password, role } = req.body;
+
+    if (!fullName || !email || !password || !role) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    const result = await adminService.createUser({
+      fullName,
+      email,
+      password,
+      role,
+    });
+    if (result.success) {
+      res.status(201).json(result);
+    } else {
+      res.status(400).json(result);
+    }
+  }
+  // PUT /api/admin/users/:id
+  static async updateUser(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const updates = req.body;
+
+    const result = await adminService.updateUser(id, updates);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message === "User not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+  // GET /api/admin/kyc/user/:userId/partners
+  static async getPartnersByUser(req: Request, res: Response) {
+    const userId = req.params.userId as string;
+    const result = await adminService.getPartnersByUser(userId);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
+  // PUT /api/admin/kyc/partner/:partnerId/status
+  static async updatePartnerStatus(req: Request, res: Response) {
+    const partnerId = req.params.partnerId as string;
+    const { action, rejectionReason } = req.body;
+
+    if (!action || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Must be 'approve' or 'reject'",
+      });
+    }
+
+    const result = await adminService.updatePartnerStatus(
+      partnerId,
+      action,
+      rejectionReason,
+    );
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message === "Partner not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
+>>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
   // GET /api/admin/kyc-requests
   static async getAllPartnerKYC(req: Request, res: Response) {
     const page = parseInt(req.query.page as string) || 1;
@@ -240,6 +315,7 @@ export class AdminController {
       res.status(200).json(result);
     } else {
       res.status(500).json(result);
+<<<<<<< HEAD
     }
   }
 
@@ -294,6 +370,8 @@ export class AdminController {
       const statusCode =
         result.message === "Business info not found" ? 404 : 500;
       res.status(statusCode).json(result);
+=======
+>>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
     }
   }
 }

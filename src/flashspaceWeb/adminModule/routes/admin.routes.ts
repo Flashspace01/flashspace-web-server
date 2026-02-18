@@ -87,6 +87,7 @@ adminRoutes.put(
   AdminController.reviewKYC,
 );
 
+<<<<<<< HEAD
 // Get Partner KYC Details
 adminRoutes.get(
   "/kyc/partner/:id",
@@ -115,6 +116,8 @@ adminRoutes.put(
   AdminController.reviewKYCDocument,
 );
 
+=======
+>>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
 // Partner KYC Management - List all requests
 adminRoutes.get(
   "/kyc-requests",
@@ -142,6 +145,7 @@ adminRoutes.put(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.updatePartnerStatus,
+<<<<<<< HEAD
   AdminController.updatePartnerStatus,
 );
 
@@ -171,6 +175,8 @@ adminRoutes.put(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.updateBusinessInfoStatus,
+=======
+>>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
 );
 
 // 6. Ticket Management Routes (from ticket module)

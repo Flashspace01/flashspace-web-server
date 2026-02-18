@@ -130,9 +130,12 @@ export class KYCDocument {
   @prop({ default: 0 })
   partnerCount?: number;
 
+<<<<<<< HEAD
   @prop({ default: 0 })
   businessInfoCount?: number;
 
+=======
+>>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
   @prop({ default: false })
   isDeleted?: boolean;
 

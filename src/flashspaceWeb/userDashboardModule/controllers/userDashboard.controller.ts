@@ -882,6 +882,7 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       if (personalPan) kyc.personalInfo.panNumber = personalPan;
       if (personalFullName) {
         kyc.personalInfo.fullName = personalFullName;
+        // Update isPartner flag if changing fullName on existing individual profile
         if (kyc.kycType === "individual") {
           const user = await UserModel.findById(userId);
           kyc.isPartner = personalFullName !== user?.fullName;
