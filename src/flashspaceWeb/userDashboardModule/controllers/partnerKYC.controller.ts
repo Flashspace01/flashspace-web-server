@@ -62,6 +62,7 @@ export const addPartner = async (req: Request, res: Response) => {
     const pendingPartnerCount = await PartnerKYCModel.countDocuments({
       user: userId,
       status: "pending",
+      isDeleted: { $ne: true },
     });
 
     kycProfile.partnerCount = pendingPartnerCount;
@@ -82,7 +83,54 @@ export const addPartner = async (req: Request, res: Response) => {
   }
 };
 
-// Get all partners for a KYC profile
+export const getPartners = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { profileId } = req.params;
+
+    console.log(`[getPartners] User: ${userId}, Profile: ${profileId}`);
+
+    if (!profileId) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile ID required",
+      });
+    }
+
+    // Verify KYC Profile access
+    const kycProfile = await KYCDocumentModel.findOne({
+      _id: profileId,
+      user: userId,
+    });
+
+    if (!kycProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "KYC profile not found",
+      });
+    }
+
+    // Query PartnerKYCModel for partners linked to this profile
+    const partners = await PartnerKYCModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
+    }).sort({ createdAt: -1 });
+
+    console.log(`[getPartners] Found ${partners.length} partners`);
+
+    res.status(200).json({
+      success: true,
+      data: partners,
+    });
+  } catch (error: any) {
+    console.error("Get partners error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch partners",
+      error: error.message,
+    });
+  }
+};
 
 // Remove a partner
 export const removePartner = async (req: Request, res: Response) => {
@@ -114,13 +162,18 @@ export const removePartner = async (req: Request, res: Response) => {
     partner.isDeleted = true;
     await partner.save();
 
-    // Decrement partnerCount
+    // Recalculate partnerCount
     const kycProfile = await KYCDocumentModel.findOne({
       _id: partner.kycProfile,
     });
 
-    if (kycProfile) {
-      kycProfile.partnerCount = Math.max((kycProfile.partnerCount || 1) - 1, 0);
+    if (kycProfile && partner.user) {
+      const pendingPartnerCount = await PartnerKYCModel.countDocuments({
+        user: partner.user,
+        status: "pending",
+        isDeleted: { $ne: true },
+      });
+      kycProfile.partnerCount = pendingPartnerCount;
       await kycProfile.save();
     }
 
@@ -133,43 +186,6 @@ export const removePartner = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to remove partner",
-    });
-  }
-};
-
-// Get details of a specific partner
-export const getPartners = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { profileId } = req.params;
-
-    console.log(`[getPartners] User: ${userId}, MainProfile: ${profileId}`);
-
-    if (!profileId) {
-      return res.status(400).json({
-        success: false,
-        message: "Profile ID required",
-      });
-    }
-
-    // Correctly query PartnerKYCModel for partners linked to this profile
-    const partners = await PartnerKYCModel.find({
-      user: userId,
-      isDeleted: { $ne: true },
-    }).sort({ createdAt: -1 });
-
-    console.log(`[getPartners] Found ${partners.length} partners`);
-
-    res.status(200).json({
-      success: true,
-      data: partners,
-    });
-  } catch (error: any) {
-    console.error("Get partners error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch partners",
-      error: error.message,
     });
   }
 };

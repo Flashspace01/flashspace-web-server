@@ -638,21 +638,19 @@ export class AdminService {
             partner.updatedAt = new Date();
             await partner.save();
 
-            // Recalculate partnerCount if status changed to rejected
-            if (action === "reject") {
-              const userId = partner.user;
-              if (userId) {
-                const pendingPartnerCount =
-                  await PartnerKYCModel.countDocuments({
-                    user: userId,
-                    status: "pending",
-                  });
+            // Recalculate partnerCount for any status change
+            const userId = partner.user;
+            if (userId) {
+              const pendingPartnerCount = await PartnerKYCModel.countDocuments({
+                user: userId,
+                status: "pending",
+                isDeleted: false,
+              });
 
-                await KYCDocumentModel.findOneAndUpdate(
-                  { user: userId },
-                  { partnerCount: pendingPartnerCount },
-                );
-              }
+              await KYCDocumentModel.findOneAndUpdate(
+                { user: userId },
+                { partnerCount: pendingPartnerCount },
+              );
             }
 
             return {
@@ -713,24 +711,22 @@ export class AdminService {
             businessInfo.updatedAt = new Date();
             await businessInfo.save();
 
-            // Recalculate businessInfoCount if status changed to rejected
-            if (action === "reject") {
-              const userId = businessInfo.user;
-              if (userId) {
-                const userObjectId = new mongoose.Types.ObjectId(
-                  userId.toString(),
-                );
-                const pendingBusinessCount =
-                  await BusinessInfoModel.countDocuments({
-                    user: userObjectId,
-                    status: "pending",
-                  });
+            // Recalculate businessInfoCount for any status change
+            const userId = businessInfo.user;
+            if (userId) {
+              const userObjectId = new mongoose.Types.ObjectId(
+                userId.toString(),
+              );
+              const pendingBusinessCount =
+                await BusinessInfoModel.countDocuments({
+                  user: userObjectId,
+                  status: "pending",
+                });
 
-                await KYCDocumentModel.findOneAndUpdate(
-                  { user: userObjectId },
-                  { businessInfoCount: pendingBusinessCount },
-                );
-              }
+              await KYCDocumentModel.findOneAndUpdate(
+                { user: userObjectId },
+                { businessInfoCount: pendingBusinessCount },
+              );
             }
 
             return {
@@ -794,6 +790,7 @@ export class AdminService {
         data: kyc,
       };
     } catch (error: any) {
+      console.error("Review KYC Document error:", error);
       return {
         success: false,
         message: "Failed to review document",

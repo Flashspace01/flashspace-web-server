@@ -172,6 +172,7 @@ export class AdminController {
       res.status(400).json(result);
     }
   }
+
   // PUT /api/admin/users/:id
   static async updateUser(req: Request, res: Response) {
     const id = req.params.id as string;
@@ -185,6 +186,7 @@ export class AdminController {
       res.status(statusCode).json(result);
     }
   }
+
   // GET /api/admin/kyc/user/:userId/partners
   static async getPartnersByUser(req: Request, res: Response) {
     const userId = req.params.userId as string;

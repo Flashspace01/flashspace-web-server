@@ -1365,6 +1365,20 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       );
     }
 
+    // Recalculate partnerCount if it's a Partner KYC doc
+    if (isPartner) {
+      const pendingPartnerCount = await PartnerKYCModel.countDocuments({
+        user: userId,
+        status: "pending",
+        isDeleted: { $ne: true },
+      });
+
+      await KYCDocumentModel.findOneAndUpdate(
+        { user: userId },
+        { partnerCount: pendingPartnerCount },
+      );
+    }
+
     res.status(200).json({
       success: true,
       message:
