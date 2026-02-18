@@ -10,6 +10,8 @@ import { UserModel } from "../../authModule/models/user.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
 
 // ============ DASHBOARD ============
 
@@ -1377,6 +1379,36 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
         { user: userId },
         { partnerCount: pendingPartnerCount },
       );
+    }
+
+    // Notify Admin
+    try {
+      const user = await UserModel.findById(userId);
+      const userName = user?.fullName || "User";
+
+      let title = "New KYC Request";
+      let message = `${userName} has submitted a KYC request for review.`;
+
+      if (isPartner) {
+        title = "New Partner KYC Request";
+        message = `${userName} has submitted a Partner KYC request.`;
+      } else if (isBusinessInfoDoc) {
+        title = "New Business Profile Request";
+        message = `${userName} has submitted a Business Profile for review.`;
+      }
+
+      await NotificationService.notifyAdmin(
+        title,
+        message,
+        NotificationType.INFO,
+        {
+          userId,
+          kycId: profileId,
+          type: isPartner ? "partner" : isBusinessInfoDoc ? "business" : "individual"
+        }
+      );
+    } catch (notifError) {
+      console.error("[submitKYCForReview] Failed to send notification:", notifError);
     }
 
     res.status(200).json({
