@@ -257,11 +257,7 @@ export class AdminService {
 
       const query: any = {
         isDeleted: false,
-<<<<<<< HEAD
         overallStatus: { $nin: ["in_progress", "not_started"] },
-=======
-        // Fetch all statuses, not just pending
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
       };
 
       // If partner, filter KYC docs by linkedBookings
@@ -389,7 +385,6 @@ export class AdminService {
     rejectionReason?: string,
   ): Promise<ApiResponse<any>> {
     try {
-<<<<<<< HEAD
       let doc: any = await KYCDocumentModel.findById(kycId);
       let type: "kyc" | "partner" | "business" = "kyc";
 
@@ -812,58 +807,6 @@ export class AdminService {
     try {
       const { fullName, email, password, role } = userData;
 
-=======
-      const kyc = await KYCDocumentModel.findById(kycId);
-      if (!kyc) return { success: false, message: "KYC document not found" };
-
-      // Note: Ideally, check if this KYC belongs to a booking in a space managed by the partner.
-      // For now, relying on controller RBAC. But safer to add check here too if critical.
-
-      kyc.overallStatus = action === "approve" ? "approved" : "rejected";
-
-      if (kyc.documents) {
-        kyc.documents.forEach((doc) => {
-          doc.status = action === "approve" ? "approved" : "rejected";
-          if (action === "reject" && rejectionReason)
-            doc.rejectionReason = rejectionReason;
-          doc.verifiedAt = new Date();
-        });
-      }
-
-      kyc.progress = action === "approve" ? 100 : 0;
-      kyc.updatedAt = new Date();
-      await kyc.save();
-
-      // If approved, update the related bookings' KYC status
-      if (
-        action === "approve" &&
-        kyc.linkedBookings &&
-        kyc.linkedBookings.length > 0
-      ) {
-        for (const bookingId of kyc.linkedBookings) {
-          await BookingModel.findByIdAndUpdate(bookingId, {
-            kycStatus: "approved",
-            status: "active", // Move booking to active status
-          });
-        }
-      }
-
-      return { success: true, message: `KYC ${action}ed successfully` };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: "Failed to review KYC",
-        error: error.message,
-      };
-    }
-  }
-
-  // Create a new user
-  async createUser(userData: any): Promise<ApiResponse<any>> {
-    try {
-      const { fullName, email, password, role } = userData;
-
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
       const existingUser = await UserModel.findOne({
         email: email.toLowerCase(),
       });
@@ -1113,7 +1056,6 @@ export class AdminService {
 
       await partner.save();
 
-<<<<<<< HEAD
       // Recalculate partnerCount in the user's KYC document
       // Rely on user ID to find the main KYC profile
       const userId = partner.user;
@@ -1126,17 +1068,6 @@ export class AdminService {
         await KYCDocumentModel.findOneAndUpdate(
           { user: userId },
           { partnerCount: pendingPartnerCount },
-=======
-      // Decrement partnerCount in the user's KYC document when partner is approved
-      if (action === "approve" && partner.kycProfile) {
-        await KYCDocumentModel.findByIdAndUpdate(partner.kycProfile, {
-          $inc: { partnerCount: -1 },
-        });
-        // Ensure partnerCount doesn't go below 0
-        await KYCDocumentModel.updateOne(
-          { _id: partner.kycProfile, partnerCount: { $lt: 0 } },
-          { $set: { partnerCount: 0 } },
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
         );
       }
 
@@ -1164,14 +1095,10 @@ export class AdminService {
   ): Promise<ApiResponse<any>> {
     try {
       const skip = (page - 1) * limit;
-<<<<<<< HEAD
       const query: any = {
         isDeleted: false,
         status: { $nin: ["in_progress", "not_started"] },
       };
-=======
-      const query: any = { isDeleted: false };
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
 
       if (userId) {
         query.user = userId;
@@ -1219,7 +1146,6 @@ export class AdminService {
     }
   }
 
-<<<<<<< HEAD
   // Get business info by user
   async getBusinessInfoByUser(userId: string): Promise<ApiResponse<any>> {
     try {
@@ -1360,8 +1286,6 @@ export class AdminService {
     }
   }
 
-=======
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
   private getEmptyRevenueStats() {
     return {
       metrics: { mtd: 0, ytd: 0, avgPerClient: 0, partnerPayouts: 0 },

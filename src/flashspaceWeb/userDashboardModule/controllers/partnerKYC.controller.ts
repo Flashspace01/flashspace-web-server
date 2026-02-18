@@ -58,7 +58,6 @@ export const addPartner = async (req: Request, res: Response) => {
       });
     }
 
-<<<<<<< HEAD
     // Recalculate partnerCount in KYC Profile
     const pendingPartnerCount = await PartnerKYCModel.countDocuments({
       user: userId,
@@ -66,10 +65,6 @@ export const addPartner = async (req: Request, res: Response) => {
     });
 
     kycProfile.partnerCount = pendingPartnerCount;
-=======
-    // Increment partnerCount in KYC Profile
-    kycProfile.partnerCount = (kycProfile.partnerCount || 0) + 1;
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
     await kycProfile.save();
 
     res.status(201).json({
@@ -88,57 +83,6 @@ export const addPartner = async (req: Request, res: Response) => {
 };
 
 // Get all partners for a KYC profile
-<<<<<<< HEAD
-=======
-export const getPartners = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const profileId = req.params.profileId as string;
-
-    if (!Types.ObjectId.isValid(profileId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Profile ID",
-      });
-    }
-
-    // Verify KYC Profile access
-    console.log(`[getPartners] ID: ${profileId}, User: ${userId}`);
-    const kycProfile = await KYCDocumentModel.findOne({
-      _id: profileId,
-      user: userId,
-    });
-
-    if (!kycProfile) {
-      console.log(
-        `[getPartners] KYC Profile NOT FOUND for ID: ${profileId}, User: ${userId}`,
-      );
-      return res.status(404).json({
-        success: false,
-        message: "KYC profile not found",
-      });
-    }
-
-    console.log(`[getPartners] Found profile: ${kycProfile._id}`);
-
-    const partners = await PartnerKYCModel.find({
-      kycProfile: profileId,
-      isDeleted: false,
-    }).sort({ createdAt: -1 });
-
-    res.status(200).json({
-      success: true,
-      data: partners,
-    });
-  } catch (error) {
-    console.error("Get partners error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch partners",
-    });
-  }
-};
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
 
 // Remove a partner
 export const removePartner = async (req: Request, res: Response) => {
@@ -194,7 +138,6 @@ export const removePartner = async (req: Request, res: Response) => {
 };
 
 // Get details of a specific partner
-<<<<<<< HEAD
 export const getPartners = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -232,8 +175,6 @@ export const getPartners = async (req: Request, res: Response) => {
 };
 
 // Get details of a specific partner
-=======
->>>>>>> b1c89c47e11a3f785d0330572d3e731ac812e2f4
 export const getPartnerDetails = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
