@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
-import { MeetingRoomService } from "./meetingRoom.service";
+import { EventSpaceService } from "./eventSpace.service";
 import {
-  createMeetingRoomSchema,
-  updateMeetingRoomSchema,
-} from "./meetingRoom.validation";
+  createEventSpaceSchema,
+  updateEventSpaceSchema,
+} from "./eventSpace.validation";
 
-// --- HELPERS ---
 const sendError = (
   res: Response,
   status: number,
@@ -21,10 +20,9 @@ const sendError = (
   });
 };
 
-export const createMeetingRoom = async (req: Request, res: Response) => {
+export const createEventSpace = async (req: Request, res: Response) => {
   try {
-    // 1. Validate Input (Zod)
-    const validation = createMeetingRoomSchema.safeParse(req);
+    const validation = createEventSpaceSchema.safeParse(req);
     if (!validation.success) {
       return sendError(
         res,
@@ -37,32 +35,28 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
       );
     }
 
-    const MEETING_ROOM_DATA = validation.data.body;
-
-    // 2. Get Partner ID from Auth Middleware
     const partnerId = (req as any).user?.id;
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
 
-    // 3. Call Service
-    const createdRoom = await MeetingRoomService.createRoom(
-      MEETING_ROOM_DATA,
+    const createdSpace = await EventSpaceService.createSpace(
+      validation.data.body,
       partnerId,
     );
 
     res.status(201).json({
       success: true,
-      message: "Meeting room created successfully",
-      data: createdRoom,
+      message: "Event space created successfully",
+      data: createdSpace,
     });
   } catch (err) {
-    sendError(res, 500, "Failed to create meeting room", err);
+    sendError(res, 500, "Failed to create event space", err);
   }
 };
 
-export const updateMeetingRoom = async (req: Request, res: Response) => {
+export const updateEventSpace = async (req: Request, res: Response) => {
   try {
-    const validation = updateMeetingRoomSchema.safeParse(req);
+    const validation = updateEventSpaceSchema.safeParse(req);
     if (!validation.success) {
       return sendError(
         res,
@@ -75,30 +69,29 @@ export const updateMeetingRoom = async (req: Request, res: Response) => {
       );
     }
 
-    const { meetingRoomId } = validation.data.params;
+    const { eventSpaceId } = validation.data.params;
     const userId = (req as any).user?.id;
-
     if (!userId) return sendError(res, 401, "Unauthorized");
 
-    const updatedRoom = await MeetingRoomService.updateRoom(
-      meetingRoomId,
+    const updatedSpace = await EventSpaceService.updateSpace(
+      eventSpaceId,
       validation.data.body,
       userId,
     );
 
     res.status(200).json({
       success: true,
-      message: "Meeting room updated successfully",
-      data: updatedRoom,
+      message: "Event space updated successfully",
+      data: updatedSpace,
     });
   } catch (err: any) {
-    if (err.message === "Meeting room not found or unauthorized")
+    if (err.message === "Event space not found or unauthorized")
       return sendError(res, 404, err.message);
     sendError(res, 500, "Update failed", err);
   }
 };
 
-export const getAllMeetingRooms = async (req: Request, res: Response) => {
+export const getAllEventSpaces = async (req: Request, res: Response) => {
   try {
     const { deleted, type, minPrice, maxPrice } = req.query;
     const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
@@ -113,46 +106,46 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    const rooms = await MeetingRoomService.getRooms(query);
+    const spaces = await EventSpaceService.getSpaces(query);
 
-    if (rooms.length === 0) {
+    if (spaces.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "No meeting rooms found",
+        message: "No event spaces found",
         data: [],
       });
     }
 
     res.status(200).json({
       success: true,
-      message: "Meeting rooms retrieved successfully",
-      data: rooms,
+      message: "Event spaces retrieved successfully",
+      data: spaces,
     });
   } catch (err) {
-    sendError(res, 500, "Failed to retrieve meeting rooms", err);
+    sendError(res, 500, "Failed to retrieve event spaces", err);
   }
 };
 
-export const getMeetingRoomById = async (req: Request, res: Response) => {
+export const getEventSpaceById = async (req: Request, res: Response) => {
   try {
-    const { meetingRoomId } = req.params;
-    const room = await MeetingRoomService.getRoomById(meetingRoomId);
+    const { eventSpaceId } = req.params;
+    const space = await EventSpaceService.getSpaceById(eventSpaceId);
 
-    if (!room) return sendError(res, 404, "Meeting room not found");
+    if (!space) return sendError(res, 404, "Event space not found");
 
     res.status(200).json({
       success: true,
-      message: "Meeting room retrieved successfully",
-      data: room,
+      message: "Event space retrieved successfully",
+      data: space,
     });
   } catch (err: any) {
     if (err.kind === "ObjectId")
       return sendError(res, 400, "Invalid ID format");
-    sendError(res, 500, "Failed to retrieve meeting room", err);
+    sendError(res, 500, "Failed to retrieve event space", err);
   }
 };
 
-export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
+export const getEventSpacesByCity = async (req: Request, res: Response) => {
   try {
     const { city } = req.params;
     const { type, minPrice, maxPrice } = req.query;
@@ -169,27 +162,27 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    const rooms = await MeetingRoomService.getRooms(query);
+    const spaces = await EventSpaceService.getSpaces(query);
 
-    if (rooms.length === 0) {
+    if (spaces.length === 0) {
       return res.status(200).json({
         success: true,
-        message: `No meeting rooms found in ${city}`,
+        message: `No event spaces found in ${city}`,
         data: [],
       });
     }
 
     res.status(200).json({
       success: true,
-      message: `Meeting rooms in ${city} retrieved successfully`,
-      data: rooms,
+      message: `Event spaces in ${city} retrieved successfully`,
+      data: spaces,
     });
   } catch (err) {
-    sendError(res, 500, "Failed to retrieve rooms by city", err);
+    sendError(res, 500, "Failed to retrieve spaces by city", err);
   }
 };
 
-export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
+export const getPartnerEventSpaces = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const { type, minPrice, maxPrice } = req.query;
@@ -204,35 +197,35 @@ export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
-    const rooms = await MeetingRoomService.getRooms(query);
+    const spaces = await EventSpaceService.getSpaces(query);
 
     res.status(200).json({
       success: true,
-      message: "Partner meeting rooms retrieved successfully",
-      data: rooms,
+      message: "Partner event spaces retrieved successfully",
+      data: spaces,
     });
   } catch (err) {
-    sendError(res, 500, "Failed to retrieve partner meeting rooms", err);
+    sendError(res, 500, "Failed to retrieve partner event spaces", err);
   }
 };
 
-export const deleteMeetingRoom = async (req: Request, res: Response) => {
+export const deleteEventSpace = async (req: Request, res: Response) => {
   try {
-    const { meetingRoomId } = req.params;
+    const { eventSpaceId } = req.params;
     const userId = (req as any).user?.id;
 
     if (!userId) return sendError(res, 401, "Unauthorized");
 
-    await MeetingRoomService.deleteRoom(meetingRoomId, userId);
+    await EventSpaceService.deleteSpace(eventSpaceId, userId);
 
     res.status(200).json({
       success: true,
-      message: "Meeting room deleted successfully",
+      message: "Event space deleted successfully",
       data: {},
     });
   } catch (err: any) {
-    if (err.message === "Meeting room not found or unauthorized")
+    if (err.message === "Event space not found or unauthorized")
       return sendError(res, 404, err.message);
-    sendError(res, 500, "Failed to delete meeting room", err);
+    sendError(res, 500, "Failed to delete event space", err);
   }
 };

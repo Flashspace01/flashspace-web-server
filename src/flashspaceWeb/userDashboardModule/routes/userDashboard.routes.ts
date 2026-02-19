@@ -22,6 +22,7 @@ import {
   getCredits,
   redeemReward,
   getPartnerSpaceBookings,
+  cancelBooking,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
@@ -40,7 +41,7 @@ router.get("/bookings/property/:spaceId", getBookingsByProperty);
 router.get("/bookings/:bookingId", getBookingById);
 router.patch("/bookings/:bookingId/auto-renew", toggleAutoRenew);
 router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
-
+router.post("/bookings/:bookingId/cancel", cancelBooking);
 
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);

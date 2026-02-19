@@ -30,6 +30,10 @@ GoogleUtil.initialize();
 // Initialize Socket.IO
 initSocket(server);
 
+// Initialize Cron Jobs
+import { initCreditExpirationJob } from "./cron/creditExpiration.cron";
+initCreditExpirationJob();
+
 // CORS configuration with credentials support (MUST be FIRST)
 // Avoid wildcard origin when credentials are included
 const allowedOrigins = new Set([

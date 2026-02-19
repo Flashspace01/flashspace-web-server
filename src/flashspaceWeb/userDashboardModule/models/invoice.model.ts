@@ -1,4 +1,10 @@
-import { prop, getModelForClass, Ref, modelOptions, Severity } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  Ref,
+  modelOptions,
+  Severity,
+} from "@typegoose/typegoose";
 import { User } from "../../authModule/models/user.model";
 
 class LineItem {
@@ -38,6 +44,9 @@ class BillingAddress {
   pincode?: string;
 }
 
+import { Booking } from "./booking.model";
+import { Payment } from "../../paymentModule/payment.model";
+
 @modelOptions({ options: { allowMixed: Severity.ALLOW } })
 export class Invoice {
   @prop({ required: true, unique: true })
@@ -46,14 +55,14 @@ export class Invoice {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop()
-  bookingId?: string;
+  @prop({ ref: () => Booking })
+  bookingId?: Ref<Booking>;
 
   @prop()
   bookingNumber?: string;
 
-  @prop()
-  paymentId?: string;
+  @prop({ ref: () => Payment })
+  paymentId?: Ref<Payment>;
 
   @prop({ required: true })
   description!: string;
@@ -73,7 +82,10 @@ export class Invoice {
   @prop({ required: true })
   total!: number;
 
-  @prop({ enum: ["paid", "pending", "overdue", "cancelled"], default: "pending" })
+  @prop({
+    enum: ["paid", "pending", "overdue", "cancelled"],
+    default: "pending",
+  })
   status?: string;
 
   @prop()

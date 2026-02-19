@@ -61,4 +61,8 @@ mainRoutes.use("/reviews", reviewRoutes);
 
 // /api/meetingRooms
 import { meetingRoomRoutes } from "./flashspaceWeb/meetingRoomModule/meetingRoom.routes";
-mainRoutes.use("/meetingRooms", meetingRoomRoutes);
+mainRoutes.use("/meetingRoom", meetingRoomRoutes);
+
+// /api/eventSpace
+import { eventSpaceRoutes } from "./flashspaceWeb/eventSpaceModule/eventSpace.routes";
+mainRoutes.use("/eventSpace", eventSpaceRoutes);

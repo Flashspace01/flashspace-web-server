@@ -35,14 +35,18 @@ export const postReview = async (req: Request, res: Response) => {
       );
     }
 
-    const { spaceId, rating, comment, reviewImages } = validation.data.body;
+    const { spaceId, spaceModel, rating, comment, reviewImages } =
+      validation.data.body;
     const userId = (req as any).user?.id;
-    console.log(`Adding review for space ${spaceId} by user ${userId}`);
+    console.log(
+      `Adding review for space ${spaceId} (${spaceModel}) by user ${userId}`,
+    );
 
     // 2. Call Service
     const newReview = await ReviewService.addReview(
       {
         space: spaceId,
+        spaceModel,
         rating,
         comment,
         reviewImages,

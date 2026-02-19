@@ -9,22 +9,15 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       address,
       city,
       area,
-      price,
-      priceYearly,
-      originalPrice,
       gstPlanPrice,
-      gstPlanPriceYearly,
       mailingPlanPrice,
-      mailingPlanPriceYearly,
       brPlanPrice,
-      brPlanPriceYearly,
-      rating,
-      reviews,
       features,
       availability,
       popular,
       coordinates,
-      image,
+      images,
+      isSponsored,
     } = req.body;
 
     const createdOffice = await VirtualOfficeModel.create({
@@ -32,22 +25,15 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       address,
       city,
       area,
-      price,
-      priceYearly,
-      originalPrice,
       gstPlanPrice,
-      gstPlanPriceYearly,
       mailingPlanPrice,
-      mailingPlanPriceYearly,
       brPlanPrice,
-      brPlanPriceYearly,
-      rating,
-      reviews,
       features,
       availability,
       popular,
       coordinates,
-      image,
+      images: images || [],
+      isSponsored: isSponsored || false,
     });
 
     if (!createdOffice) {
@@ -159,7 +145,7 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     const offices = await VirtualOfficeModel.find({
       city: new RegExp(`^${city}$`, "i"), // Case-insensitive match
       isDeleted: false,
-    }).sort({ popular: -1, rating: -1 });
+    }).sort({ popular: -1, avgRating: -1 });
 
     if (offices.length === 0) {
       return res.status(200).json({
@@ -195,22 +181,15 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
       address,
       city,
       area,
-      price,
-      priceYearly,
-      originalPrice,
       gstPlanPrice,
-      gstPlanPriceYearly,
       mailingPlanPrice,
-      mailingPlanPriceYearly,
       brPlanPrice,
-      brPlanPriceYearly,
-      rating,
-      reviews,
       features,
       availability,
       popular,
       coordinates,
-      image,
+      images,
+      isSponsored,
     } = req.body;
 
     if (!Types.ObjectId.isValid(virtualOfficeId)) {
@@ -229,22 +208,15 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
         ...(address && { address }),
         ...(city && { city }),
         ...(area && { area }),
-        ...(price && { price }),
-        ...(priceYearly && { priceYearly }),
-        ...(originalPrice && { originalPrice }),
         ...(gstPlanPrice && { gstPlanPrice }),
-        ...(gstPlanPriceYearly && { gstPlanPriceYearly }),
         ...(mailingPlanPrice && { mailingPlanPrice }),
-        ...(mailingPlanPriceYearly && { mailingPlanPriceYearly }),
         ...(brPlanPrice && { brPlanPrice }),
-        ...(brPlanPriceYearly && { brPlanPriceYearly }),
-        ...(rating !== undefined && { rating }),
-        ...(reviews !== undefined && { reviews }),
         ...(features && { features }),
         ...(availability && { availability }),
         ...(popular !== undefined && { popular }),
         ...(coordinates && { coordinates }),
-        ...(image && { image }),
+        ...(images && { images }),
+        ...(isSponsored !== undefined && { isSponsored }),
       },
       { new: true, runValidators: true },
     );
@@ -333,14 +305,14 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
     const spaces = await VirtualOfficeModel.find({
       $or: [{ partner: userId }, { managers: userId }],
       isDeleted: false,
-    }).select("name address city image features");
+    }).select("name address city images features");
 
     const formattedSpaces = spaces.map((space) => {
       const s = space.toObject();
       return {
         ...s,
         type: "Virtual Office",
-        images: s.image ? [s.image] : [], // Backend has 'image' string, frontend expects 'images' array
+        images: s.images || [],
       };
     });
 

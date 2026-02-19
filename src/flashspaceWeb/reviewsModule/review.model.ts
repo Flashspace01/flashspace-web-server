@@ -13,6 +13,18 @@ import {
   CoworkingSpace,
   CoworkingSpaceModel,
 } from "../coworkingSpaceModule/coworkingspace.model";
+import {
+  VirtualOffice,
+  VirtualOfficeModel,
+} from "../virtualOfficeModule/virtualOffice.model";
+import {
+  MeetingRoom,
+  MeetingRoomModel,
+} from "../meetingRoomModule/meetingRoom.model";
+import {
+  EventSpace,
+  EventSpaceModel,
+} from "../eventSpaceModule/eventSpace.model";
 
 @modelOptions({ schemaOptions: { timestamps: true } })
 @index({ space: 1, createdAt: -1 }) // Fast lookup for a specific office's reviews
@@ -33,8 +45,17 @@ export class Review {
   @prop({ ref: () => User, required: true })
   public user!: Ref<User>;
 
-  @prop({ ref: () => CoworkingSpace, required: true })
-  public space!: Ref<CoworkingSpace>;
+  @prop({
+    refPath: "spaceModel",
+    required: true,
+  })
+  public space!: Ref<CoworkingSpace | VirtualOffice | MeetingRoom | EventSpace>;
+
+  @prop({
+    required: true,
+    enum: ["CoworkingSpace", "VirtualOffice", "MeetingRoom", "EventSpace"],
+  })
+  public spaceModel!: string;
 
   @prop({ required: true, min: 1, max: 5 })
   public rating!: number;
@@ -59,16 +80,36 @@ export class Review {
       },
     ]);
 
-    if (stats.length > 0) {
-      await CoworkingSpaceModel.findByIdAndUpdate(spaceId, {
-        totalReviews: stats[0].nRating,
-        avgRating: Math.round(stats[0].avgRating * 10) / 10, // Round to 1 decimal place
-      });
-    } else {
-      await CoworkingSpaceModel.findByIdAndUpdate(spaceId, {
-        totalReviews: 0,
-        avgRating: 0, // Reset if no reviews
-      });
+    const updateData =
+      stats.length > 0
+        ? {
+            totalReviews: stats[0].nRating,
+            avgRating: Math.round(stats[0].avgRating * 10) / 10,
+          }
+        : {
+            totalReviews: 0,
+            avgRating: 0,
+          };
+
+    // Try updating CoworkingSpace
+    let updated = await CoworkingSpaceModel.findByIdAndUpdate(
+      spaceId,
+      updateData,
+    );
+
+    // If not found, try VirtualOffice
+    if (!updated) {
+      updated = await VirtualOfficeModel.findByIdAndUpdate(spaceId, updateData);
+    }
+
+    // If still not found, try MeetingRoom
+    if (!updated) {
+      updated = await MeetingRoomModel.findByIdAndUpdate(spaceId, updateData);
+    }
+
+    // If still not found, try EventSpace
+    if (!updated) {
+      await EventSpaceModel.findByIdAndUpdate(spaceId, updateData);
     }
   }
 }

@@ -1,4 +1,10 @@
-import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  modelOptions,
+  index,
+  Ref,
+} from "@typegoose/typegoose";
 import { Types } from "mongoose";
 
 export enum PaymentStatus {
@@ -7,18 +13,18 @@ export enum PaymentStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   REFUNDED = "refunded",
-  CANCELLED = "cancelled"
+  CANCELLED = "cancelled",
 }
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
   COWORKING_SPACE = "coworking_space",
-  MEETING_ROOM = "meeting_room"
+  MEETING_ROOM = "meeting_room",
 }
 
 @modelOptions({
   schemaOptions: {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 })
 @index({ razorpayPaymentId: 1 })
 @index({ userId: 1 })
@@ -36,6 +42,12 @@ export class Payment {
 
   @prop({ required: false }) // Phone is optional - not all users have phone numbers
   public userPhone?: string;
+
+  @prop({ required: false })
+  public userCompany?: string;
+
+  @prop({ required: false })
+  public userGst?: string;
 
   // Razorpay Details
   @prop({ required: true, unique: true })
@@ -87,6 +99,9 @@ export class Payment {
 
   @prop({ default: 0 })
   public discountAmount!: number;
+
+  @prop({ default: 0 })
+  public creditsUsed!: number;
 
   // Metadata
   @prop()

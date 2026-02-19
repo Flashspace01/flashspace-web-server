@@ -7,7 +7,7 @@ import { KYCDocumentModel } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
-import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
+import { CreditLedgerModel, CreditType } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 
 // ============ DASHBOARD ============
@@ -1305,22 +1305,38 @@ export const getCredits = async (req: Request, res: Response) => {
     // Get Credit History
     const history = await CreditLedgerModel.find({ user: userId })
       .sort({ createdAt: -1 })
-      .limit(20);
+      .limit(50); // Increased limit for better history visibility
 
-    // Calculate total earned (optional, or just use history)
-    const totalEarned = await CreditLedgerModel.aggregate([
-      { $match: { user: userId, source: CreditSource.BOOKING } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
+    // Calculate Expiring Credits (Next 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const expiringSoon = await CreditLedgerModel.aggregate([
+      {
+        $match: {
+          user: new mongoose.Types.ObjectId(userId), // Ensure ObjectId
+          type: { $in: [CreditType.EARNED, CreditType.REFUND] },
+          isExpired: false,
+          remainingAmount: { $gt: 0 },
+          expiryDate: { $lte: thirtyDaysFromNow },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$remainingAmount" },
+        },
+      },
     ]);
+
+    const expiringAmount = expiringSoon[0]?.total || 0;
 
     res.status(200).json({
       success: true,
       data: {
         balance: user?.credits || 0,
-        totalEarned: totalEarned[0]?.total || 0,
+        expiringAmount,
         history,
-        rewardThreshold: 5000,
-        canRedeem: (user?.credits || 0) >= 5000,
       },
     });
   } catch (error) {
@@ -1384,7 +1400,7 @@ export const redeemReward = async (req: Request, res: Response) => {
     await CreditLedgerModel.create({
       user: userId,
       amount: -currentCredits, // Deduct everything
-      source: CreditSource.REDEEM,
+      type: CreditType.SPENT,
       description: `Redeemed ${currentCredits} credits for 1 Hour Free Meeting Room`,
       referenceId: booking._id?.toString(),
       balanceAfter: 0,
@@ -1400,5 +1416,90 @@ export const redeemReward = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to redeem reward" });
+  }
+};
+
+// ============ CANCELLATION ============
+
+export const cancelBooking = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    const { bookingId } = req.params;
+    const { reason } = req.body;
+
+    const booking = await BookingModel.findOne({
+      _id: bookingId,
+      user: userId,
+      isDeleted: false,
+    });
+
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    if (booking.status === "cancelled" || booking.status === "expired") {
+      return res.status(400).json({
+        success: false,
+        message: "Booking is already cancelled or expired",
+      });
+    }
+
+    // Logic to check if cancellation is allowed (e.g. 24h before start)
+    // For now, assuming allowed if active/upcoming.
+
+    booking.status = "cancelled";
+    booking.timeline = booking.timeline || [];
+    booking.timeline.push({
+      status: "cancelled",
+      date: new Date(),
+      note: reason || "Cancelled by user",
+      by: "User",
+    });
+    await booking.save();
+
+    // --- CREDIT LOGIC ---
+    const { refundCredits, revokeCredits } =
+      await import("../utils/credit.utils");
+
+    // 1. Refund Used Credits (If any)
+    if (booking.paymentId) {
+      // Find payment to get creditsUsed
+      // Need to import PaymentModel (dynamic to avoid circular dep if needed, or normal import if clean)
+      const { PaymentModel } =
+        await import("../../paymentModule/payment.model");
+      const payment = await PaymentModel.findById(booking.paymentId);
+
+      const creditsUsed = (payment as any)?.creditsUsed || 0;
+      if (creditsUsed > 0) {
+        await refundCredits(
+          userId,
+          creditsUsed,
+          bookingId,
+          booking.spaceSnapshot?.name || "Booking",
+        );
+      }
+    } else {
+      // Zero-cost booking might not have paymentId or it is the paymentId?
+      // In createOrder zero-cost, we create a payment record and pass it. So paymentId exists.
+    }
+
+    // 2. Revoke Earned Credits
+    await revokeCredits(userId, bookingId);
+
+    res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Cancel booking error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to cancel booking" });
   }
 };

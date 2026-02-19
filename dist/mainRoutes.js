@@ -8,7 +8,7 @@ const express_1 = require("express");
 const contactForm_routes_1 = require("./flashspaceWeb/contactFormModule/contactForm.routes");
 // import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 const virtualOffice_routes_1 = require("./flashspaceWeb/virtualOfficeModule/virtualOffice.routes");
-const coworkingSpace_routes_1 = require("./flashspaceWeb/coworkingSpaceModule/coworkingSpace.routes");
+const coworkingspace_routes_1 = require("./flashspaceWeb/coworkingSpaceModule/coworkingspace.routes");
 const auth_routes_1 = require("./flashspaceWeb/authModule/routes/auth.routes");
 const partnerInquiry_routes_1 = require("./flashspaceWeb/partnerInquiryModule/partnerInquiry.routes");
 const payment_routes_1 = require("./flashspaceWeb/paymentModule/payment.routes");
@@ -32,7 +32,7 @@ exports.mainRoutes.use("/feedback", feedback_routes_1.feedbackRoutes);
 // /api/virtualOffice
 exports.mainRoutes.use("/virtualOffice", virtualOffice_routes_1.virtualOfficeRoutes);
 // /api/coworkingSpace
-exports.mainRoutes.use("/coworkingSpace", coworkingSpace_routes_1.coworkingSpaceRoutes);
+exports.mainRoutes.use("/coworkingSpace", coworkingspace_routes_1.coworkingSpaceRoutes);
 // /api/partnerInquiry
 exports.mainRoutes.use("/partnerInquiry", partnerInquiry_routes_1.partnerInquiryRoutes);
 // /api/payment
@@ -49,4 +49,13 @@ exports.mainRoutes.use("/spaceportal", spacePortal_routes_1.spacePortalRoutes);
 exports.mainRoutes.use("/meetings", meetingScheduler_routes_1.meetingSchedulerRoutes);
 // /api/coupon
 exports.mainRoutes.use("/coupon", coupon_routes_1.couponRoutes);
-exports.mainRoutes.use('/tickets', ticket_routes_1.ticketRoutes);
+exports.mainRoutes.use("/tickets", ticket_routes_1.ticketRoutes);
+// /api/notifications
+const notification_routes_1 = require("./flashspaceWeb/notificationModule/routes/notification.routes");
+exports.mainRoutes.use("/notifications", notification_routes_1.notificationRoutes);
+// /api/reviews
+const review_routes_1 = require("./flashspaceWeb/reviewsModule/review.routes");
+exports.mainRoutes.use("/reviews", review_routes_1.reviewRoutes);
+// /api/meetingRooms
+const meetingRoom_routes_1 = require("./flashspaceWeb/meetingRoomModule/meetingRoom.routes");
+exports.mainRoutes.use("/meetingRooms", meetingRoom_routes_1.meetingRoomRoutes);
