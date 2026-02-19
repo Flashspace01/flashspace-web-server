@@ -16,15 +16,37 @@ const userDashboard_routes_1 = __importDefault(require("./flashspaceWeb/userDash
 const admin_routes_1 = require("./flashspaceWeb/adminModule/routes/admin.routes");
 const ticket_routes_1 = require("./flashspaceWeb/ticketModule/routes/ticket.routes");
 const meetingScheduler_routes_1 = require("./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes");
+const affiliate_routes_1 = require("./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes");
 const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
 const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
 const mail_routes_1 = __importDefault(require("./flashspaceWeb/mailModule/routes/mail.routes"));
 exports.mainRoutes = (0, express_1.Router)();
+const mongoose_1 = __importDefault(require("mongoose"));
+// /api/health - Check server and DB status
+exports.mainRoutes.get("/health", (req, res) => {
+    const dbStatus = mongoose_1.default.connection.readyState;
+    const statusMap = {
+        0: "Disconnected",
+        1: "Connected",
+        2: "Connecting",
+        3: "Disconnecting",
+    };
+    res.json({
+        success: true,
+        message: "Server is running",
+        // dbStatus: statusMap[dbStatus] || "Unknown",
+        dbReadyState: dbStatus,
+        envPort: process.env.PORT,
+        timestamp: new Date()
+    });
+});
 // /api/auth
 exports.mainRoutes.use("/auth", auth_routes_1.authRoutes);
 // /api/contactForm
 exports.mainRoutes.use("/contactForm", contactForm_routes_1.contactFormRoutes);
+// /api/affiliate (Affiliate Portal APIs)
+exports.mainRoutes.use("/affiliate", affiliate_routes_1.affiliateRoutes);
 // /api/feeback
 exports.mainRoutes.use("/feedback", feedback_routes_1.feedbackRoutes);
 // /api/spaceProvider
