@@ -8,7 +8,7 @@ import {
   updateCoworkingSpace,
   deleteCoworkingSpace,
   getPartnerSpaces,
-} from "./coworkingSpace.controller";
+} from "./coworkingspace.controller";
 import multer from "multer";
 
 const coworkingSpaceRoutes = Router({ mergeParams: true });
@@ -18,7 +18,6 @@ const upload = multer();
 coworkingSpaceRoutes.post(
   "/create",
   AuthMiddleware.authenticate,
-  upload.none(),
   createCoworkingSpace,
 );
 
@@ -35,7 +34,6 @@ coworkingSpaceRoutes.get("/getById/:coworkingSpaceId", getCoworkingSpaceById);
 coworkingSpaceRoutes.put(
   "/update/:coworkingSpaceId",
   AuthMiddleware.authenticate,
-  upload.none(),
   updateCoworkingSpace,
 );
 

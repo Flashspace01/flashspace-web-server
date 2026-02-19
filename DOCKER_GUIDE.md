@@ -1,63 +1,62 @@
-# FlashSpace Docker Backend Guide
+# Docker Guide for Flashspace Server
 
-This document explains how to run the backend using Docker, why we are using it, and details about the underlying services (Redis, MongoDB, Socket.IO).
+## 1. The 'Why': Multi-Stage Builds vs. Single-Stage
+In a production environment, image size and security are paramount.
 
-## 🚀 How to Run the Backend
+- **Single-Stage Build**: A standard `npm install` brings in `devDependencies` (like TypeScript, nodemon, testing libraries) and your full source code. This bloats the image (often 1GB+) and increases the attack surface.
+- **Multi-Stage Build**: We use two "stages" in one Dockerfile:
+    1.  **Builder Stage**: Contains all tools needed to compile the code (`tsc`, `npm install`). We generate the production-ready JavaScript in the `/dist` folder.
+    2.  **Runner Stage**: A fresh, minimal image. We copy **only** the `/dist` folder and `production` dependencies from the Builder stage. The original source code and dev tools are discarded.
+    - **Result**: A tiny, secure image (often <200MB) containing only what's needed to run the app.
 
-To start the entire backend stack (Server, Database, Redis), run this command in your terminal inside `flashspace-web-server`:
+## 2. Networking Layer: `-p 3000:3000`
+The command `-p [HOST]:[CONTAINER]` maps a port on your host machine to a port inside the container.
+- **`-p 3000:3000`**: Traffic hitting port `3000` on your Linux server is forwarded to port `3000` inside the container.
+- **Database Connection (`localhost` vs. Network Name)**:
+    - **Localhost**: Inside a container, `localhost` refers to the **container itself**, not your Linux host. If your DB is running on the host machine, the container cannot reach it via `localhost`.
+    - **Docker Network**: Use `host.docker.internal` (Mac/Windows) or the **service name** if using `docker-compose` (e.g., `mongodb`).
+    - **Production Tip**: Identify your DB host by its container name or IP address in your `.env` file (e.g., `MONGO_URI=mongodb://mongo:27017/flashspace`).
 
+## 3. Volume Persistence
+Containers are ephemeral; when they stop, their file system is reset. To keep data (logs, uploads), you must use **Volumes**.
+
+**Example: Persisting Logs and Uploads**
 ```bash
-docker-compose up --build
+docker run -d \
+  -p 3000:3000 \
+  -v $(pwd)/logs:/app/logs \       # Maps host ./logs to container /app/logs
+  -v $(pwd)/uploads:/app/uploads \ # Maps host ./uploads to container /app/uploads
+  --name flashspace-server \
+  flashspace-server
 ```
-*   `up`: Starts the containers.
-*   `--build`: Forces a rebuild of the specialized Docker image. **Always use this if you have installed new npm packages (like socket.io) or made changes to `package.json`.**
+Now, even if you delete the container, your logs and user uploads remain on your server in the `logs` and `uploads` directories.
 
-To stop the backend:
-```bash
-docker-compose down
-```
+## 4. Debugging Checkpoints
+If the app crashes on startup, use these commands to inspect the container:
 
----
+1.  **View Logs (Stdout/Stderr)**:
+    ```bash
+    docker logs flashspace-server
+    # Or follow live logs:
+    docker logs -f flashspace-server
+    ```
 
-## ❓ Why no more `npm run dev`?
+2.  **Inspect Filesystem (Shell Access)**:
+    If the container is running but behaving strangely:
+    ```bash
+    docker exec -it flashspace-server /bin/sh
+    # Check if files exist: ls -la dist/
+    ```
 
-Previously, you ran `npm run dev` to start a Node.js process directly on your local machine.
-Now, **Docker** takes over that responsibility.
+3.  **Inspect Crashed Container**:
+    If the container acts like it's starting but immediately exits, override the entrypoint to keep it alive for debugging:
+    ```bash
+    docker run -it --entrypoint /bin/sh flashspace-server
+    # Now you are inside. Try running manually: node dist/app.js
+    ```
 
-*   **Then**: You had to ensure MongoDB was installed and running locally, Redis was installed locally, and Node versions matched.
-*   **Now**: Docker creates a self-contained "virtual computer" (container) that has Node, MongoDB, and Redis pre-installed and configured exactly how the app needs them.
-*   **Conflict**: If you run `npm run dev` while Docker is running, it will fail because **Port 5000** is already being used by the Docker container.
+## 5. Constraints & Bottlenecks
+Your current structure (`src` -> `dist`) is standard and works well with Docker. However, one potential bottleneck is:
 
----
-
-## 🛠 Services & Tech Stack
-
-### 1. Redis (Port 6379)
-*   **What is it?**: An ultra-fast, in-memory data store.
-*   **Why do we use it?**:
-    *   **Socket.IO Adapter**: It helps manage real-time connections, especially if we scale to multiple backend instances in the future.
-    *   **Caching**: It can store frequently accessed data strings to reduce database load.
-*   **Port**: Accessible locally at `localhost:6379`.
-
-### 2. Socket.IO (Real-time Communication)
-*   **What is it?**: A library that enables real-time, bi-directional communication between the web client and the server.
-*   **Usage**:
-    *   **Notifications**: Sending instant alerts to admins when a meeting is booked.
-    *   **Chat**: Powering the support chat feature.
-    *   **Live Updates**: Updating the dashboard without refreshing the page.
-
-### 3. MongoDB (Database)
-*   **Where is my data?**: Your data is stored in a **Docker Volume** named `mongo-data`. This volume persists even if you delete the container, so your data is safe.
-*   **How to access it?**:
-    *   **Connection String**: `mongodb://localhost:27018/myapp`
-    *   **Port**: We have mapped the container's port 27017 to your local machine's **Port 27018**.
-    *   **Why 27018?**: This avoids conflicts if you have a local MongoDB instance already running on the default port 27017.
-*   **GUI Access**: You can use MongoDB Compass or Studio 3T to connect to `localhost:27018`.
-
----
-
-## 📂 Important Files
-
-*   **`docker-compose.yml`**: The "recipe" file that tells Docker how to spin up the backend, database, and Redis together.
-*   **`Dockerfile`**: The blueprint for building the backend server image itself.
-*   **`google-tokens.json`**: This file (on your host machine) is **mounted** into the container so that your Google Calendar authentication persists even when the container restarts.
+-   **`npm ci` speed**: If you have many dependencies, installing them twice (once in builder, once in runner) can be slow.
+    -   **Fix**: The Dockerfile uses **layer caching**. If `package.json` hasn't changed, Docker reuses the previous installation layer instantly. This makes subsequent builds extremely fast.

@@ -1,9 +1,22 @@
+# Ignore node_modules to ensure a clean install in the container
 node_modules
+# Ignore the local build output
 dist
-.env
+# Ignore git metadata
 .git
 .gitignore
-README.md
+# Ignore local environment files (secrets should be passed via docker run --env-file or overrides)
+.env
+.env.*
+# Ignore logs and testing reports
 *.log
-.DS_Store
+report.json
+test-output.txt
+verify_output.txt
+rbac_full_output.txt
+# Ignore Docker-related files to avoid recursion (though Docker handles Dockerfile usually)
+Dockerfile
+docker-compose.yml
+# Ignore IDE configs
 .vscode
+.idea

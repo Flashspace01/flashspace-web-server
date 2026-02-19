@@ -111,7 +111,7 @@ const resolveAssignedToId = async (assignedTo?: string) => {
 const buildBookingSpaceMap = async (tickets: any[]) => {
   const bookingIds = tickets
     .map((t) => t.bookingId)
-    .filter((id) => id && Types.ObjectId.isValid(id));
+    .filter((id) => id && Types.ObjectId.isValid(id as any));
 
   if (bookingIds.length === 0) return new Map<string, string>();
 
@@ -247,7 +247,7 @@ export class SpacePortalTicketsService {
       }
 
       let space = "";
-      if (ticket.bookingId && Types.ObjectId.isValid(ticket.bookingId)) {
+      if (ticket.bookingId && Types.ObjectId.isValid(ticket.bookingId as any)) {
         const booking = await BookingModel.findById(ticket.bookingId).select(
           "spaceSnapshot.name spaceId"
         );

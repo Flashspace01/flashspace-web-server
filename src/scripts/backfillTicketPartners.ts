@@ -35,7 +35,7 @@ const run = async () => {
     let spaceSnapshot: any = t.spaceSnapshot;
 
     // Prefer booking to derive partner/space
-    if (t.bookingId && Types.ObjectId.isValid(t.bookingId)) {
+    if (t.bookingId && Types.ObjectId.isValid(t.bookingId as any)) {
       const booking = await BookingModel.findById(t.bookingId).lean();
       if (booking) {
         partner = booking.partner as any;

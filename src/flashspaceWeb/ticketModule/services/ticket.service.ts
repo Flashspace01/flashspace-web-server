@@ -5,8 +5,6 @@ import { SpacePortalSpaceModel } from "../../spacePortalModule/models/space.mode
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
-import { Space } from "../../spacePartnerModule/models/space.model";
-import { BookingModel } from "../../userDashboardModule/models/booking.model";
 
 export interface CreateTicketDTO {
   subject: string;
@@ -15,6 +13,8 @@ export interface CreateTicketDTO {
   priority?: TicketPriority;
   attachments?: string[];
   bookingId?: string;
+  partner?: string;
+  spaceId?: string;
 }
 
 export interface UpdateTicketDTO {
@@ -78,7 +78,6 @@ export class TicketService {
       ticketNumber,
       subject: data.subject,
       description: data.description,
-      bookingId: data.bookingId,
       spaceId,
       spaceSnapshot,
       user: new Types.ObjectId(userId),
@@ -463,7 +462,7 @@ export class TicketService {
    */
   private static async getPartnerBookingIds(partnerId: string): Promise<Types.ObjectId[]> {
     // 1. Find all spaces owned by this partner
-    const spaces = await Space.find({ partnerId: new Types.ObjectId(partnerId) }).select('_id').lean();
+    const spaces = await SpacePortalSpaceModel.find({ partner: new Types.ObjectId(partnerId) }).select('_id').lean();
     const spaceIds = spaces.map(s => s._id);
     if (spaceIds.length === 0) return [];
 

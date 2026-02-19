@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { AuthMiddleware } from '../../authModule/middleware/auth.middleware';
 import { RoleMiddleware } from '../../authModule/middleware/role.middleware';
-import { requireSpacePartner } from '../../spacePartnerModule/middleware/spacePartner.middleware';
 import { TicketValidation } from '../middleware/validation.middleware';
 import {
   createTicket,
@@ -130,7 +129,7 @@ router.post(
 router.get(
   '/partner/all',
   AuthMiddleware.authenticate,
-  requireSpacePartner,
+  RoleMiddleware.requirePartner,
   getPartnerTickets
 );
 
@@ -138,7 +137,7 @@ router.get(
 router.post(
   '/partner/:ticketId/reply',
   AuthMiddleware.authenticate,
-  requireSpacePartner,
+  RoleMiddleware.requirePartner,
   addPartnerReply
 );
 
@@ -146,7 +145,7 @@ router.post(
 router.post(
   '/partner/:ticketId/close',
   AuthMiddleware.authenticate,
-  requireSpacePartner,
+  RoleMiddleware.requirePartner,
   partnerCloseTicket
 );
 

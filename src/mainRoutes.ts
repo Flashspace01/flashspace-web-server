@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes"
+import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes";
 // import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtualOffice.routes";
-import { coworkingSpaceRoutes } from "./flashspaceWeb/coworkingSpaceModule/coworkingSpace.routes";
+import { coworkingSpaceRoutes } from "./flashspaceWeb/coworkingSpaceModule/coworkingspace.routes";
 import { authRoutes } from "./flashspaceWeb/authModule/routes/auth.routes";
 import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partnerInquiry.routes";
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 import { spacePortalRoutes } from "./flashspaceWeb/spacePortalModule/routes/spacePortal.routes";
-import { ticketRoutes } from './flashspaceWeb/ticketModule/routes/ticket.routes';
+import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 
 // import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
@@ -23,7 +23,7 @@ mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/feeback
-mainRoutes.use("/feedback", feedbackRoutes)
+mainRoutes.use("/feedback", feedbackRoutes);
 // /api/spaceProvider
 // mainRoutes.use("/spaceProvider", spaceProviderRoutes);
 // /api/virtualOffice
@@ -50,10 +50,15 @@ mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
 mainRoutes.use("/coupon", couponRoutes);
 
-
-
-mainRoutes.use('/tickets', ticketRoutes);
+mainRoutes.use("/tickets", ticketRoutes);
 
 // /api/notifications
 import { notificationRoutes } from "./flashspaceWeb/notificationModule/routes/notification.routes";
-mainRoutes.use('/notifications', notificationRoutes);
+mainRoutes.use("/notifications", notificationRoutes);
+// /api/reviews
+import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
+mainRoutes.use("/reviews", reviewRoutes);
+
+// /api/meetingRooms
+import { meetingRoomRoutes } from "./flashspaceWeb/meetingRoomModule/meetingRoom.routes";
+mainRoutes.use("/meetingRooms", meetingRoomRoutes);

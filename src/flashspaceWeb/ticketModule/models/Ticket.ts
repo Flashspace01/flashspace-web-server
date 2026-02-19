@@ -67,8 +67,7 @@ export class Ticket extends TimeStamps {
   public ticketNumber!: string;
 
   // Optional linkage to a booking and space (for partner routing)
-  @prop()
-  public bookingId?: string;
+
 
   @prop()
   public spaceId?: string;

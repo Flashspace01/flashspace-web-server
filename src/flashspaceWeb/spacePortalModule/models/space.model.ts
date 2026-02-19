@@ -1,5 +1,6 @@
 import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
 import { User } from "../../authModule/models/user.model";
+import { ServiceConfig } from "./serviceConfig.model";
 
 export enum SpacePortalSpaceStatus {
   ACTIVE = "ACTIVE",
@@ -45,6 +46,10 @@ export class SpacePortalSpace {
 
   @prop({ default: false })
   public isDeleted?: boolean;
+
+  // Services offered by this space
+  @prop({ ref: () => ServiceConfig, default: [] })
+  public services!: Ref<ServiceConfig>[];
 
   // Owner (space partner) reference
   @prop({ ref: () => User, required: true })
