@@ -12,6 +12,8 @@ import { BusinessInfoModel } from "../../userDashboardModule/models/businessInfo
 import { ApiResponse } from "../../authModule/types/auth.types";
 import { PasswordUtil } from "../../authModule/utils/password.util";
 import mongoose from "mongoose";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
 
 export class AdminService {
   /**
@@ -289,7 +291,7 @@ export class AdminService {
     restore: boolean = false,
   ): Promise<ApiResponse<any>> {
     try {
-      const mongoose = require("mongoose");
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
@@ -488,6 +490,26 @@ export class AdminService {
             { businessInfoCount: pendingBusinessCount },
           );
         }
+      }
+
+      // Notify User
+      try {
+        if (doc.user) {
+          const title = `KYC ${action === 'approve' ? 'Approved' : 'Rejected'}`;
+          const message = action === 'approve'
+            ? `Your KYC application has been approved.`
+            : `Your KYC application has been rejected. Reason: ${rejectionReason || 'Documents invalid'}`;
+
+          await NotificationService.notifyUser(
+            doc.user.toString(),
+            title,
+            message,
+            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
+            { kycId, type }
+          );
+        }
+      } catch (notifError) {
+        console.error("[reviewKYC] Failed to send notification:", notifError);
       }
 
       return { success: true, message: `KYC ${action}ed successfully` };
@@ -851,7 +873,7 @@ export class AdminService {
   // Update user details
   async updateUser(userId: string, updates: any): Promise<ApiResponse<any>> {
     try {
-      const mongoose = require("mongoose");
+
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
@@ -1068,6 +1090,26 @@ export class AdminService {
         );
       }
 
+      // Notify User
+      try {
+        if (partner.user) {
+          const title = `Partner Application ${action === 'approve' ? 'Approved' : 'Rejected'}`;
+          const message = action === 'approve'
+            ? `Your Partner application has been approved.`
+            : `Your Partner application has been rejected. Reason: ${rejectionReason}`;
+
+          await NotificationService.notifyUser(
+            partner.user.toString(),
+            title,
+            message,
+            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
+            { partnerId, type: 'partner' }
+          );
+        }
+      } catch (notifError) {
+        console.error("[updatePartnerStatus] Failed to send notification:", notifError);
+      }
+
       return {
         success: true,
         message: `Partner ${action}d successfully`,
@@ -1266,6 +1308,26 @@ export class AdminService {
           { user: businessInfo.user },
           { businessInfoCount: pendingBusinessCount },
         );
+      }
+
+      // Notify User
+      try {
+        if (businessInfo.user) {
+          const title = `Business Profile ${action === 'approve' ? 'Approved' : 'Rejected'}`;
+          const message = action === 'approve'
+            ? `Your Business Profile (${businessInfo.companyName}) has been approved.`
+            : `Your Business Profile (${businessInfo.companyName}) has been rejected. Reason: ${rejectionReason}`;
+
+          await NotificationService.notifyUser(
+            businessInfo.user.toString(),
+            title,
+            message,
+            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
+            { businessId: id, type: 'business' }
+          );
+        }
+      } catch (notifError) {
+        console.error("[updateBusinessInfoStatus] Failed to send notification:", notifError);
       }
 
       return {
