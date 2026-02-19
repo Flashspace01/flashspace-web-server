@@ -153,10 +153,7 @@ adminRoutes.put(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.updatePartnerStatus,
-<<<<<<< HEAD
   // AdminController.updatePartnerStatus,
-=======
->>>>>>> 1fa6d26 (add changes)
 );
 
 // Business Info Management
