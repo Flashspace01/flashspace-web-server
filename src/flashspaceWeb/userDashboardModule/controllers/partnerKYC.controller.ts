@@ -83,58 +83,7 @@ export const addPartner = async (req: Request, res: Response) => {
   }
 };
 
-<<<<<<< HEAD
-export const getPartners = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const { profileId } = req.params;
-
-    console.log(`[getPartners] User: ${userId}, Profile: ${profileId}`);
-
-    if (!profileId) {
-      return res.status(400).json({
-        success: false,
-        message: "Profile ID required",
-      });
-    }
-
-    // Verify KYC Profile access
-    const kycProfile = await KYCDocumentModel.findOne({
-      _id: profileId,
-      user: userId,
-    });
-
-    if (!kycProfile) {
-      return res.status(404).json({
-        success: false,
-        message: "KYC profile not found",
-      });
-    }
-
-    // Query PartnerKYCModel for partners linked to this profile
-    const partners = await PartnerKYCModel.find({
-      user: userId,
-      isDeleted: { $ne: true },
-    }).sort({ createdAt: -1 });
-
-    console.log(`[getPartners] Found ${partners.length} partners`);
-
-    res.status(200).json({
-      success: true,
-      data: partners,
-    });
-  } catch (error: any) {
-    console.error("Get partners error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch partners",
-      error: error.message,
-    });
-  }
-};
-=======
 // Get all partners for a KYC profile
->>>>>>> 41cd396 (solved conflicts)
 
 // Remove a partner
 export const removePartner = async (req: Request, res: Response) => {
@@ -195,8 +144,6 @@ export const removePartner = async (req: Request, res: Response) => {
 };
 
 // Get details of a specific partner
-<<<<<<< HEAD
-=======
 export const getPartners = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -234,7 +181,6 @@ export const getPartners = async (req: Request, res: Response) => {
 };
 
 // Get details of a specific partner
->>>>>>> 41cd396 (solved conflicts)
 export const getPartnerDetails = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
