@@ -22,6 +22,25 @@ const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
 const mail_routes_1 = __importDefault(require("./flashspaceWeb/mailModule/routes/mail.routes"));
 exports.mainRoutes = (0, express_1.Router)();
+const mongoose_1 = __importDefault(require("mongoose"));
+// /api/health - Check server and DB status
+exports.mainRoutes.get("/health", (req, res) => {
+    const dbStatus = mongoose_1.default.connection.readyState;
+    const statusMap = {
+        0: "Disconnected",
+        1: "Connected",
+        2: "Connecting",
+        3: "Disconnecting",
+    };
+    res.json({
+        success: true,
+        message: "Server is running",
+        // dbStatus: statusMap[dbStatus] || "Unknown",
+        dbReadyState: dbStatus,
+        envPort: process.env.PORT,
+        timestamp: new Date()
+    });
+});
 // /api/auth
 exports.mainRoutes.use("/auth", auth_routes_1.authRoutes);
 // /api/contactForm
