@@ -41,13 +41,8 @@ export class PartnerKYC {
   isDeleted?: boolean;
 
   @prop({
-<<<<<<< HEAD
     enum: ["in_progress", "pending", "approved", "rejected"],
     default: "in_progress",
-=======
-    enum: ["pending", "approved", "rejected"],
-    default: "pending",
->>>>>>> 41cd396 (solved conflicts)
   })
   status?: string;
 
