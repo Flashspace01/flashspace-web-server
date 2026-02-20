@@ -12,7 +12,20 @@ export const getVisits = async (req: Request, res: Response) => {
 
 export const createVisit = async (req: Request, res: Response) => {
     try {
-        const newVisit = new Visit(req.body);
+        const { client, visitor, email, purpose, space } = req.body;
+
+        if (!client || !visitor || !email || !purpose || !space) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const newVisit = new Visit({
+            client,
+            visitor,
+            email: email.trim(), // Sanitize email
+            purpose,
+            space
+        });
+
         await newVisit.save();
         res.status(201).json({ success: true, data: newVisit });
     } catch (error) {

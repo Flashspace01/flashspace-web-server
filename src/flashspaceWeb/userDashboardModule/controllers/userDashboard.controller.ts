@@ -7,10 +7,11 @@ import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
+import Mail from "../../mailModule/models/mail.model"; 
+import Visit from "../../visitModule/models/visit.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
-import Mail from "../../mailModule/models/mail.model";
 
 // ============ DASHBOARD ============
 
@@ -1874,5 +1875,30 @@ export const getUserMails = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get user mails error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch mails" });
+  }
+};
+
+// ============ VISITS ============
+
+export const getUserVisits = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const userEmail = user.email.trim();
+
+    // Case-insensitive exact match
+    const visits = await Visit.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: visits });
+  } catch (error) {
+    console.error("Get user visits error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
