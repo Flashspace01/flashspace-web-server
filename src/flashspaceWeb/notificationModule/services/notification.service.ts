@@ -94,4 +94,8 @@ export class NotificationService {
     static async deleteNotification(notificationId: string) {
         return await NotificationModel.findByIdAndDelete(notificationId);
     }
+
+    static async deleteAllForAdmin() {
+        return await NotificationModel.deleteMany({ recipientType: NotificationRecipientType.ADMIN });
+    }
 }

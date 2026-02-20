@@ -9,6 +9,8 @@ import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { UserModel } from "../authModule/models/user.model";
 import { CreditLedgerModel, CreditSource } from "../userDashboardModule/models/creditLedger.model";
+import { NotificationModel, NotificationType, NotificationRecipientType } from "../notificationModule/models/Notification";
+import { getIO } from "../../socket";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -60,8 +62,8 @@ async function createBookingAndInvoice(payment: any) {
     // or we could add specific MeetingRoomModel lookup later.
 
     // Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
+    const startDate = payment.startDate ? new Date(payment.startDate) : new Date();
+    const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + (payment.tenure * 12)); // tenure in years
 
     // Create booking
@@ -212,6 +214,7 @@ export const createOrder = async (req: Request, res: Response) => {
       discountPercent,
       discountAmount,
       paymentType = PaymentType.VIRTUAL_OFFICE,
+      startDate,
     } = req.body;
 
     // Validation
@@ -279,6 +282,7 @@ export const createOrder = async (req: Request, res: Response) => {
       totalAmount,
       discountPercent: discountPercent || 0,
       discountAmount: discountAmount || 0,
+      startDate: startDate ? new Date(startDate) : undefined,
     });
 
     res.status(201).json({
@@ -339,6 +343,31 @@ export const verifyPayment = async (req: Request, res: Response) => {
       let bookingData = null;
       try {
         bookingData = await createBookingAndInvoice(payment);
+
+        // --- NOTIFICATION LOGIC (DEV MODE) ---
+        const notification = await NotificationModel.create({
+          recipient: payment.userId,
+          recipientType: NotificationRecipientType.USER,
+          type: NotificationType.SUCCESS,
+          title: "Booking Confirmed! 🎉",
+          message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          read: false,
+          metadata: {
+            bookingId: bookingData?.booking?._id,
+            paymentId: payment._id,
+            type: 'booking_confirmation'
+          }
+        });
+
+        // Emit Socket Event
+        try {
+          const io = getIO();
+          io.to(payment.userId.toString()).emit("notification:new", notification);
+        } catch (socketError) {
+          console.error("Socket emission failed:", socketError);
+        }
+        // -------------------------------------
+
       } catch (err) {
         console.error("Failed to create booking:", err);
       }
@@ -417,6 +446,31 @@ export const verifyPayment = async (req: Request, res: Response) => {
     let bookingData = null;
     try {
       bookingData = await createBookingAndInvoice(payment);
+
+      // --- NOTIFICATION LOGIC (PROD MODE) ---
+      const notification = await NotificationModel.create({
+        recipient: payment.userId,
+        recipientType: NotificationRecipientType.USER,
+        type: NotificationType.SUCCESS,
+        title: "Booking Confirmed! 🎉",
+        message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+        read: false,
+        metadata: {
+          bookingId: bookingData?.booking?._id,
+          paymentId: payment._id,
+          type: 'booking_confirmation'
+        }
+      });
+
+      // Emit Socket Event
+      try {
+        const io = getIO();
+        io.to(payment.userId.toString()).emit("notification:new", notification);
+      } catch (socketError) {
+        console.error("Socket emission failed:", socketError);
+      }
+      // -------------------------------------
+
     } catch (err) {
       console.error("Failed to create booking:", err);
     }
