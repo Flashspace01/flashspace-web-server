@@ -33,6 +33,7 @@ export enum UserRole {
       }
     }
   },
+  options: { allowMixed: 0 },
 })
 @index({ email: 1 }, { unique: true })
 @index({ googleId: 1 }, { sparse: true, unique: true })
@@ -45,10 +46,10 @@ export enum UserRole {
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
 
-  @prop({ required: true, trim: true, lowercase: true })
+  @prop({ type: () => String, required: true, trim: true, lowercase: true })
   public email!: string;
 
-  @prop({ required: true, trim: true })
+  @prop({ type: () => String, required: true, trim: true })
   public fullName!: string;
 
   @prop({ trim: true })
