@@ -54,7 +54,7 @@ export class VirtualOffice {
   public popular!: boolean;
 
   @prop({ default: false })
-  public isSponsored!: boolean;
+  public sponsored!: boolean;
 
   @prop({ _id: false })
   public coordinates?: {
@@ -73,9 +73,6 @@ export class VirtualOffice {
 
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;
-
-  @prop({ ref: () => User, default: [] })
-  public managers?: Ref<User>[];
 }
 
 export const VirtualOfficeModel = getModelForClass(VirtualOffice);

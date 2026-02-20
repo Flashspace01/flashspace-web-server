@@ -7,6 +7,8 @@ import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingspace.model";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import { EventSpaceModel } from "../eventSpaceModule/eventSpace.model";
 import { UserModel } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
@@ -58,6 +60,32 @@ async function createBookingAndInvoice(payment: any) {
           coordinates: space.coordinates,
         };
       }
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.images?.[0],
+          coordinates: space.coordinates,
+        };
+      }
+    } else if (payment.paymentType === PaymentType.EVENT_SPACE) {
+      const space = await EventSpaceModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.images?.[0],
+          coordinates: space.coordinates,
+        };
+      }
     }
     // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
     // or we could add specific MeetingRoomModel lookup later.
@@ -76,7 +104,9 @@ async function createBookingAndInvoice(payment: any) {
           ? "virtual_office"
           : payment.paymentType === PaymentType.MEETING_ROOM
             ? "meeting_room"
-            : "coworking_space",
+            : payment.paymentType === PaymentType.EVENT_SPACE
+              ? "event_space"
+              : "coworking_space",
       spaceId: payment.spaceId,
       spaceSnapshot,
       plan: {

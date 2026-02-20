@@ -1,9 +1,20 @@
 import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { VirtualOfficeModel } from "./virtualOffice.model";
+import {
+  createVirtualOfficeSchema,
+  updateVirtualOfficeSchema,
+} from "./virtualOffice.validation";
+import { z } from "zod";
+import { UserRole } from "../authModule/models/user.model";
 
+// Create new Virtual Office
 export const createVirtualOffice = async (req: Request, res: Response) => {
   try {
+    const validatedData = createVirtualOfficeSchema.parse({
+      body: req.body,
+    });
+
     const {
       name,
       address,
@@ -15,12 +26,20 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       features,
       availability,
       popular,
+      sponsored,
       coordinates,
       images,
-      isSponsored,
-    } = req.body;
+    } = validatedData.body;
 
-    const createdOffice = await VirtualOfficeModel.create({
+    // Check if user is a partner
+    if (req.user?.role !== UserRole.PARTNER) {
+      return res.status(403).json({
+        message: "Only partners can create virtual offices",
+        success: false,
+      });
+    }
+
+    const newOffice = new VirtualOfficeModel({
       name,
       address,
       city,
@@ -28,30 +47,34 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       gstPlanPrice,
       mailingPlanPrice,
       brPlanPrice,
+      images,
       features,
       availability,
       popular,
+      sponsored, // Renamed from isSponsored
       coordinates,
-      images: images || [],
-      isSponsored: isSponsored || false,
+      partner: req.user!.id,
+      isActive: true, // Default
     });
 
-    if (!createdOffice) {
-      return res.status(400).json({
-        success: false,
-        message: "Issue with database",
-        data: {},
-        error: "Issue with Database",
-      });
-    }
+    await newOffice.save();
 
     res.status(201).json({
       success: true,
       message: "Virtual office created successfully",
-      data: createdOffice,
+      data: newOffice,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        data: {},
+        error: err.issues,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
@@ -300,10 +323,10 @@ export const deleteVirtualOffice = async (req: Request, res: Response) => {
 
 export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = req.user?.id;
 
     const spaces = await VirtualOfficeModel.find({
-      $or: [{ partner: userId }, { managers: userId }],
+      partner: userId,
       isDeleted: false,
     }).select("name address city images features");
 

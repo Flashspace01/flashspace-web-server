@@ -22,6 +22,7 @@ export enum MeetingRoomType {
 @index({ city: 1, area: 1 })
 @index({ type: 1 })
 @index({ avgRating: -1 }) // For "Top Rated" sorting
+@index({ popular: 1 })
 @index({ coordinates: "2dsphere" }) // For "Near Me" map searches
 export class MeetingRoom {
   @prop({ required: true, trim: true })
@@ -38,6 +39,9 @@ export class MeetingRoom {
 
   @prop({ required: true })
   public price!: number;
+
+  @prop({ required: true })
+  public capacity!: number;
 
   @prop({ required: true, enum: MeetingRoomType })
   public type!: MeetingRoomType;
@@ -56,6 +60,12 @@ export class MeetingRoom {
 
   @prop({ type: () => [String], required: true })
   public images!: string[];
+
+  @prop({ default: false })
+  public sponsored!: boolean;
+
+  @prop({ default: false })
+  public popular!: boolean;
 
   @prop({ default: true })
   public isActive!: boolean;

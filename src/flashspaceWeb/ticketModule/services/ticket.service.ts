@@ -1,7 +1,16 @@
-import { TicketModel, Ticket, TicketStatus, TicketPriority, TicketCategory } from "../models/Ticket";
+import {
+  TicketModel,
+  Ticket,
+  TicketStatus,
+  TicketPriority,
+  TicketCategory,
+} from "../models/Ticket";
 import { UserModel } from "../../authModule/models/user.model";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
-import { SpacePortalSpaceModel } from "../../spacePortalModule/models/space.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingspace.model";
+import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -27,14 +36,17 @@ export interface UpdateTicketDTO {
 
 export interface ReplyDTO {
   userId: string;
-  sender: 'user' | 'admin';
+  sender: "user" | "admin";
   message: string;
   attachments?: string[];
 }
 
 export class TicketService {
   // User Methods
-  static async createTicket(userId: string, data: CreateTicketDTO): Promise<any> {
+  static async createTicket(
+    userId: string,
+    data: CreateTicketDTO,
+  ): Promise<any> {
     const ticketNumber = Ticket.generateTicketNumber();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
@@ -54,17 +66,31 @@ export class TicketService {
       spaceId = spaceId || booking.spaceId?.toString();
       spaceSnapshot = booking.spaceSnapshot;
     } else if (data.spaceId) {
-      // Look up space to determine partner and snapshot
-      const space = await SpacePortalSpaceModel.findOne({
-        _id: Types.ObjectId.isValid(data.spaceId) ? data.spaceId : undefined,
-        isDeleted: false,
-      }).lean();
+      // Look up space in all collections
+      const [mr, cs, es, vo] = await Promise.all([
+        MeetingRoomModel.findOne({
+          _id: data.spaceId,
+          isDeleted: false,
+        }).lean(),
+        CoworkingSpaceModel.findOne({
+          _id: data.spaceId,
+          isDeleted: false,
+        }).lean(),
+        EventSpaceModel.findOne({ _id: data.spaceId, isDeleted: false }).lean(),
+        VirtualOfficeModel.findOne({
+          _id: data.spaceId,
+          isDeleted: false,
+        }).lean(),
+      ]);
+
+      const space: any = mr || cs || es || vo;
+
       if (space) {
         partnerId = partnerId || (space.partner as any)?.toString?.();
         spaceId = spaceId || space._id?.toString();
         spaceSnapshot = {
           name: space.name,
-          address: space.location,
+          address: space.address || space.location,
           city: space.city,
         };
       }
@@ -86,18 +112,22 @@ export class TicketService {
       priority: data.priority || TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
       attachments: data.attachments || [],
-      bookingId: data.bookingId ? new Types.ObjectId(data.bookingId) : undefined,
-      messages: [{
-        sender: 'user',
-        message: data.description,
-        createdAt: new Date()
-      }],
-      expiresAt
+      bookingId: data.bookingId
+        ? new Types.ObjectId(data.bookingId)
+        : undefined,
+      messages: [
+        {
+          sender: "user",
+          message: data.description,
+          createdAt: new Date(),
+        },
+      ],
+      expiresAt,
     });
 
     // Populate user data
     const populatedTicket = await TicketModel.findById(ticket._id)
-      .populate('user', 'fullName email phoneNumber')
+      .populate("user", "fullName email phoneNumber")
       .lean();
 
     // Notify Admins
@@ -105,13 +135,28 @@ export class TicketService {
       `New Ticket: ${ticketNumber}`,
       `A new ticket "${data.subject}" has been created.`,
       NotificationType.INFO,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
+
+    // Notify Partner
+    if (partnerId) {
+      NotificationService.notifyPartner(
+        partnerId,
+        `New Ticket: ${ticketNumber}`,
+        `A new ticket "${data.subject}" has been created for your space.`,
+        NotificationType.INFO,
+        { ticketId: ticket._id },
+      );
+    }
 
     return populatedTicket;
   }
 
-  static async getUserTickets(userId: string, page: number = 1, limit: number = 10) {
+  static async getUserTickets(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     const skip = (page - 1) * limit;
 
     const [tickets, total] = await Promise.all([
@@ -119,9 +164,9 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('assignee', 'fullName email')
+        .populate("assignee", "fullName email")
         .lean(),
-      TicketModel.countDocuments({ user: new Types.ObjectId(userId) })
+      TicketModel.countDocuments({ user: new Types.ObjectId(userId) }),
     ]);
 
     return {
@@ -130,7 +175,7 @@ export class TicketService {
       page,
       totalPages: Math.ceil(total / limit),
       hasNextPage: page * limit < total,
-      hasPrevPage: page > 1
+      hasPrevPage: page > 1,
     };
   }
 
@@ -144,13 +189,13 @@ export class TicketService {
       }
 
       const ticket = await TicketModel.findOne(query)
-        .populate('user', 'fullName email phoneNumber')
-        .populate('assignee', 'fullName email')
+        .populate("user", "fullName email phoneNumber")
+        .populate("assignee", "fullName email")
         .lean();
 
       return ticket;
     } catch (error) {
-      console.error('Error in getTicketById:', error);
+      console.error("Error in getTicketById:", error);
       return null;
     }
   }
@@ -159,14 +204,14 @@ export class TicketService {
     const query: any = { _id: new Types.ObjectId(ticketId) };
 
     // If sender is user, ensure they own the ticket
-    if (data.sender === 'user') {
+    if (data.sender === "user") {
       query.user = new Types.ObjectId(data.userId);
     }
 
     const ticket = await TicketModel.findOne(query);
 
     if (!ticket) {
-      throw new Error('Ticket not found or access denied');
+      throw new Error("Ticket not found or access denied");
     }
 
     // Add the message
@@ -174,12 +219,15 @@ export class TicketService {
       sender: data.sender,
       message: data.message,
       attachments: data.attachments,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     // Update status if it was closed/resolved and user is replying
-    if (data.sender === 'user' &&
-      (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.RESOLVED)) {
+    if (
+      data.sender === "user" &&
+      (ticket.status === TicketStatus.CLOSED ||
+        ticket.status === TicketStatus.RESOLVED)
+    ) {
       ticket.status = TicketStatus.OPEN;
     }
 
@@ -189,30 +237,45 @@ export class TicketService {
     await ticket.save();
 
     // Notify Admins if user relied
-    if (data.sender === 'user') {
+    if (data.sender === "user") {
       NotificationService.notifyAdmin(
         `New Reply on Ticket: ${ticket.ticketNumber}`,
         `User replied: ${data.message.substring(0, 50)}...`,
         NotificationType.TICKET_UPDATE,
-        { ticketId: ticket._id }
+        { ticketId: ticket._id },
       );
+
+      // Notify Partner if ticket is linked to one
+      if (ticket.partner) {
+        NotificationService.notifyPartner(
+          ticket.partner.toString(),
+          `New Reply on Ticket: ${ticket.ticketNumber}`,
+          `User replied: ${data.message.substring(0, 50)}...`,
+          NotificationType.TICKET_UPDATE,
+          { ticketId: ticket._id },
+        );
+      }
     }
 
     // Return populated ticket
     return await TicketModel.findById(ticket._id)
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email')
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email")
       .lean();
   }
 
   // Admin Methods
-  static async getAllTickets(filters: {
-    status?: TicketStatus;
-    priority?: TicketPriority;
-    category?: TicketCategory;
-    assignee?: string;
-    search?: string;
-  } = {}, page: number = 1, limit: number = 20) {
+  static async getAllTickets(
+    filters: {
+      status?: TicketStatus;
+      priority?: TicketPriority;
+      category?: TicketCategory;
+      assignee?: string;
+      search?: string;
+    } = {},
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const skip = (page - 1) * limit;
     const query: any = {};
 
@@ -225,9 +288,9 @@ export class TicketService {
     // Search by ticket number or subject
     if (filters.search) {
       query.$or = [
-        { ticketNumber: { $regex: filters.search, $options: 'i' } },
-        { subject: { $regex: filters.search, $options: 'i' } },
-        { description: { $regex: filters.search, $options: 'i' } }
+        { ticketNumber: { $regex: filters.search, $options: "i" } },
+        { subject: { $regex: filters.search, $options: "i" } },
+        { description: { $regex: filters.search, $options: "i" } },
       ];
     }
 
@@ -236,10 +299,10 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('user', 'fullName email phoneNumber')
-        .populate('assignee', 'fullName email')
+        .populate("user", "fullName email phoneNumber")
+        .populate("assignee", "fullName email")
         .lean(),
-      TicketModel.countDocuments(query)
+      TicketModel.countDocuments(query),
     ]);
 
     return {
@@ -248,7 +311,7 @@ export class TicketService {
       page,
       totalPages: Math.ceil(total / limit),
       hasNextPage: page * limit < total,
-      hasPrevPage: page > 1
+      hasPrevPage: page > 1,
     };
   }
 
@@ -261,22 +324,22 @@ export class TicketService {
       priorityCounts,
       categoryCounts,
       totalTickets,
-      resolvedThisMonth
+      resolvedThisMonth,
     ] = await Promise.all([
       TicketModel.aggregate([
-        { $group: { _id: "$status", count: { $sum: 1 } } }
+        { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
       TicketModel.aggregate([
-        { $group: { _id: "$priority", count: { $sum: 1 } } }
+        { $group: { _id: "$priority", count: { $sum: 1 } } },
       ]),
       TicketModel.aggregate([
-        { $group: { _id: "$category", count: { $sum: 1 } } }
+        { $group: { _id: "$category", count: { $sum: 1 } } },
       ]),
       TicketModel.countDocuments({}),
       TicketModel.countDocuments({
         status: TicketStatus.RESOLVED,
-        resolvedAt: { $gte: startOfMonth }
-      })
+        resolvedAt: { $gte: startOfMonth },
+      }),
     ]);
 
     return {
@@ -284,7 +347,7 @@ export class TicketService {
       priorityCounts,
       categoryCounts,
       totalTickets: [{ count: totalTickets }],
-      resolvedThisMonth: [{ count: resolvedThisMonth }]
+      resolvedThisMonth: [{ count: resolvedThisMonth }],
     };
   }
 
@@ -309,31 +372,36 @@ export class TicketService {
     const ticket = await TicketModel.findByIdAndUpdate(
       new Types.ObjectId(ticketId),
       updateObj,
-      { new: true }
+      { new: true },
     )
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email');
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email");
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     return ticket;
   }
 
-  static async addAdminReply(ticketId: string, adminId: string, message: string, attachments?: string[]) {
+  static async addAdminReply(
+    ticketId: string,
+    adminId: string,
+    message: string,
+    attachments?: string[],
+  ) {
     const ticket = await TicketModel.findById(ticketId);
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     // Add admin message
     ticket.messages.push({
-      sender: 'admin',
+      sender: "admin",
       message,
       attachments,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     // Update status if needed
@@ -354,13 +422,13 @@ export class TicketService {
       `Update on Ticket: ${ticket.ticketNumber}`,
       `Admin replied: ${message.substring(0, 50)}...`,
       NotificationType.TICKET_UPDATE,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
 
     // Return populated ticket
     return await TicketModel.findById(ticket._id)
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email')
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email")
       .lean();
   }
 
@@ -369,15 +437,15 @@ export class TicketService {
       ticketId,
       {
         assignee: new Types.ObjectId(assigneeId),
-        status: TicketStatus.IN_PROGRESS
+        status: TicketStatus.IN_PROGRESS,
       },
-      { new: true }
+      { new: true },
     )
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email');
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email");
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     return ticket;
@@ -387,13 +455,13 @@ export class TicketService {
     const ticket = await TicketModel.findByIdAndUpdate(
       ticketId,
       { status: TicketStatus.ESCALATED },
-      { new: true }
+      { new: true },
     )
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email');
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email");
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     return ticket;
@@ -404,15 +472,15 @@ export class TicketService {
       ticketId,
       {
         status: TicketStatus.RESOLVED,
-        resolvedAt: new Date()
+        resolvedAt: new Date(),
       },
-      { new: true }
+      { new: true },
     )
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email');
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email");
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     // Notify User
@@ -421,7 +489,7 @@ export class TicketService {
       `Ticket Resolved: ${ticket.ticketNumber}`,
       `Your ticket has been marked as resolved.`,
       NotificationType.SUCCESS,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
 
     return ticket;
@@ -432,15 +500,15 @@ export class TicketService {
       ticketId,
       {
         status: TicketStatus.CLOSED,
-        closedAt: new Date()
+        closedAt: new Date(),
       },
-      { new: true }
+      { new: true },
     )
-      .populate('user', 'fullName email phoneNumber')
-      .populate('assignee', 'fullName email');
+      .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email");
 
     if (!ticket) {
-      throw new Error('Ticket not found');
+      throw new Error("Ticket not found");
     }
 
     // Notify User
@@ -449,7 +517,7 @@ export class TicketService {
       `Ticket Closed: ${ticket.ticketNumber}`,
       `Your ticket has been closed.`,
       NotificationType.INFO,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
 
     return ticket;
@@ -460,37 +528,75 @@ export class TicketService {
   /**
    * Helper: get all bookingIds for a partner's spaces.
    */
-  private static async getPartnerBookingIds(partnerId: string): Promise<Types.ObjectId[]> {
-    // 1. Find all spaces owned by this partner
-    const spaces = await SpacePortalSpaceModel.find({ partner: new Types.ObjectId(partnerId) }).select('_id').lean();
-    const spaceIds = spaces.map(s => s._id);
+  private static async getPartnerBookingIds(
+    partnerId: string,
+  ): Promise<Types.ObjectId[]> {
+    // 1. Find all spaces owned by this partner across all modules
+    const [mr, cs, es, vo] = await Promise.all([
+      MeetingRoomModel.find({ partner: new Types.ObjectId(partnerId) })
+        .select("_id")
+        .lean(),
+      CoworkingSpaceModel.find({ partner: new Types.ObjectId(partnerId) })
+        .select("_id")
+        .lean(),
+      EventSpaceModel.find({ partner: new Types.ObjectId(partnerId) })
+        .select("_id")
+        .lean(),
+      VirtualOfficeModel.find({ partner: new Types.ObjectId(partnerId) })
+        .select("_id")
+        .lean(),
+    ]);
+
+    const spaceIds = [
+      ...mr.map((s) => s._id),
+      ...cs.map((s) => s._id),
+      ...es.map((s) => s._id),
+      ...vo.map((s) => s._id),
+    ];
+
     if (spaceIds.length === 0) return [];
 
     // 2. Find all bookings for those spaces
-    const bookings = await BookingModel.find({ spaceId: { $in: spaceIds } }).select('_id').lean();
-    return bookings.map(b => b._id as Types.ObjectId);
+    const bookings = await BookingModel.find({ spaceId: { $in: spaceIds } })
+      .select("_id")
+      .lean();
+    return bookings.map((b) => b._id as Types.ObjectId);
   }
 
   /**
    * Helper: validate that a ticket belongs to one of partner's spaces.
    */
-  private static async validatePartnerOwnership(ticketId: string, partnerId: string) {
+  private static async validatePartnerOwnership(
+    ticketId: string,
+    partnerId: string,
+  ) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
     if (bookingIds.length === 0) return null;
 
     return TicketModel.findOne({
       _id: new Types.ObjectId(ticketId),
-      bookingId: { $in: bookingIds }
+      bookingId: { $in: bookingIds },
     });
   }
 
   /**
    * Get all tickets that belong to bookings on partner's listings.
    */
-  static async getPartnerTickets(partnerId: string, page: number = 1, limit: number = 20) {
+  static async getPartnerTickets(
+    partnerId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
     if (bookingIds.length === 0) {
-      return { tickets: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false };
+      return {
+        tickets: [],
+        total: 0,
+        page,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      };
     }
 
     const skip = (page - 1) * limit;
@@ -501,10 +607,10 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('user', 'fullName email phoneNumber')
-        .populate('bookingId', 'bookingNumber spaceSnapshot type')
+        .populate("user", "fullName email phoneNumber")
+        .populate("bookingId", "bookingNumber spaceSnapshot type")
         .lean(),
-      TicketModel.countDocuments(query)
+      TicketModel.countDocuments(query),
     ]);
 
     return {
@@ -513,24 +619,29 @@ export class TicketService {
       page,
       totalPages: Math.ceil(total / limit),
       hasNextPage: page * limit < total,
-      hasPrevPage: page > 1
+      hasPrevPage: page > 1,
     };
   }
 
   /**
    * Partner replies to a ticket.
    */
-  static async addPartnerReply(ticketId: string, partnerId: string, message: string, attachments?: string[]) {
+  static async addPartnerReply(
+    ticketId: string,
+    partnerId: string,
+    message: string,
+    attachments?: string[],
+  ) {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) {
-      throw new Error('Ticket not found or access denied');
+      throw new Error("Ticket not found or access denied");
     }
 
     ticket.messages.push({
-      sender: 'partner',
+      sender: "partner",
       message,
       attachments,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     if (ticket.status === TicketStatus.OPEN) {
@@ -546,12 +657,12 @@ export class TicketService {
       `Reply on Query: ${ticket.ticketNumber}`,
       `Partner replied: ${message.substring(0, 50)}...`,
       NotificationType.TICKET_UPDATE,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
 
     return TicketModel.findById(ticket._id)
-      .populate('user', 'fullName email phoneNumber')
-      .populate('bookingId', 'bookingNumber spaceSnapshot type')
+      .populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
 
@@ -561,7 +672,7 @@ export class TicketService {
   static async partnerCloseTicket(ticketId: string, partnerId: string) {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) {
-      throw new Error('Ticket not found or access denied');
+      throw new Error("Ticket not found or access denied");
     }
 
     ticket.status = TicketStatus.CLOSED;
@@ -574,12 +685,12 @@ export class TicketService {
       `Query Closed: ${ticket.ticketNumber}`,
       `Your query has been closed by the partner.`,
       NotificationType.INFO,
-      { ticketId: ticket._id }
+      { ticketId: ticket._id },
     );
 
     return TicketModel.findById(ticket._id)
-      .populate('user', 'fullName email phoneNumber')
-      .populate('bookingId', 'bookingNumber spaceSnapshot type')
+      .populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
 }

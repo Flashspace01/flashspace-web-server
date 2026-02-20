@@ -91,7 +91,10 @@ export class Booking {
   @prop({ ref: () => User })
   partner?: Ref<User>;
 
-  @prop({ required: true, enum: ["virtual_office", "coworking_space", "meeting_room"] })
+  @prop({
+    required: true,
+    enum: ["virtual_office", "coworking_space", "meeting_room", "event_space"],
+  })
   type!: string;
 
   @prop({ required: true })

@@ -21,6 +21,8 @@ export const createEventSpaceSchema = z.object({
         .optional(),
       amenities: z.array(z.string()).optional(),
       capacity: z.number().int().positive().optional(),
+      sponsored: z.boolean().optional(),
+      popular: z.boolean().optional(),
       images: z
         .array(z.string())
         .min(1, "At least one image is required")
@@ -61,6 +63,8 @@ export const updateEventSpaceSchema = z.object({
         .optional(),
       amenities: z.array(z.string()).optional(),
       capacity: z.number().int().positive().optional(),
+      sponsored: z.boolean().optional(),
+      popular: z.boolean().optional(),
       images: z.array(z.string()).max(10).optional(),
       isActive: z.boolean().optional(),
       isDeleted: z.boolean().optional(),

@@ -1,125 +1,84 @@
 import { Types } from "mongoose";
 import { ApiResponse } from "../../authModule/types/auth.types";
-import {
-  SpacePortalSpaceModel,
-  SpacePortalSpaceStatus,
-} from "../models/space.model";
-
-export type CreateSpaceInput = {
-  name: string;
-  city: string;
-  location: string;
-  totalSeats: number;
-  availableSeats: number;
-  meetingRooms: number;
-  cabins: number;
-  status: SpacePortalSpaceStatus;
-};
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingspace.model";
+import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 
 export type ListSpacesParams = {
   search?: string;
-  status?: SpacePortalSpaceStatus;
   city?: string;
   page?: number;
   limit?: number;
   includeDeleted?: boolean;
 };
 
-const escapeRegex = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 export class SpacePortalSpacesService {
-  async createSpace(
-    payload: CreateSpaceInput,
-    partnerId: string
+  /**
+   * Aggregates spaces from all specific modules.
+   * Currently returns all spaces for the partner without pagination across modules (simplification).
+   */
+  async getSpaces(
+    params: ListSpacesParams,
+    partnerId?: string,
   ): Promise<ApiResponse> {
     try {
-      if (payload.availableSeats > payload.totalSeats) {
+      if (!partnerId) {
         return {
           success: false,
-          message: "Available seats cannot exceed total seats",
+          message:
+            "Partner ID is required to list spaces in the Partner Dashboard.",
         };
       }
 
-      const createdSpace = await SpacePortalSpaceModel.create({
-        ...payload,
-        partner: partnerId,
-      });
-
-      return {
-        success: true,
-        message: "Space created successfully",
-        data: createdSpace,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: "Failed to create space",
-        error: error?.message,
-      };
-    }
-  }
-
-  async getSpaces(
-    params: ListSpacesParams,
-    partnerId?: string
-  ): Promise<ApiResponse> {
-    try {
-      const {
-        search,
-        status,
-        city,
-        page = 1,
-        limit = 10,
-        includeDeleted = false,
-      } = params;
+      const { search, city, includeDeleted } = params;
 
       const query: any = {
-        isDeleted: includeDeleted ? { $in: [true, false] } : false,
+        partner: partnerId,
       };
 
-      if (partnerId) query.partner = partnerId;
-
-      if (status) query.status = status;
-      if (city) query.city = new RegExp(`^${escapeRegex(city)}$`, "i");
-
-      if (search) {
-        const term = new RegExp(escapeRegex(search), "i");
-        const objectIdMatch = Types.ObjectId.isValid(search)
-          ? { _id: search }
-          : undefined;
-        query.$or = [
-          { name: term },
-          { city: term },
-          { location: term },
-          ...(objectIdMatch ? [objectIdMatch] : []),
-        ];
+      if (!includeDeleted) {
+        query.isDeleted = { $ne: true };
       }
 
-      const skip = (page - 1) * limit;
+      if (city) {
+        query.city = new RegExp(city, "i");
+      }
 
-      const [spaces, total] = await Promise.all([
-        SpacePortalSpaceModel.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-        SpacePortalSpaceModel.countDocuments(query),
-      ]);
+      // Note: Search implementation across 4 collections is complex.
+      // For now, we fetch all for the partner and let the frontend filter if needed,
+      // or we apply basic name search if provided.
+      if (search) {
+        query.name = new RegExp(search, "i");
+      }
 
-      const mappedSpaces = spaces.map((space: any) => ({
-        ...(space.toObject ? space.toObject() : space),
-        id: space._id?.toString?.() || space.id,
-      }));
+      const [meetingRooms, coworkingSpaces, eventSpaces, virtualOffices] =
+        await Promise.all([
+          MeetingRoomModel.find(query).sort({ createdAt: -1 }).lean(),
+          CoworkingSpaceModel.find(query).sort({ createdAt: -1 }).lean(),
+          EventSpaceModel.find(query).sort({ createdAt: -1 }).lean(),
+          VirtualOfficeModel.find(query).sort({ createdAt: -1 }).lean(),
+        ]);
 
       return {
         success: true,
         message: "Spaces fetched successfully",
         data: {
-          spaces: mappedSpaces,
-          pagination: {
-            total,
-            page,
-            pages: Math.ceil(total / limit),
+          meetingRooms,
+          coworkingSpaces,
+          eventSpaces,
+          virtualOffices,
+          // Summary counts
+          counts: {
+            meetingRooms: meetingRooms.length,
+            coworkingSpaces: coworkingSpaces.length,
+            eventSpaces: eventSpaces.length,
+            virtualOffices: virtualOffices.length,
+            total:
+              meetingRooms.length +
+              coworkingSpaces.length +
+              eventSpaces.length +
+              virtualOffices.length,
           },
         },
       };
@@ -132,51 +91,13 @@ export class SpacePortalSpacesService {
     }
   }
 
-  async getSpaceById(spaceId: string, partnerId?: string): Promise<ApiResponse> {
-    try {
-      if (!Types.ObjectId.isValid(spaceId)) {
-        return {
-          success: false,
-          message: "Invalid space ID format",
-        };
-      }
-
-      const space = await SpacePortalSpaceModel.findOne({
-        _id: spaceId,
-        isDeleted: false,
-        ...(partnerId ? { partner: partnerId } : {}),
-      });
-
-      if (!space) {
-        return {
-          success: false,
-          message: "Space not found",
-        };
-      }
-
-      const mappedSpace = {
-        ...(space.toObject ? space.toObject() : space),
-        id: space._id?.toString?.() || (space as any).id,
-      };
-
-      return {
-        success: true,
-        message: "Space fetched successfully",
-        data: mappedSpace,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: "Failed to fetch space",
-        error: error?.message,
-      };
-    }
-  }
-
-  async updateSpace(
+  /**
+   * Fetch a single space by ID by checking all collections.
+   * Efficient if we know the type, but here we just try to find it.
+   */
+  async getSpaceById(
     spaceId: string,
-    payload: Partial<CreateSpaceInput>,
-    partnerId?: string
+    partnerId?: string,
   ): Promise<ApiResponse> {
     try {
       if (!Types.ObjectId.isValid(spaceId)) {
@@ -186,112 +107,42 @@ export class SpacePortalSpacesService {
         };
       }
 
-      if (
-        payload.totalSeats !== undefined &&
-        payload.availableSeats !== undefined &&
-        payload.availableSeats > payload.totalSeats
-      ) {
-        return {
-          success: false,
-          message: "Available seats cannot exceed total seats",
-        };
-      }
+      const query = {
+        _id: spaceId,
+        ...(partnerId ? { partner: partnerId } : {}),
+      };
 
-      const updated = await SpacePortalSpaceModel.findOneAndUpdate(
-        { _id: spaceId, isDeleted: false, ...(partnerId ? { partner: partnerId } : {}) },
-        payload,
-        { new: true }
-      );
+      // Try parallel lookup since ID is unique across collections usually (or we assume disjoint sets)
+      const [mr, cs, es, vo] = await Promise.all([
+        MeetingRoomModel.findOne(query).lean(),
+        CoworkingSpaceModel.findOne(query).lean(),
+        EventSpaceModel.findOne(query).lean(),
+        VirtualOfficeModel.findOne(query).lean(),
+      ]);
 
-      if (!updated) {
+      const space = mr || cs || es || vo;
+      if (!space) {
         return {
           success: false,
           message: "Space not found",
         };
       }
 
+      let type = "unknown";
+      if (mr) type = "meeting_room";
+      if (cs) type = "coworking_space";
+      if (es) type = "event_space";
+      if (vo) type = "virtual_office";
+
       return {
         success: true,
-        message: "Space updated successfully",
-        data: updated,
+        message: "Space fetched successfully",
+        data: { ...space, type },
       };
     } catch (error: any) {
       return {
         success: false,
-        message: "Failed to update space",
-        error: error?.message,
-      };
-    }
-  }
-
-  async deleteSpace(spaceId: string, restore = false): Promise<ApiResponse> {
-    try {
-      if (!Types.ObjectId.isValid(spaceId)) {
-        return {
-          success: false,
-          message: "Invalid space ID format",
-        };
-      }
-
-      const updated = await SpacePortalSpaceModel.findByIdAndUpdate(
-        spaceId,
-        { isDeleted: !restore },
-        { new: true }
-      );
-
-      if (!updated) {
-        return {
-          success: false,
-          message: "Space not found",
-        };
-      }
-
-      return {
-        success: true,
-        message: restore
-          ? "Space restored successfully"
-          : "Space deleted successfully",
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: "Failed to update space status",
-        error: error?.message,
-      };
-    }
-  }
-
-  async uploadSpacePhotos(spaceId: string, photoUrls: string[]): Promise<ApiResponse> {
-    try {
-      if (!Types.ObjectId.isValid(spaceId)) {
-        return {
-          success: false,
-          message: "Invalid space ID format",
-        };
-      }
-
-      const updated = await SpacePortalSpaceModel.findByIdAndUpdate(
-        spaceId,
-        { $push: { photos: { $each: photoUrls } } },
-        { new: true }
-      );
-
-      if (!updated) {
-        return {
-          success: false,
-          message: "Space not found",
-        };
-      }
-
-      return {
-        success: true,
-        message: "Photos uploaded successfully",
-        data: updated,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: "Failed to upload photos",
+        message: "Failed to fetch space",
         error: error?.message,
       };
     }

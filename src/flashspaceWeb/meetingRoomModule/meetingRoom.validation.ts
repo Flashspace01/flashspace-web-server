@@ -13,12 +13,15 @@ export const createMeetingRoomSchema = z.object({
       })
       .optional(),
     price: z.number().int().positive("Price must be a positive integer"),
+    capacity: z.number().int().positive("Capacity must be a positive integer"),
     type: z.enum(["meeting_room", "board_room", "conference_room"]),
     amenities: z.array(z.string()).optional(),
     images: z
       .array(z.string())
       .min(1, "At least one image is required")
       .max(10, "Maximum 10 images allowed"),
+    sponsored: z.boolean().optional(),
+    popular: z.boolean().optional(),
   }),
 });
 
@@ -38,9 +41,12 @@ export const updateMeetingRoomSchema = z.object({
       })
       .optional(),
     price: z.number().int().positive().optional(),
+    capacity: z.number().int().positive().optional(),
     type: z.enum(["meeting_room", "board_room", "conference_room"]).optional(),
     amenities: z.array(z.string()).optional(),
     images: z.array(z.string()).max(10).optional(),
+    sponsored: z.boolean().optional(),
+    popular: z.boolean().optional(),
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
   }),

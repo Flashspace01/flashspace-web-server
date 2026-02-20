@@ -26,6 +26,7 @@ export enum EventSpaceType {
 @index({ city: 1, area: 1 })
 @index({ type: 1 })
 @index({ price: 1 })
+@index({ popular: 1 })
 @index({ coordinates: "2dsphere" })
 export class EventSpace {
   @prop({ required: true, trim: true })
@@ -57,6 +58,12 @@ export class EventSpace {
 
   @prop({ default: 0 })
   public capacity?: number;
+
+  @prop({ default: false })
+  public sponsored!: boolean;
+
+  @prop({ default: false })
+  public popular!: boolean;
 
   @prop({ default: 0 })
   public avgRating!: number;

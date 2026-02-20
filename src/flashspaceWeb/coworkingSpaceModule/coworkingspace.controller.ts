@@ -44,10 +44,10 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       city,
       area,
       inventory,
-      facilities,
       amenities,
       coordinates,
       images,
+      popular,
     } = validation.data.body;
 
     // 2. Get Partner ID from Auth Middleware
@@ -63,10 +63,10 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         city,
         area,
         inventory,
-        facilities,
         amenities,
         coordinates,
         images,
+        popular,
       },
       partnerId,
     );
