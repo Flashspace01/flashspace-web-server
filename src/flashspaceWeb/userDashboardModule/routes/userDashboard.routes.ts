@@ -23,11 +23,15 @@ import {
   getCredits,
   redeemReward,
   getPartnerSpaceBookings,
+  getUserMails,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
 // All routes require authentication
 router.use(AuthMiddleware.authenticate);
+
+// ============ MAIL ============
+router.get("/mail", getUserMails);
 
 // ============ DASHBOARD ============
 router.get("/dashboard", getDashboardOverview);
@@ -103,6 +107,8 @@ router.post("/support/tickets/:ticketId/reply", replyToTicket);
 // ============ CREDITS & REWARDS ============
 router.get("/credits", getCredits);
 router.post("/credits/redeem", redeemReward);
+
+
 
 // ============ PARTNER KYC ============
 import {
