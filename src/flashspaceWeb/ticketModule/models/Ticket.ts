@@ -1,4 +1,10 @@
-import { prop, modelOptions, getModelForClass, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  modelOptions,
+  getModelForClass,
+  index,
+  Ref,
+} from "@typegoose/typegoose";
 import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 import { Types } from "mongoose";
 import { User } from "../../authModule/models/user.model";
@@ -9,13 +15,13 @@ export enum TicketStatus {
   IN_PROGRESS = "in_progress",
   ESCALATED = "escalated",
   RESOLVED = "resolved",
-  CLOSED = "closed"
+  CLOSED = "closed",
 }
 
 export enum TicketPriority {
   LOW = "low",
   MEDIUM = "medium",
-  HIGH = "high"
+  HIGH = "high",
 }
 
 export enum TicketCategory {
@@ -27,11 +33,11 @@ export enum TicketCategory {
   MAIL_SERVICES = "mail_services",
   BOOKINGS = "bookings",
   COMPLIANCE = "compliance",
-  OTHER = "other"
+  OTHER = "other",
 }
 
 export interface Message {
-  sender: 'user' | 'support' | 'admin' | 'partner';
+  sender: "user" | "support" | "admin" | "partner";
   message: string;
   attachments?: string[];
   createdAt: Date;
@@ -48,8 +54,8 @@ export interface Message {
         delete ret._id;
         delete ret.__v;
         return ret;
-      }
-    }
+      },
+    },
   },
 })
 @index({ ticketNumber: 1 }, { unique: true })
@@ -115,19 +121,23 @@ export class Ticket extends TimeStamps {
     const prefix = "TKT";
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
     // Generate 4-digit random number
     const random = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${year}${month}${random}`;
   }
 
   // Add message to ticket
-  addMessage(sender: 'user' | 'support' | 'admin' | 'partner', message: string, attachments?: string[]) {
+  addMessage(
+    sender: "user" | "support" | "admin" | "partner",
+    message: string,
+    attachments?: string[],
+  ) {
     this.messages.push({
       sender,
       message,
       attachments,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
     this.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Reset expiry on new activity
   }
