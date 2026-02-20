@@ -1,92 +1,76 @@
-import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  modelOptions,
+  index,
+  Ref,
+} from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
+import { GeoLocation } from "../shared/geolocation.schema"; 
 
 @modelOptions({
-    schemaOptions: {
-        timestamps: true
-    }
+  schemaOptions: { timestamps: true },
 })
-@index({ city: 1, area: 1 }) // Location-based searches
-@index({ isDeleted: 1, isActive: 1 }) // Filter active offices
-@index({ popular: 1, rating: -1 }) // Featured/popular offices
-@index({ "coordinates.lat": 1, "coordinates.lng": 1 }) // Geospatial queries
-@index({ price: 1 }) // Price-based filtering
+@index({ city: 1, area: 1 }) 
+@index({ isDeleted: 1, isActive: 1 }) 
+@index({ popular: 1, avgRating: -1 }) 
+@index({ location: "2dsphere" }) 
 export class VirtualOffice {
-    @prop({ required: true, trim: true })
-    public name!: string;
+  @prop({ required: true, trim: true })
+  public name!: string;
 
-    @prop({ required: true })
-    public address!: string;
+  @prop({ required: true })
+  public address!: string;
 
-    @prop({ required: true, trim: true })
-    public city!: string;
+  @prop({ required: true, trim: true })
+  public city!: string;
 
-    @prop({ required: true, trim: true })
-    public area!: string;
+  @prop({ required: true, trim: true })
+  public area!: string;
 
-    @prop({ required: true })
-    public price!: string;
+  // --- UPDATED: Explicitly named as Per Year ---
+  @prop({ required: false })
+  public gstPlanPricePerYear?: number;
 
-    @prop({ required: false })
-    public priceYearly?: string;
+  @prop({ required: false })
+  public mailingPlanPricePerYear?: number;
 
-    @prop({ required: true })
-    public originalPrice!: string;
+  @prop({ required: false })
+  public brPlanPricePerYear?: number;
+  // ---------------------------------------------
 
-    @prop({ required: false })
-    public gstPlanPrice!: string;
+  @prop({ required: true, default: 0 })
+  public avgRating!: number;
 
-    @prop({ required: false })
-    public gstPlanPriceYearly?: string;
+  @prop({ required: true, default: 0 })
+  public totalReviews!: number;
 
-    @prop({ required: false })
-    public mailingPlanPrice!: string;
+  @prop({ required: true, type: () => [String] })
+  public features!: string[];
 
-    @prop({ required: false })
-    public mailingPlanPriceYearly?: string;
+  @prop({ required: true, default: "Available Now" })
+  public availability!: string;
 
-    @prop({ required: false })
-    public brPlanPrice!: string;
+  @prop({ default: false })
+  public popular!: boolean;
 
-    @prop({ required: false })
-    public brPlanPriceYearly?: string;
+  @prop({ default: false })
+  public sponsored!: boolean;
 
-    @prop({ required: true, default: 4.0 })
-    public rating!: number;
+  @prop({ type: () => GeoLocation, _id: false })
+  public location?: GeoLocation;
 
-    @prop({ required: true, default: 0 })
-    public reviews!: number;
+  @prop({ type: () => [String], default: [] })
+  public images!: string[];
 
-    @prop({ required: true, type: () => [String] })
-    public features!: string[];
+  @prop({ default: false })
+  public isDeleted?: boolean;
 
-    @prop({ required: true, default: "Available Now" })
-    public availability!: string;
+  @prop({ default: true })
+  public isActive?: boolean;
 
-    @prop({ default: false })
-    public popular!: boolean;
-
-    @prop({ type: () => Object })
-    public coordinates?: {
-        lat: number;
-        lng: number;
-    };
-
-    @prop({ type: () => String })
-    public image?: string;
-
-    @prop({ default: false })
-    public isDeleted?: boolean;
-
-    @prop({ default: true })
-    public isActive?: boolean;
-
-    @prop({ ref: () => User })
-    public partner?: Ref<User>;
-
-    @prop({ ref: () => User, default: [] })
-    public managers?: Ref<User>[];
+  @prop({ ref: () => User, required: true })
+  public partner!: Ref<User>;
 }
 
 export const VirtualOfficeModel = getModelForClass(VirtualOffice);
-// Schema Updated

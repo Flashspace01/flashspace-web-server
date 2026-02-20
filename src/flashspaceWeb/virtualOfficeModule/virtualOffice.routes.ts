@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
+import { UserRole } from "../authModule/models/user.model"; // <-- ADDED
 import {
   createVirtualOffice,
   getAllVirtualOffices,
@@ -6,35 +8,42 @@ import {
   getVirtualOfficesByCity,
   updateVirtualOffice,
   deleteVirtualOffice,
+  getPartnerVirtualOffices,
 } from "./virtualOffice.controller";
 
 export const virtualOfficeRoutes = Router();
 
-// POST /api/virtualOffice/create
-virtualOfficeRoutes.post("/create", createVirtualOffice);
-
-// GET /api/virtualOffice/getAll
+// Public Routes
 virtualOfficeRoutes.get("/getAll", getAllVirtualOffices);
-
-// GET /api/virtualOffice/getByCity/:city
 virtualOfficeRoutes.get("/getByCity/:city", getVirtualOfficesByCity);
-
-// GET /api/virtualOffice/getById/:virtualOfficeId
 virtualOfficeRoutes.get("/getById/:virtualOfficeId", getVirtualOfficeById);
 
-// PUT /api/virtualOffice/update/:virtualOfficeId
-virtualOfficeRoutes.put("/update/:virtualOfficeId", updateVirtualOffice);
+// Protected Routes (Partners & Admins)
+virtualOfficeRoutes.post(
+  "/create",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN), // <-- FIXED
+  createVirtualOffice,
+);
 
-// DELETE /api/virtualOffice/delete/:virtualOfficeId
-virtualOfficeRoutes.delete("/delete/:virtualOfficeId", deleteVirtualOffice);
+virtualOfficeRoutes.put(
+  "/update/:virtualOfficeId",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN), // <-- FIXED
+  updateVirtualOffice,
+);
 
-// --- Partner Portal Routes ---
-// Protected Routes
-import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
-import { getPartnerVirtualOffices } from "./virtualOffice.controller";
+virtualOfficeRoutes.delete(
+  "/delete/:virtualOfficeId",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN), // <-- FIXED
+  deleteVirtualOffice,
+);
 
+// Partner Specific Route
 virtualOfficeRoutes.get(
   "/partner/spaces",
   AuthMiddleware.authenticate,
+  AuthMiddleware.requireRole(UserRole.PARTNER), // <-- FIXED
   getPartnerVirtualOffices,
 );

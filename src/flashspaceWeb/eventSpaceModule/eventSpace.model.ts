@@ -9,47 +9,26 @@ import {
 import { User } from "../authModule/models/user.model";
 import { GeoLocation } from "../shared/geolocation.schema";
 
-export enum InventoryType {
-  PRIVATE_CABIN = "PRIVATE_CABIN",
-  OPEN_DESK = "OPEN_DESK",
-  OTHER = "OTHER",
-}
-
-class InventoryItem {
-  @prop({ required: true, enum: InventoryType })
-  public type!: InventoryType;
-
-  // Required only if type is "OTHER"
-  @prop({ required: false, trim: true })
-  public customName?: string;
-
-  @prop({ required: true, default: 0 })
-  public totalUnits!: number;
-
-  // --- Long-Term Pricing ---
-  @prop({ required: false, default: 0 })
-  public pricePerMonth?: number;
-
-  @prop({ required: false, default: 0 })
-  public pricePerYear?: number;
-
-  // --- Short-Term "Day Pass" Pricing ---
-  @prop({ required: false })
-  public pricePerDay?: number;
-
-  @prop({ required: false })
-  public pricePerHour?: number;
-}
-
 class OperatingHours {
   @prop({ required: true, trim: true })
   public openTime!: string; // e.g., "09:00"
 
   @prop({ required: true, trim: true })
-  public closeTime!: string; // e.g., "18:00"
+  public closeTime!: string; // e.g., "22:00"
 
   @prop({ type: () => [String], required: true })
-  public daysOpen!: string[]; // e.g., ["Monday", "Tuesday", "Wednesday"]
+  public daysOpen!: string[]; 
+}
+
+export enum EventSpaceType {
+  CONFERENCE_HALL = "conference_hall",
+  SEMINAR_ROOM = "seminar_room",
+  TRAINING_ROOM = "training_room",
+  WORKSHOP_VENUE = "workshop_venue",
+  PRODUCT_LAUNCH_SPACE = "product_launch_space",
+  EVENT_HALL = "event_hall",
+  NETWORKING_EVENT_SPACE = "networking_event_space",
+  OTHER = "other",
 }
 
 @modelOptions({
@@ -57,11 +36,11 @@ class OperatingHours {
   options: { allowMixed: Severity.ALLOW },
 })
 @index({ city: 1, area: 1 })
-@index({ "inventory.type": 1 })
+@index({ type: 1 })
+@index({ pricePerHour: 1 })
 @index({ popular: 1 })
-@index({ avgRating: -1 })
 @index({ location: "2dsphere" })
-export class CoworkingSpace {
+export class EventSpace {
   @prop({ required: true, trim: true })
   public name!: string;
 
@@ -74,28 +53,40 @@ export class CoworkingSpace {
   @prop({ required: true, index: true })
   public area!: string;
 
+  @prop({ required: true })
+  public pricePerHour!: number;
+
+  @prop({ required: false })
+  public pricePerDay?: number; // ADDED: Highly recommended for Event Spaces
+
+  // --- ADDED: Timing & Booking Rules ---
+  @prop({ type: () => OperatingHours, _id: false })
+  public operatingHours?: OperatingHours;
+
+  @prop({ required: false, default: 1 })
+  public minBookingHours?: number; // e.g., requires at least a 2-hour booking
+  // -------------------------------------
+
+  @prop({ required: true, enum: EventSpaceType })
+  public type!: EventSpaceType;
+
+  @prop({ required: false })
+  public customType?: string;
+
   @prop({ type: () => GeoLocation, _id: false })
   public location?: GeoLocation;
 
-  @prop({ required: true })
-  public capacity!: number;
+  @prop({ type: () => [String] })
+  public amenities!: string[];
+
+  @prop({ default: 0 })
+  public capacity?: number;
 
   @prop({ default: false })
   public sponsored!: boolean;
 
   @prop({ default: false })
   public popular!: boolean;
-
-  // The restructured inventory
-  @prop({ type: () => [InventoryItem], _id: false })
-  public inventory!: InventoryItem[];
-
-  // Added Operating Hours for Day Pass logic
-  @prop({ type: () => OperatingHours, _id: false })
-  public operatingHours?: OperatingHours;
-
-  @prop({ type: () => [String] })
-  public amenities!: string[];
 
   @prop({ default: 0 })
   public avgRating!: number;
@@ -116,4 +107,4 @@ export class CoworkingSpace {
   public partner!: Ref<User>;
 }
 
-export const CoworkingSpaceModel = getModelForClass(CoworkingSpace);
+export const EventSpaceModel = getModelForClass(EventSpace);
