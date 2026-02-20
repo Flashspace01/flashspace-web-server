@@ -774,7 +774,20 @@ async function testSpacePortal() {
   const results: TestResult[] = [];
   const headers = { Authorization: `Bearer ${authToken}` };
 
-  // 1. Get All Spaces (Partner Dashboard)
+  // 1. Get Dashboard Stats
+  results.push(
+    await runTest("Space Portal - Get Dashboard Stats", async () => {
+      const response = await api.get("/spaceportal/dashboard", { headers });
+      console.log("   Stats received:", response.data.success);
+      if (response.data.data?.stats) {
+        console.log("   Total Bookings:", response.data.data.stats.total);
+        console.log("   Active Clients:", response.data.data.stats.active);
+      }
+      return response.data;
+    }),
+  );
+
+  // 2. Get All Spaces (Partner Dashboard)
   results.push(
     await runTest("Space Portal - Get All Spaces", async () => {
       const response = await api.get("/spaceportal/spaces", { headers });

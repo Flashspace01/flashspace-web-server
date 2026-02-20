@@ -91,8 +91,9 @@ async function main() {
           address: "456 Business Park, Koramangala",
           city: "Bangalore",
           area: "Koramangala",
-          price: 2500, // New field
+          pricePerHour: 2500, // New field
           type: "board_room", // New field
+          capacity: 10,
           amenities: ["Projector", "Whiteboard", "Video Conferencing"],
           coordinates: { lat: 12.9352, lng: 77.6245 },
           images: ["https://example.com/boardroom.jpg"],
@@ -157,7 +158,7 @@ async function main() {
       await runTest("Meeting Room - Get By ID", async () => {
         const response = await api.get(`/meetingRoom/getById/${meetingRoomId}`);
         console.log("   Name:", response.data.data.name);
-        console.log("   Price:", response.data.data.price);
+        console.log("   Price:", response.data.data.pricePerHour);
         console.log("   Type:", response.data.data.type);
         return response.data;
       }),
@@ -174,11 +175,11 @@ async function main() {
           `/meetingRoom/update/${meetingRoomId}`,
           {
             name: `Updated Board Room ${Date.now()}`,
-            price: 3000,
+            pricePerHour: 3000,
           },
           { headers },
         );
-        console.log("   Updated Price:", response.data.data.price);
+        console.log("   Updated Price:", response.data.data.pricePerHour);
         return response.data;
       }),
     );

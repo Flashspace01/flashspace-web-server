@@ -10,7 +10,7 @@ export const createEventSpaceSchema = z.object({
       address: z.string().min(5, "Address must be at least 5 characters long"),
       city: z.string().min(2, "City must be at least 2 characters long"),
       area: z.string().min(2, "Area must be at least 2 characters long"),
-      price: z.number().positive("Price must be a positive number"),
+      pricePerHour: z.number().positive("Price must be a positive number"),
       type: eventSpaceTypeEnum,
       customType: z.string().optional(),
       coordinates: z
@@ -52,7 +52,7 @@ export const updateEventSpaceSchema = z.object({
       address: z.string().min(5).optional(),
       city: z.string().min(2).optional(),
       area: z.string().min(2).optional(),
-      price: z.number().positive().optional(),
+      pricePerHour: z.number().positive().optional(),
       type: eventSpaceTypeEnum.optional(),
       customType: z.string().optional(),
       coordinates: z

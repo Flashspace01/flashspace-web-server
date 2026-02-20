@@ -101,9 +101,9 @@ export const getAllEventSpaces = async (req: Request, res: Response) => {
     }
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const spaces = await EventSpaceService.getSpaces(query);
@@ -157,9 +157,9 @@ export const getEventSpacesByCity = async (req: Request, res: Response) => {
     if (type) query.type = type;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const spaces = await EventSpaceService.getSpaces(query);
@@ -192,9 +192,9 @@ export const getPartnerEventSpaces = async (req: Request, res: Response) => {
     if (type) query.type = type;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const spaces = await EventSpaceService.getSpaces(query);

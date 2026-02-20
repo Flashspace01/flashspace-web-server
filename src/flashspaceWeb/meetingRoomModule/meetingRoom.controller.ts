@@ -108,9 +108,9 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
     }
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const rooms = await MeetingRoomService.getRooms(query);
@@ -164,9 +164,9 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
     if (type) query.type = type;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const rooms = await MeetingRoomService.getRooms(query);
@@ -199,9 +199,9 @@ export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
     if (type) query.type = type;
 
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      query.pricePerHour = {};
+      if (minPrice) query.pricePerHour.$gte = Number(minPrice);
+      if (maxPrice) query.pricePerHour.$lte = Number(maxPrice);
     }
 
     const rooms = await MeetingRoomService.getRooms(query);

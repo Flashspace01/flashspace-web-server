@@ -96,12 +96,25 @@ async function createBookingAndInvoice(payment: any) {
     // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
     // or we could add specific MeetingRoomModel lookup later.
 
-    // Calculate dates
+    // Calculate dates and tenure
     const startDate = payment.startDate
       ? new Date(payment.startDate)
       : new Date();
     const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
+
+    let planTenure = payment.tenure * 12;
+    let planTenureUnit = "months";
+
+    if (
+      payment.paymentType === PaymentType.MEETING_ROOM ||
+      payment.paymentType === PaymentType.EVENT_SPACE
+    ) {
+      endDate.setHours(endDate.getHours() + payment.tenure); // tenure represents hours
+      planTenure = payment.tenure;
+      planTenureUnit = "hours";
+    } else {
+      endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
+    }
 
     // Create booking
     const booking = await BookingModel.create({
@@ -122,8 +135,8 @@ async function createBookingAndInvoice(payment: any) {
         price: payment.totalAmount,
         originalPrice: payment.yearlyPrice * payment.tenure,
         discount: payment.discountAmount || 0,
-        tenure: payment.tenure * 12,
-        tenureUnit: "months",
+        tenure: planTenure,
+        tenureUnit: planTenureUnit,
       },
       paymentId: payment._id?.toString(),
       razorpayOrderId: payment.razorpayOrderId,

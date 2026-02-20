@@ -12,7 +12,7 @@ export const createMeetingRoomSchema = z.object({
         lng: z.number(),
       })
       .optional(),
-    price: z.number().int().positive("Price must be a positive integer"),
+    pricePerHour: z.number().int().positive("Price must be a positive integer"),
     capacity: z.number().int().positive("Capacity must be a positive integer"),
     type: z.enum(["meeting_room", "board_room", "conference_room"]),
     amenities: z.array(z.string()).optional(),
@@ -40,7 +40,7 @@ export const updateMeetingRoomSchema = z.object({
         lng: z.number(),
       })
       .optional(),
-    price: z.number().int().positive().optional(),
+    pricePerHour: z.number().int().positive().optional(),
     capacity: z.number().int().positive().optional(),
     type: z.enum(["meeting_room", "board_room", "conference_room"]).optional(),
     amenities: z.array(z.string()).optional(),

@@ -25,7 +25,7 @@ export enum EventSpaceType {
 })
 @index({ city: 1, area: 1 })
 @index({ type: 1 })
-@index({ price: 1 })
+@index({ pricePerHour: 1 })
 @index({ popular: 1 })
 @index({ coordinates: "2dsphere" })
 export class EventSpace {
@@ -42,7 +42,7 @@ export class EventSpace {
   public area!: string;
 
   @prop({ required: true })
-  public price!: number;
+  public pricePerHour!: number;
 
   @prop({ required: true, enum: EventSpaceType })
   public type!: EventSpaceType;

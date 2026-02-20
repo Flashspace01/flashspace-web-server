@@ -91,7 +91,7 @@ async function main() {
           address: "123 Tech Park, Whitefield",
           city: "Bangalore",
           area: "Whitefield",
-          price: 15000,
+          pricePerHour: 15000,
           type: "conference_hall",
           capacity: 200,
           amenities: ["Stage", "Sound System", "Projector", "WiFi"],
@@ -120,7 +120,7 @@ async function main() {
           address: "789 Innovation Hub, Koramangala",
           city: "Bangalore",
           area: "Koramangala",
-          price: 5000,
+          pricePerHour: 5000,
           type: "other",
           customType: "Outdoor Amphitheater",
           amenities: ["Open Air", "Lighting", "Seating"],
@@ -189,11 +189,11 @@ async function main() {
           `/eventSpace/update/${eventSpaceId}`,
           {
             name: `Updated Conference Center ${Date.now()}`,
-            price: 18000,
+            pricePerHour: 18000,
           },
           { headers },
         );
-        console.log("   Updated Price:", response.data.data.price);
+        console.log("   Updated Price:", response.data.data.pricePerHour);
         return response.data;
       }),
     );

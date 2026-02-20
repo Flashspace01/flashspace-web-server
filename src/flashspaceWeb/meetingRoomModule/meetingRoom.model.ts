@@ -38,7 +38,7 @@ export class MeetingRoom {
   public area!: string;
 
   @prop({ required: true })
-  public price!: number;
+  public pricePerHour!: number;
 
   @prop({ required: true })
   public capacity!: number;

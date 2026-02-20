@@ -68,13 +68,14 @@ const corsOptions = {
     origin: string | undefined,
     callback: (err: Error | null, allow?: boolean | string) => void,
   ) => {
-    // Allow requests with no origin (like mobile apps or curl) without setting CORS headers
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) {
       return callback(null, false);
     }
 
     if (allowedOrigins.has(origin)) {
-      return callback(null, origin);
+      // Return true to reflect the origin back to the client
+      return callback(null, true);
     }
 
     console.error("CORS blocked origin:", origin);
