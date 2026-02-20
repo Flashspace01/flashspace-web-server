@@ -314,4 +314,37 @@ export class GoogleCalendarService {
             process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET
         );
     }
+
+    /**
+     * List upcoming events (for verification purposes)
+     */
+    static async listUpcomingEvents(maxResults: number = 10): Promise<any[]> {
+        if (!this.isInitialized) {
+            this.initializeCalendar();
+        }
+
+        if (!this.calendar) {
+            console.warn('⚠️ Google Calendar not initialized');
+            return [];
+        }
+
+        const calendarId = process.env.MEETING_SCHEDULER_CALENDAR_ID || 'primary';
+
+        try {
+            const response = await this.calendar.events.list({
+                calendarId,
+                timeMin: new Date().toISOString(),
+                maxResults,
+                singleEvents: true,
+                orderBy: 'startTime',
+            });
+
+            const events = response.data.items || [];
+            console.log(`✅ Found ${events.length} upcoming events`);
+            return events;
+        } catch (error) {
+            console.error('❌ Error listing calendar events:', error);
+            throw error;
+        }
+    }
 }

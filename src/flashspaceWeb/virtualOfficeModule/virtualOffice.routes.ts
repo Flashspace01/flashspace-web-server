@@ -1,11 +1,11 @@
 import { Router } from "express";
 import {
-    createVirtualOffice,
-    getAllVirtualOffices,
-    getVirtualOfficeById,
-    getVirtualOfficesByCity,
-    updateVirtualOffice,
-    deleteVirtualOffice
+  createVirtualOffice,
+  getAllVirtualOffices,
+  getVirtualOfficeById,
+  getVirtualOfficesByCity,
+  updateVirtualOffice,
+  deleteVirtualOffice,
 } from "./virtualOffice.controller";
 
 export const virtualOfficeRoutes = Router();
@@ -27,3 +27,14 @@ virtualOfficeRoutes.put("/update/:virtualOfficeId", updateVirtualOffice);
 
 // DELETE /api/virtualOffice/delete/:virtualOfficeId
 virtualOfficeRoutes.delete("/delete/:virtualOfficeId", deleteVirtualOffice);
+
+// --- Partner Portal Routes ---
+// Protected Routes
+import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
+import { getPartnerVirtualOffices } from "./virtualOffice.controller";
+
+virtualOfficeRoutes.get(
+  "/partner/spaces",
+  AuthMiddleware.authenticate,
+  getPartnerVirtualOffices,
+);

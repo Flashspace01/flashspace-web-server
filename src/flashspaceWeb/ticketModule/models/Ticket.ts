@@ -2,6 +2,7 @@ import { prop, modelOptions, getModelForClass, index, Ref } from "@typegoose/typ
 import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 import { Types } from "mongoose";
 import { User } from "../../authModule/models/user.model";
+import { Booking } from "../../userDashboardModule/models/booking.model";
 
 export enum TicketStatus {
   OPEN = "open",
@@ -30,7 +31,7 @@ export enum TicketCategory {
 }
 
 export interface Message {
-  sender: 'user' | 'support' | 'admin';
+  sender: 'user' | 'support' | 'admin' | 'partner';
   message: string;
   attachments?: string[];
   createdAt: Date;
@@ -58,6 +59,7 @@ export interface Message {
 @index({ assignee: 1 })
 @index({ updatedAt: -1 })
 @index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+@index({ bookingId: 1 })
 export class Ticket extends TimeStamps {
   public _id!: Types.ObjectId;
 
@@ -75,6 +77,10 @@ export class Ticket extends TimeStamps {
 
   @prop({ ref: () => User, default: null })
   public assignee?: Ref<User>;
+
+  // Optional: links the ticket to a specific booking (for partner queries)
+  @prop({ ref: () => Booking, default: null })
+  public bookingId?: Ref<Booking>;
 
   @prop({ enum: TicketCategory, required: true })
   public category!: TicketCategory;
@@ -110,12 +116,13 @@ export class Ticket extends TimeStamps {
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    // Generate 4-digit random number
     const random = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${year}${month}${random}`;
   }
 
   // Add message to ticket
-  addMessage(sender: 'user' | 'support' | 'admin', message: string, attachments?: string[]) {
+  addMessage(sender: 'user' | 'support' | 'admin' | 'partner', message: string, attachments?: string[]) {
     this.messages.push({
       sender,
       message,

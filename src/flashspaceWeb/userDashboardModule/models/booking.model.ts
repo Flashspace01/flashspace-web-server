@@ -1,5 +1,12 @@
-import { prop, getModelForClass, Ref, modelOptions, Severity } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  Ref,
+  modelOptions,
+  Severity,
+} from "@typegoose/typegoose";
 import { User } from "../../authModule/models/user.model";
+import mongoose from "mongoose";
 
 class PlanDetails {
   @prop({ required: true })
@@ -80,11 +87,14 @@ export class Booking {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop({ required: true, enum: ["virtual_office", "coworking_space", "meeting_room"] })
+  @prop({
+    required: true,
+    enum: ["virtual_office", "coworking_space", "meeting_room"],
+  })
   type!: string;
 
   @prop({ required: true })
-  spaceId!: string;
+  spaceId!: mongoose.Types.ObjectId;
 
   @prop({ type: () => SpaceSnapshot })
   spaceSnapshot?: SpaceSnapshot;
@@ -111,7 +121,10 @@ export class Booking {
   @prop()
   kycProfileId?: string; // Reference to the KYC profile used for this booking
 
-  @prop({ enum: ["not_started", "pending", "approved", "rejected"], default: "not_started" })
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
   kycStatus?: string;
 
   @prop({ type: () => [TimelineEntry], default: [] })

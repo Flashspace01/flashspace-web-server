@@ -1,4 +1,10 @@
-import { prop, getModelForClass, Ref, modelOptions, Severity } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  Ref,
+  modelOptions,
+  Severity,
+} from "@typegoose/typegoose";
 import { User } from "../../authModule/models/user.model";
 
 class PersonalInfo {
@@ -43,6 +49,9 @@ class BusinessInfo {
   @prop()
   registeredAddress?: string;
 
+  @prop()
+  industry?: string;
+
   @prop({ default: false })
   verified?: boolean;
 
@@ -50,7 +59,7 @@ class BusinessInfo {
   partners?: string[]; // Array of KYCDocument IDs (Individual profiles)
 }
 
-class KYCDocumentItem {
+export class KYCDocumentItem {
   @prop({ required: true })
   type!: string;
 
@@ -103,13 +112,26 @@ export class KYCDocument {
   documents?: KYCDocumentItem[];
 
   @prop({
-    enum: ["not_started", "in_progress", "pending", "approved", "rejected", "resubmit"],
+    enum: [
+      "not_started",
+      "in_progress",
+      "pending",
+      "approved",
+      "rejected",
+      "resubmit",
+    ],
     default: "not_started",
   })
   overallStatus?: string;
 
   @prop({ default: 0, min: 0, max: 100 })
   progress?: number;
+
+  @prop({ default: 0 })
+  partnerCount?: number;
+
+  @prop({ default: 0 })
+  businessInfoCount?: number;
 
   @prop({ default: false })
   isDeleted?: boolean;

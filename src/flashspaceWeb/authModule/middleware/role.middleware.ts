@@ -43,4 +43,47 @@ export class RoleMiddleware {
     }
     next();
   }
+
+  /**
+   * Middleware to require partner role
+   */
+  static requirePartner(req: Request, res: Response, next: NextFunction) {
+    if (req.user?.role !== UserRole.PARTNER) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Partner role required.',
+        error: 'Forbidden'
+      });
+    }
+    next();
+  }
+
+  /**
+   * Middleware to require sales role
+   */
+  static requireSales(req: Request, res: Response, next: NextFunction) {
+    if (req.user?.role !== UserRole.SALES) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Sales role required.',
+        error: 'Forbidden'
+      });
+    }
+    next();
+  }
+
+  /**
+   * Middleware to allow admin or partner
+   */
+  static requireManagementRole(req: Request, res: Response, next: NextFunction) {
+    const allowedRoles = [UserRole.ADMIN, UserRole.PARTNER];
+    if (!req.user || !allowedRoles.includes(req.user.role as UserRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Management role required.',
+        error: 'Forbidden'
+      });
+    }
+    next();
+  }
 }

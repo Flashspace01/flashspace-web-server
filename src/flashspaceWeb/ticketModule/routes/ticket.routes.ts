@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthMiddleware } from '../../authModule/middleware/auth.middleware';
 import { RoleMiddleware } from '../../authModule/middleware/role.middleware';
+import { requireSpacePartner } from '../../spacePartnerModule/middleware/spacePartner.middleware';
 import { TicketValidation } from '../middleware/validation.middleware';
 import {
   createTicket,
@@ -14,7 +15,10 @@ import {
   addAdminReply,
   escalateTicket,
   resolveTicket,
-  closeTicket
+  closeTicket,
+  getPartnerTickets,
+  addPartnerReply,
+  partnerCloseTicket
 } from '../controllers/ticket.controller';
 
 const router = Router();
@@ -119,6 +123,31 @@ router.post(
   AuthMiddleware.authenticate,
   RoleMiddleware.requireAdmin,
   closeTicket
+);
+
+// ============ PARTNER ROUTES ============
+// Get all tickets for partner's listings
+router.get(
+  '/partner/all',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  getPartnerTickets
+);
+
+// Partner reply to ticket
+router.post(
+  '/partner/:ticketId/reply',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  addPartnerReply
+);
+
+// Partner close ticket
+router.post(
+  '/partner/:ticketId/close',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  partnerCloseTicket
 );
 
 export { router as ticketRoutes };

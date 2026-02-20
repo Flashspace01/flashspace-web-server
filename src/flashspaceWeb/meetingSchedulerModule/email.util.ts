@@ -2,75 +2,85 @@ import nodemailer from 'nodemailer';
 import { DateTime } from 'luxon';
 
 export interface MeetingEmailOptions {
-    to: string;
-    fullName: string;
-    meetingDate: Date;
-    meetLink: string;
-    duration?: number; // in minutes
+  to: string;
+  fullName: string;
+  meetingDate: Date;
+  meetLink: string;
+  duration?: number; // in minutes
 }
 
 export class MeetingEmailUtil {
-    private static transporter: nodemailer.Transporter | null = null;
-    private static isInitialized = false;
+  private static transporter: nodemailer.Transporter | null = null;
+  private static isInitialized = false;
 
-    static initialize() {
-        const service = process.env.EMAIL_SERVICE?.toLowerCase();
+  static initialize() {
+    const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
-        if (service === 'gmail') {
-            this.transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASSWORD,
-                },
-            });
-            console.log('✅ Meeting email service initialized (Gmail)');
-            this.isInitialized = true;
-        } else {
-            console.log('📧 Meeting email service disabled - emails will be logged only');
-            this.isInitialized = true;
-        }
+    if (service === 'gmail') {
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      });
+      console.log('✅ Meeting email service initialized (Gmail)');
+      this.isInitialized = true;
+    } else if (service === 'sendgrid') {
+      this.transporter = nodemailer.createTransport({
+        service: 'SendGrid',
+        auth: {
+          user: 'apikey',
+          pass: process.env.SENDGRID_API_KEY,
+        },
+      });
+      console.log('✅ Meeting email service initialized (SendGrid)');
+      this.isInitialized = true;
+    } else {
+      console.log('📧 Meeting email service disabled - emails will be logged only');
+      this.isInitialized = true;
     }
+  }
 
-    private static async sendEmail(options: { to: string; subject: string; html: string; text?: string }): Promise<void> {
-        const service = process.env.EMAIL_SERVICE?.toLowerCase();
+  private static async sendEmail(options: { to: string; subject: string; html: string; text?: string }): Promise<void> {
+    const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
-        try {
-            if (!this.isInitialized) {
-                this.initialize();
-            }
+    try {
+      if (!this.isInitialized) {
+        this.initialize();
+      }
 
-            if (service === 'gmail') {
-                if (!this.transporter) {
-                    throw new Error('Email transporter not initialized');
-                }
-
-                await this.transporter.sendMail({
-                    from: `"FlashSpace" <${process.env.EMAIL_USER}>`,
-                    to: options.to,
-                    subject: options.subject,
-                    text: options.text,
-                    html: options.html,
-                });
-                console.log('✅ Meeting email sent successfully via Gmail');
-            } else {
-                console.log('📧 Meeting email logged (sending disabled):');
-                console.log('   To:', options.to);
-                console.log('   Subject:', options.subject);
-            }
-        } catch (error: any) {
-            console.error('❌ Error sending meeting email:', error);
-            console.log('⚠️ Email sending failed but continuing...');
+      if (service === 'gmail' || service === 'sendgrid') {
+        if (!this.transporter) {
+          throw new Error('Email transporter not initialized');
         }
+
+        await this.transporter.sendMail({
+          from: `"FlashSpace" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+          to: options.to,
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        });
+        console.log(`✅ Meeting email sent successfully via ${service}`);
+      } else {
+        console.log('📧 Meeting email logged (sending disabled):');
+        console.log('   To:', options.to);
+        console.log('   Subject:', options.subject);
+      }
+    } catch (error: any) {
+      console.error('❌ Error sending meeting email:', error);
+      console.log('⚠️ Email sending failed but continuing...');
     }
+  }
 
-    static async sendMeetingConfirmation(options: MeetingEmailOptions): Promise<void> {
-        const meetingDateTime = DateTime.fromJSDate(options.meetingDate).setZone('Asia/Kolkata');
-        const formattedDate = meetingDateTime.toFormat('cccc, LLLL d, yyyy');
-        const formattedTime = meetingDateTime.toFormat('h:mm a');
-        const duration = options.duration || 30;
+  static async sendMeetingConfirmation(options: MeetingEmailOptions): Promise<void> {
+    const meetingDateTime = DateTime.fromJSDate(options.meetingDate).setZone('Asia/Kolkata');
+    const formattedDate = meetingDateTime.toFormat('cccc, LLLL d, yyyy');
+    const formattedTime = meetingDateTime.toFormat('h:mm a');
+    const duration = options.duration || 30;
 
-        const html = `
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -133,7 +143,7 @@ export class MeetingEmailUtil {
       </html>
     `;
 
-        const text = `
+    const text = `
       Meeting Confirmed - FlashSpace
       
       Hello ${options.fullName},
@@ -156,11 +166,11 @@ export class MeetingEmailUtil {
       © 2024 FlashSpace. All rights reserved.
     `;
 
-        await this.sendEmail({
-            to: options.to,
-            subject: '📅 Meeting Confirmed - FlashSpace Sales Team',
-            html,
-            text,
-        });
-    }
+    await this.sendEmail({
+      to: options.to,
+      subject: '📅 Meeting Confirmed - FlashSpace Sales Team',
+      html,
+      text,
+    });
+  }
 }
