@@ -54,6 +54,12 @@ export const initSocket = (httpServer: HttpServer) => {
             console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
         });
 
+        // Join user specific notification feed
+        socket.on("join_user_feed", (userId: string) => {
+            socket.join(userId);
+            console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
+        });
+
         // Join admin feed
         socket.on("join_admin_feed", () => {
             socket.join("admin_feed");

@@ -120,7 +120,7 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
 
 export const getVirtualOfficeById = async (req: Request, res: Response) => {
   try {
-    const { virtualOfficeId } = req.params;
+    const virtualOfficeId = req.params.virtualOfficeId as string;
 
     if (!Types.ObjectId.isValid(virtualOfficeId)) {
       return res.status(400).json({
@@ -163,7 +163,7 @@ export const getVirtualOfficeById = async (req: Request, res: Response) => {
 
 export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
   try {
-    const { city } = req.params;
+    const city = req.params.city as string;
 
     const offices = await VirtualOfficeModel.find({
       city: new RegExp(`^${city}$`, "i"), // Case-insensitive match
@@ -198,7 +198,7 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
 // Updates an existing virtual office including new yearly pricing fields
 export const updateVirtualOffice = async (req: Request, res: Response) => {
   try {
-    const { virtualOfficeId } = req.params;
+    const virtualOfficeId = req.params.virtualOfficeId as string;
     const {
       name,
       address,
@@ -271,7 +271,7 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
 
 export const deleteVirtualOffice = async (req: Request, res: Response) => {
   try {
-    const { virtualOfficeId } = req.params;
+    const virtualOfficeId = req.params.virtualOfficeId as string;
     const { restore } = req.query;
 
     if (!Types.ObjectId.isValid(virtualOfficeId)) {

@@ -43,6 +43,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       address,
       city,
       area,
+      capacity,
       inventory,
       amenities,
       coordinates,
@@ -62,6 +63,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         address,
         city,
         area,
+        capacity,
         inventory,
         amenities,
         coordinates,
@@ -97,7 +99,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
     }
 
     const { coworkingSpaceId } = validation.data.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.id;
 
     const updatedSpace = await CoworkingSpaceService.updateSpace(
       coworkingSpaceId,
@@ -196,7 +198,7 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
 // Keeping this here or moving to service - let's move logic to service eventually but for now simple enough
 export const getPartnerSpaces = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user?.id;
     const spaces = await CoworkingSpaceService.getSpaces({
       $or: [{ partner: userId }, { managers: userId }],
     });
@@ -218,7 +220,7 @@ export const getPartnerSpaces = async (req: Request, res: Response) => {
 export const deleteCoworkingSpace = async (req: Request, res: Response) => {
   try {
     const { coworkingSpaceId } = req.params;
-    const userId = (req as any).user?.userId;
+    const userId = (req as any).user?.id;
 
     if (!userId) return sendError(res, 401, "Unauthorized");
 

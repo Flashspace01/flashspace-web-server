@@ -8,6 +8,7 @@ import {
   getBookingsByProperty,
   toggleAutoRenew,
   getKYCStatus,
+  getBusinessInfo,
   updateBusinessInfo,
   uploadKYCDocument,
   deleteKYCDocument,
@@ -45,6 +46,7 @@ router.post("/bookings/:bookingId/cancel", cancelBooking);
 
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);
+router.get("/kyc/business-info", getBusinessInfo);
 router.put("/kyc/business-info", updateBusinessInfo);
 router.post(
   "/kyc/upload",
@@ -79,7 +81,16 @@ router.post(
   uploadKYCDocument,
 );
 router.delete("/kyc/upload", deleteKYCDocument);
-router.post("/kyc/submit", submitKYCForReview);
+router.post(
+  "/kyc/submit",
+  (req, res, next) => {
+    console.log(
+      `[DEBUG_ROUTE] POST /kyc/submit hit at ${new Date().toISOString()}`,
+    );
+    next();
+  },
+  submitKYCForReview,
+);
 
 // ============ INVOICES ============
 router.get("/invoices", getAllInvoices);
@@ -94,5 +105,18 @@ router.post("/support/tickets/:ticketId/reply", replyToTicket);
 // ============ CREDITS & REWARDS ============
 router.get("/credits", getCredits);
 router.post("/credits/redeem", redeemReward);
+
+// ============ PARTNER KYC ============
+import {
+  addPartner,
+  getPartners,
+  removePartner,
+  getPartnerDetails,
+} from "../controllers/partnerKYC.controller";
+
+router.post("/kyc/partner", addPartner);
+router.get("/kyc/partner/:profileId", getPartners);
+router.get("/kyc/partner-details/:partnerId", getPartnerDetails);
+router.delete("/kyc/partner/:partnerId", removePartner);
 
 export default router;

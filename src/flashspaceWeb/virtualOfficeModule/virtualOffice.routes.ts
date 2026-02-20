@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 import {
   createVirtualOffice,
   getAllVirtualOffices,
@@ -11,7 +12,11 @@ import {
 export const virtualOfficeRoutes = Router();
 
 // POST /api/virtualOffice/create
-virtualOfficeRoutes.post("/create", createVirtualOffice);
+virtualOfficeRoutes.post(
+  "/create",
+  AuthMiddleware.authenticate,
+  createVirtualOffice,
+);
 
 // GET /api/virtualOffice/getAll
 virtualOfficeRoutes.get("/getAll", getAllVirtualOffices);
@@ -23,14 +28,21 @@ virtualOfficeRoutes.get("/getByCity/:city", getVirtualOfficesByCity);
 virtualOfficeRoutes.get("/getById/:virtualOfficeId", getVirtualOfficeById);
 
 // PUT /api/virtualOffice/update/:virtualOfficeId
-virtualOfficeRoutes.put("/update/:virtualOfficeId", updateVirtualOffice);
+virtualOfficeRoutes.put(
+  "/update/:virtualOfficeId",
+  AuthMiddleware.authenticate,
+  updateVirtualOffice,
+);
 
 // DELETE /api/virtualOffice/delete/:virtualOfficeId
-virtualOfficeRoutes.delete("/delete/:virtualOfficeId", deleteVirtualOffice);
+virtualOfficeRoutes.delete(
+  "/delete/:virtualOfficeId",
+  AuthMiddleware.authenticate,
+  deleteVirtualOffice,
+);
 
 // --- Partner Portal Routes ---
 // Protected Routes
-import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 import { getPartnerVirtualOffices } from "./virtualOffice.controller";
 
 virtualOfficeRoutes.get(

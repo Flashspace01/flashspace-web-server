@@ -57,6 +57,9 @@ export class AuthMiddleware {
           email: user.email,
           role: user.role,
         } as AuthUser;
+        console.log(
+          `[AUTH] Authenticated: ${user.email}, role: ${user.role}, id: ${user._id}`,
+        );
 
         next();
       } catch (tokenError) {
@@ -164,7 +167,11 @@ export class AuthMiddleware {
           };
           console.log("✅ User authenticated:", user.email);
         } else {
-          console.log('⚠️ User not found in database for userId:', decoded.userId, '— clearing auth cookies');
+          console.log(
+            "⚠️ User not found in database for userId:",
+            decoded.userId,
+            "— clearing auth cookies",
+          );
           AuthMiddleware.clearTokenCookies(res);
         }
       } catch (tokenError: any) {
@@ -206,12 +213,19 @@ export class AuthMiddleware {
                 user.email,
               );
             } else {
-              console.log('⚠️ User not found for refresh token userId:', decoded.userId, '— clearing auth cookies');
+              console.log(
+                "⚠️ User not found for refresh token userId:",
+                decoded.userId,
+                "— clearing auth cookies",
+              );
               AuthMiddleware.clearTokenCookies(res);
             }
           } catch (refreshError: any) {
             // Both tokens invalid, continue without auth
-            console.log('⚠️ Refresh token verification failed:', refreshError.message);
+            console.log(
+              "⚠️ Refresh token verification failed:",
+              refreshError.message,
+            );
             AuthMiddleware.clearTokenCookies(res);
           }
         } else {

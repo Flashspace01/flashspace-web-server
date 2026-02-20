@@ -66,6 +66,7 @@ const corsOptions = {
         if (allowedOrigins.has(origin)) {
             return callback(null, origin);
         }
+<<<<<<< HEAD
         console.error("CORS blocked origin:", origin);
         return callback(new Error("CORS not allowed"), false);
     },
@@ -75,6 +76,16 @@ app.use((0, cors_1.default)(corsOptions));
 app.options(/.*/, (0, cors_1.default)(corsOptions));
 console.log(`CORS enabled for allowed origins: ${Array.from(allowedOrigins).join(", ")}`);
 console.log(process.env.MONGODB_URI);
+=======
+        else {
+            console.error('CORS blocked origin:', origin);
+            callback(new Error("CORS not allowed"), false);
+        }
+    }
+}));
+console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
+console.log(process.env.DB_URI);
+>>>>>>> fd79f040bc40257c0cb881c7d733a65884046221
 // Middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
@@ -112,6 +123,7 @@ app.use((req, res, next) => {
 });
 // Serve uploaded files statically
 // Serve uploaded files statically
+<<<<<<< HEAD
 app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "../uploads")));
 // Health check (Support both /health and /api/health)
 const healthCheck = (_req, res) => {
@@ -122,5 +134,8 @@ const healthCheck = (_req, res) => {
 };
 app.get("/health", healthCheck);
 app.get("/api/health", healthCheck);
+=======
+app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
+>>>>>>> fd79f040bc40257c0cb881c7d733a65884046221
 // Main API routes
 app.use("/api", mainRoutes_1.mainRoutes);

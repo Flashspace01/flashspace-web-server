@@ -11,17 +11,41 @@ import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
 import { spacePortalRoutes } from "./flashspaceWeb/spacePortalModule/routes/spacePortal.routes";
 import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
-
-// import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
+import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
+import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
 import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 
+import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 export const mainRoutes = Router();
+
+import mongoose from "mongoose";
+
+// /api/health - Check server and DB status
+mainRoutes.get("/health", (req, res) => {
+  const dbStatus = mongoose.connection.readyState;
+  const statusMap = {
+    0: "Disconnected",
+    1: "Connected",
+    2: "Connecting",
+    3: "Disconnecting",
+  };
+  res.json({
+    success: true,
+    message: "Server is running",
+    // dbStatus: statusMap[dbStatus] || "Unknown",
+    dbReadyState: dbStatus,
+    envPort: process.env.PORT,
+    timestamp: new Date(),
+  });
+});
 
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
+// /api/affiliate (Affiliate Portal APIs)
+mainRoutes.use("/affiliate", affiliateRoutes);
 // /api/feeback
 mainRoutes.use("/feedback", feedbackRoutes);
 // /api/spaceProvider
@@ -48,13 +72,17 @@ mainRoutes.use("/spaceportal", spacePortalRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
+// /api/coupon
 mainRoutes.use("/coupon", couponRoutes);
+// /api/mail
+mainRoutes.use("/mail", mailRoutes);
 
 mainRoutes.use("/tickets", ticketRoutes);
 
 // /api/notifications
 import { notificationRoutes } from "./flashspaceWeb/notificationModule/routes/notification.routes";
 mainRoutes.use("/notifications", notificationRoutes);
+
 // /api/reviews
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 mainRoutes.use("/reviews", reviewRoutes);
@@ -66,3 +94,7 @@ mainRoutes.use("/meetingRoom", meetingRoomRoutes);
 // /api/eventSpace
 import { eventSpaceRoutes } from "./flashspaceWeb/eventSpaceModule/eventSpace.routes";
 mainRoutes.use("/eventSpace", eventSpaceRoutes);
+
+// /api/visit
+import visitRoutes from "./flashspaceWeb/visitModule/routes/visit.routes";
+mainRoutes.use("/visit", visitRoutes);

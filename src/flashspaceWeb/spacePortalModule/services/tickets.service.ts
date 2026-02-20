@@ -72,8 +72,8 @@ const mapTicketToUi = (ticket: any, spaceFromBooking?: string) => {
     typeof ticket.assignee === "object" && ticket.assignee
       ? ticket.assignee.fullName
       : typeof ticket.assignedTo === "object" && ticket.assignedTo
-      ? ticket.assignedTo.fullName
-      : undefined;
+        ? ticket.assignedTo.fullName
+        : undefined;
 
   return {
     id: ticket.ticketNumber || ticket._id?.toString(),
@@ -178,7 +178,7 @@ export class SpacePortalTicketsService {
 
       const bookingSpaceMap = await buildBookingSpaceMap(tickets);
       const mappedTickets = tickets.map((ticket: any) =>
-        mapTicketToUi(ticket, bookingSpaceMap.get(ticket.bookingId) || "")
+        mapTicketToUi(ticket, bookingSpaceMap.get(ticket.bookingId) || ""),
       );
 
       const normalizedSearch = search?.toLowerCase().trim();
@@ -208,7 +208,7 @@ export class SpacePortalTicketsService {
             total: hasSearch ? filteredTickets.length : total,
             page,
             pages: Math.ceil(
-              (hasSearch ? filteredTickets.length : total) / limit
+              (hasSearch ? filteredTickets.length : total) / limit,
             ),
           },
         },
@@ -222,20 +222,25 @@ export class SpacePortalTicketsService {
     }
   }
 
-  async getTicketById(ticketId: string, partnerId?: string): Promise<ApiResponse> {
+  async getTicketById(
+    ticketId: string,
+    partnerId?: string,
+  ): Promise<ApiResponse> {
     try {
-      if (!Types.ObjectId.isValid(ticketId)) {
-        return {
-          success: false,
-          message: "Invalid ticket ID format",
-        };
+      const isObjectId = Types.ObjectId.isValid(ticketId);
+
+      const query: any = {
+        isDeleted: { $ne: true },
+        ...(partnerId ? { partner: partnerId } : {}),
+      };
+
+      if (isObjectId) {
+        query._id = ticketId;
+      } else {
+        query.ticketNumber = ticketId;
       }
 
-      const ticket = await TicketModel.findOne({
-        _id: ticketId,
-        isDeleted: false,
-        ...(partnerId ? { partner: partnerId } : {}),
-      })
+      const ticket = await TicketModel.findOne(query)
         .populate("user", "fullName email")
         .populate("assignee", "fullName email");
 
@@ -249,9 +254,10 @@ export class SpacePortalTicketsService {
       let space = "";
       if (ticket.bookingId && Types.ObjectId.isValid(ticket.bookingId as any)) {
         const booking = await BookingModel.findById(ticket.bookingId).select(
-          "spaceSnapshot.name spaceId"
+          "spaceSnapshot.name spaceId",
         );
-        space = booking?.spaceSnapshot?.name || booking?.spaceId?.toString() || "";
+        space =
+          booking?.spaceSnapshot?.name || booking?.spaceId?.toString() || "";
       }
 
       return {
@@ -271,14 +277,20 @@ export class SpacePortalTicketsService {
   async updateTicket(
     ticketId: string,
     payload: { status?: string; priority?: string; assignedTo?: string },
-    partnerId?: string
+    partnerId?: string,
   ): Promise<ApiResponse> {
     try {
-      if (!Types.ObjectId.isValid(ticketId)) {
-        return {
-          success: false,
-          message: "Invalid ticket ID format",
-        };
+      const isObjectId = Types.ObjectId.isValid(ticketId);
+
+      const query: any = {
+        isDeleted: { $ne: true },
+        ...(partnerId ? { partner: partnerId } : {}),
+      };
+
+      if (isObjectId) {
+        query._id = ticketId;
+      } else {
+        query.ticketNumber = ticketId;
       }
 
       const normalizedStatus = normalizeStatus(payload.status);
@@ -299,11 +311,9 @@ export class SpacePortalTicketsService {
         delete updatePayload.assignedTo;
       }
 
-      const updated = await TicketModel.findOneAndUpdate(
-        { _id: ticketId, isDeleted: false, ...(partnerId ? { partner: partnerId } : {}) },
-        updatePayload,
-        { new: true }
-      )
+      const updated = await TicketModel.findOneAndUpdate(query, updatePayload, {
+        new: true,
+      })
         .populate("user", "fullName email")
         .populate("assignee", "fullName email");
 

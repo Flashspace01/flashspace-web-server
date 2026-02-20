@@ -12,8 +12,14 @@ import { EventSpaceModel } from "../eventSpaceModule/eventSpace.model";
 import { UserModel } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
-  CreditType, // Updated Enum
+  CreditType,
 } from "../userDashboardModule/models/creditLedger.model";
+import {
+  NotificationModel,
+  NotificationType,
+  NotificationRecipientType,
+} from "../notificationModule/models/Notification";
+import { getIO } from "../../socket";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -91,8 +97,10 @@ async function createBookingAndInvoice(payment: any) {
     // or we could add specific MeetingRoomModel lookup later.
 
     // Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
+    const startDate = payment.startDate
+      ? new Date(payment.startDate)
+      : new Date();
+    const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
 
     // Create booking
@@ -265,6 +273,7 @@ export const createOrder = async (req: Request, res: Response) => {
       discountAmount,
       paymentType = PaymentType.VIRTUAL_OFFICE,
       creditsToRedeem = 0, // NEW: Credits to redeem
+      startDate,
     } = req.body;
 
     // Validation
@@ -338,6 +347,7 @@ export const createOrder = async (req: Request, res: Response) => {
         discountPercent: discountPercent || 0,
         discountAmount: (discountAmount || 0) + creditsUsed, // Total discount
         creditsUsed: creditsUsed, // New field to track credits
+        startDate: startDate ? new Date(startDate) : undefined,
       });
 
       // Deduct Credits
@@ -437,13 +447,8 @@ export const createOrder = async (req: Request, res: Response) => {
       yearlyPrice,
       totalAmount, // Original Total
       discountPercent: discountPercent || 0,
-      discountAmount: (discountAmount || 0) + creditsUsed, // Valid? Or keep discountAmount as explicit discount?
-      // Let's rely on totalAmount - finalAmount logic.
-      // But for record, let's track creditsUsed separately in model?
-      // Payment model needs update for `creditsUsed`?
-      // I should probably add `creditsUsed` to PaymentModel schema too.
-      // For now, I'll assume valid schema or use discountAmount.
-      // creditsUsed: creditsUsed // Ensure PaymentModel has this field or add it.
+      discountAmount: (discountAmount || 0) + creditsUsed,
+      startDate: startDate ? new Date(startDate) : undefined,
     });
 
     res.status(201).json({
@@ -504,6 +509,33 @@ export const verifyPayment = async (req: Request, res: Response) => {
       let bookingData = null;
       try {
         bookingData = await createBookingAndInvoice(payment);
+
+        // --- NOTIFICATION LOGIC (DEV MODE) ---
+        const notification = await NotificationModel.create({
+          recipient: payment.userId,
+          recipientType: NotificationRecipientType.USER,
+          type: NotificationType.SUCCESS,
+          title: "Booking Confirmed! 🎉",
+          message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          read: false,
+          metadata: {
+            bookingId: bookingData?.booking?._id,
+            paymentId: payment._id,
+            type: "booking_confirmation",
+          },
+        });
+
+        // Emit Socket Event
+        try {
+          const io = getIO();
+          io.to(payment.userId.toString()).emit(
+            "notification:new",
+            notification,
+          );
+        } catch (socketError) {
+          console.error("Socket emission failed:", socketError);
+        }
+        // -------------------------------------
       } catch (err) {
         console.error("Failed to create booking:", err);
       }
@@ -600,6 +632,30 @@ export const verifyPayment = async (req: Request, res: Response) => {
           payment.planName,
         );
       }
+
+      // --- NOTIFICATION LOGIC (PROD MODE) ---
+      const notification = await NotificationModel.create({
+        recipient: payment.userId,
+        recipientType: NotificationRecipientType.USER,
+        type: NotificationType.SUCCESS,
+        title: "Booking Confirmed! 🎉",
+        message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+        read: false,
+        metadata: {
+          bookingId: bookingData?.booking?._id,
+          paymentId: payment._id,
+          type: "booking_confirmation",
+        },
+      });
+
+      // Emit Socket Event
+      try {
+        const io = getIO();
+        io.to(payment.userId.toString()).emit("notification:new", notification);
+      } catch (socketError) {
+        console.error("Socket emission failed:", socketError);
+      }
+      // -------------------------------------
     } catch (err) {
       console.error("Failed to create booking:", err);
     }
