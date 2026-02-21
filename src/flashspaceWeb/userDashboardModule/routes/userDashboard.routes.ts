@@ -22,17 +22,29 @@ import {
   replyToTicket,
   getCredits,
   redeemReward,
+  getPartnerDashboardOverview,
   getPartnerSpaceBookings,
+  getAllPartnerSpaces,
+  getUserMails,
+  getUserVisits,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
 // All routes require authentication
 router.use(AuthMiddleware.authenticate);
 
+// ============ MAIL ============
+router.get("/mail", getUserMails);
+
+// ============ VISITS ============
+router.get("/visit", getUserVisits);
+
 // ============ DASHBOARD ============
 router.get("/dashboard", getDashboardOverview);
 
 // ============ PARTNER BOOKINGS ============
+router.get("/partner/dashboard", getPartnerDashboardOverview);
+router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
 
 // ============ BOOKINGS ============
