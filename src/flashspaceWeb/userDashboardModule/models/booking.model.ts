@@ -87,9 +87,13 @@ export class Booking {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
+  @prop({ required: true }) // <-- NEW: ADDED FOR SECURITY & FAST QUERIES
+  partnerId!: mongoose.Types.ObjectId; // The Seller
+
   @prop({
     required: true,
-    enum: ["virtual_office", "coworking_space", "meeting_room"],
+    // <-- FIXED: Added event_space
+    enum: ["virtual_office", "coworking_space", "meeting_room", "event_space"], 
   })
   type!: string;
 
