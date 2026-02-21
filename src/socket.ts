@@ -64,6 +64,11 @@ export const initSocket = (httpServer: HttpServer) => {
       console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
+    socket.on("disconnect", () => {
+      console.log("Client disconnected", socket.id);
+    });
+  });
+
     // Handle typing events
     socket.on("typing", (data: { ticketId: string; user: string }) => {
       socket.to(data.ticketId).emit("typing", data);
