@@ -21,7 +21,7 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
 export const getUserNotifications = async (req: Request, res: Response) => {
   try {
     // Assuming req.user is populated by authMiddleware
-    const userId = (req as any).user._id;
+    const userId = (req as any).user.id || (req as any).user._id;
     const notifications = await NotificationService.getUserNotifications(userId);
     res.status(200).json({
       success: true,
@@ -82,6 +82,40 @@ export const markAsRead = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to mark notification as read",
+    });
+  }
+};
+
+export const markAllAsRead = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id || (req as any).user._id;
+    await NotificationService.markAllAsRead(userId);
+    res.status(200).json({
+      success: true,
+      message: "All notifications marked as read",
+    });
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to mark all notifications as read",
+    });
+  }
+};
+
+export const deleteAllForUser = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id || (req as any).user._id;
+    await NotificationService.deleteAllForUser(userId);
+    res.status(200).json({
+      success: true,
+      message: "All notifications deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting all user notifications:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete all notifications",
     });
   }
 };
