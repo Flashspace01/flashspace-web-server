@@ -17,22 +17,18 @@ export const getVisits = async (req: Request, res: Response) => {
 
 export const createVisit = async (req: Request, res: Response) => {
     try {
-        const { client, visitor, purpose, space } = req.body;
+        const { client, visitor, email, purpose, space } = req.body;
 
-        if (!client || !visitor || !purpose || !space) {
-            return res.status(400).json({ success: false, message: 'Missing required fields: client, visitor, purpose, space' });
+        if (!client || !visitor || !email || !purpose || !space) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
-        const visitId = `VISIT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
         const newVisit = new Visit({
-            visitId,
             client,
             visitor,
+            email: email.trim(), // Sanitize email
             purpose,
-            space,
-            date: new Date(),
-            status: 'Pending'
+            space
         });
 
         await newVisit.save();

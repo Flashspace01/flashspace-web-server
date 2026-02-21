@@ -3,11 +3,10 @@ import Mail from '../models/mail.model';
 
 export const createMail = async (req: Request, res: Response) => {
     try {
-        // console.log("createMail - Payload:", JSON.stringify(req.body, null, 2));
-        const { client, sender, type, space } = req.body;
+        const { client, email, sender, type, space } = req.body;
 
-        if (!client || !sender || !type || !space) {
-            return res.status(400).json({ success: false, message: 'Missing required fields: client, sender, type, space' });
+        if (!client || !email || !sender || !type || !space) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
         const mailId = `MAIL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -15,6 +14,7 @@ export const createMail = async (req: Request, res: Response) => {
         const newMail = new Mail({
             mailId,
             client,
+            email: email.trim(), // Sanitize email
             sender,
             type,
             space,
@@ -24,17 +24,9 @@ export const createMail = async (req: Request, res: Response) => {
 
         await newMail.save();
         res.status(201).json({ success: true, data: newMail });
-    } catch (error: any) {
-        console.error("Error creating mail record:", error);
-        if (error.name === 'ValidationError') {
-            console.error("Validation Errors:", JSON.stringify(error.errors, null, 2));
-        }
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create mail record',
-            error: error.message || error,
-            details: error.errors // valid for mongoose validation errors
-        });
+    } catch (error) {
+        console.error('[createMail] Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create mail record', error });
     }
 };
 
@@ -42,13 +34,9 @@ export const getMails = async (req: Request, res: Response) => {
     try {
         const mails = await Mail.find().sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: mails });
-    } catch (error: any) {
-        console.error("Error fetching mail records:", error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch mail records',
-            error: error.message || error
-        });
+    } catch (error) {
+        console.error('[getMails] Error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch mail records', error });
     }
 };
 
