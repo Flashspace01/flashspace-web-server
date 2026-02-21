@@ -23,11 +23,19 @@ import {
   getCredits,
   redeemReward,
   getPartnerSpaceBookings,
+  getUserMails,
+  getUserVisits,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
 // All routes require authentication
 router.use(AuthMiddleware.authenticate);
+
+// ============ MAIL ============
+router.get("/mail", getUserMails);
+
+// ============ VISITS ============
+router.get("/visit", getUserVisits);
 
 // ============ DASHBOARD ============
 router.get("/dashboard", getDashboardOverview);
