@@ -46,6 +46,12 @@ export class Coupon {
   public usedAt?: Date;
 
   @prop({ default: false })
+  public isAffiliateCoupon?: boolean;
+
+  @prop()
+  public affiliateId?: string; // User ID of the affiliate who owns this coupon
+
+  @prop({ default: false })
   public isDeleted?: boolean;
 }
 

@@ -21,6 +21,7 @@ export interface AuthResponse {
     fullName: string;
     role: string;
     isEmailVerified: boolean;
+    kycVerified: boolean;
   };
   tokens?: {
     accessToken: string;
