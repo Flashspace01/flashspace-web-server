@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Dependencies install karo
-RUN npm ci
+RUN npm i
 
 # Source code copy karo
 COPY . .
