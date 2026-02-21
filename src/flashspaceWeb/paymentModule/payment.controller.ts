@@ -398,10 +398,6 @@ export const verifyPayment = async (req: Request, res: Response) => {
           console.error("Socket emission failed:", socketError);
         }
         // -------------------------------------
-<<<<<<< HEAD
-
-=======
->>>>>>> 82f7303e0ed151b122a70892883cac3d0ab89fed
       } catch (err) {
         console.error("Failed to create booking:", err);
       }
