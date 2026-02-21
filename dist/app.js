@@ -69,7 +69,6 @@ app.use((0, cors_1.default)({
     }
 }));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
-console.log(process.env.MONGODB_URI);
 // Middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));

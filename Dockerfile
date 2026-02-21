@@ -1,21 +1,22 @@
-FROM node:20-alpine
+# Use a specific Node version
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Package files copy karo
+# Copy package files
 COPY package*.json ./
 
-# Dependencies install karo
-RUN npm ci
+# Use npm install instead of npm ci to avoid lockfile issues
+RUN npm install
 
-# Source code copy karo
+# Copy source code
 COPY . .
 
-# TypeScript build karo
+# Build the TypeScript code (if you're using TypeScript)
 RUN npm run build
 
-# Port expose karo
+# Expose port
 EXPOSE 5000
 
-# Server start karo
+# Start command
 CMD ["node", "dist/app.js"]
