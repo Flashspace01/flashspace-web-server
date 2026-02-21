@@ -5,18 +5,41 @@ export const getVisits = async (req: Request, res: Response) => {
     try {
         const visits = await Visit.find().sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: visits });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch visits', error });
+    } catch (error: any) {
+        console.error("Error fetching visits:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch visits',
+            error: error.message || error
+        });
     }
 };
 
 export const createVisit = async (req: Request, res: Response) => {
     try {
-        const newVisit = new Visit(req.body);
+        const { client, visitor, email, purpose, space } = req.body;
+
+        if (!client || !visitor || !email || !purpose || !space) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const newVisit = new Visit({
+            client,
+            visitor,
+            email: email.trim(), // Sanitize email
+            purpose,
+            space
+        });
+
         await newVisit.save();
         res.status(201).json({ success: true, data: newVisit });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to create visit', error });
+    } catch (error: any) {
+        console.error("Error creating visit record:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create visit',
+            error: error.message || error
+        });
     }
 };
 
@@ -24,6 +47,11 @@ export const updateVisitStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+
+        const validStatuses = ['Pending', 'Completed'];
+        if (!status || !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing status provided.' });
+        }
 
         const updatedVisit = await Visit.findByIdAndUpdate(
             id,
@@ -36,7 +64,12 @@ export const updateVisitStatus = async (req: Request, res: Response) => {
         }
 
         res.status(200).json({ success: true, data: updatedVisit });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to update visit status', error });
+    } catch (error: any) {
+        console.error("Error updating visit status:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update visit status',
+            error: error.message || error
+        });
     }
 };

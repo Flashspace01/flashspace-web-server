@@ -7,6 +7,8 @@ import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
+import Mail from "../../mailModule/models/mail.model"; 
+import Visit from "../../visitModule/models/visit.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
@@ -143,48 +145,194 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 // ============ PARTNER BOOKINGS ============
 
 import { PartnerKYCModel } from "../models/partnerKYC.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+
+export const getAllPartnerSpaces = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Fetch spaces across all 4 models
+    const filter = { partner: userId, isDeleted: false };
+
+    const [coworkingSpaces, meetingRooms, eventSpaces, virtualOffices] =
+      await Promise.all([
+        CoworkingSpaceModel.find(filter),
+        MeetingRoomModel.find(filter),
+        EventSpaceModel.find(filter),
+        VirtualOfficeModel.find(filter),
+      ]);
+
+    const spaces: any[] = [];
+
+    // Map Coworking Spaces
+    coworkingSpaces.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0, // Placeholder calculation
+        totalSeats: s.capacity || 0,
+        meetingRooms: 0, // In a real scenario, count nested or linked meeting rooms
+        cabins:
+          s.inventory
+            ?.filter((i: any) => i.type === "PRIVATE_CABIN")
+            .reduce((sum: number, i: any) => sum + (i.totalUnits || 0), 0) || 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Coworking Space",
+      });
+    });
+
+    // Map Meeting Rooms
+    meetingRooms.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0,
+        totalSeats: s.capacity || 0,
+        meetingRooms: 1,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Meeting Room",
+      });
+    });
+
+    // Map Event Spaces
+    eventSpaces.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0,
+        totalSeats: s.capacity || 0,
+        meetingRooms: 0,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Event Space",
+      });
+    });
+
+    // Map Virtual Offices
+    virtualOffices.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: "N/A",
+        totalSeats: "N/A",
+        meetingRooms: 0,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Virtual Office",
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: spaces,
+    });
+  } catch (error) {
+    console.error("Failed to fetch all partner spaces:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch spaces" });
+  }
+};
+
+export const getPartnerDashboardOverview = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+
+    // Get all bookings where the partner is the logged-in user
+    const partnerBookings = await BookingModel.find({
+      partnerId: userId,
+      isDeleted: false,
+    }).populate("user", "fullName email phone company");
+
+    // Map bookings to the frontend Client structure
+    const clients = partnerBookings.map((b: any) => {
+      // Determine Status
+      let status = "INACTIVE";
+      if (b.status === "active") {
+        if (b.endDate) {
+          const now = new Date();
+          const end = new Date(b.endDate);
+          const diffDays = Math.ceil(
+            (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          status = diffDays <= 7 ? "EXPIRING_SOON" : "ACTIVE"; // Mark as expiring if <= 7 days left
+        } else {
+          status = "ACTIVE";
+        }
+      }
+
+      // Determine Plan name
+      let planName = b.plan?.name || "Standard";
+      if (b.type === "virtual_office") planName = "Virtual Office " + planName;
+      if (b.type === "coworking_space") planName = "Coworking " + planName;
+
+      return {
+        id: b.bookingNumber || b._id.toString(),
+        companyName: b.user?.company || b.user?.fullName || "N/A",
+        contactName: b.user?.fullName || "N/A",
+        plan: planName,
+        space: b.spaceSnapshot?.name || "Unknown Space",
+        startDate: b.startDate
+          ? new Date(b.startDate).toISOString().split("T")[0]
+          : "N/A",
+        endDate: b.endDate
+          ? new Date(b.endDate).toISOString().split("T")[0]
+          : "N/A",
+        status: status,
+        kycStatus: b.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        clients,
+      },
+    });
+  } catch (error) {
+    console.error("Partner Dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch partner dashboard data",
+    });
+  }
+};
+
 export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
   try {
     const { spaceId } = req.params;
     const { month, year } = req.query;
-    console.log("spaceId", spaceId);
+
     if (!spaceId || !mongoose.Types.ObjectId.isValid(spaceId as string)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid space ID",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid space ID" });
     }
 
-    // Verify if the user has access to this space (Partner or Manager)
-    // We still need to check this for security, even if we don't filter bookings by user
-    const userId = req.user?.id;
-    // You might need to import CoworkingSpaceModel if not already imported,
-    // or use a different way to check ownership if models are isolated.
-    // Assuming CoworkingSpaceModel is needed here.
-    // Since it wasn't imported in the original file, I'll add the import or use a dynamic import/service.
-    // However, for now, let's assume I can import it.
-    // Wait, the user said "no need to match the user id".
-    // Maybe they meant "don't check ownership"?
-    // But then anyone can see anyone's bookings. That's bad.
-    // I will assume they meant "don't filter bookings by booking.user = userId".
+    const userId = req.user?.id; // This is the partner requesting the data
 
-    // Let's implement the ownership check.
-    // I need to import CoworkingSpaceModel.
-    // It's in ../../coworkingSpaceModule/coworkingSpace.model
-
-    // For now, I will implement the functionality. I'll add the import in a separate step if needed,
-    // or assuming it's available.
-    // Actually, looking at the imports, CoworkingSpaceModel is NOT imported.
-    // I will add the import first in a separate tool call to be safe, or just append it to the top.
-
-    // Re-reading: "no need to macth the user id just filter property by spaceid and fetch data based on the filter provided"
-    // This could arguably mean "Skip the partner check entirely".
-    // "just filter property by spaceid".
-    // If I skip the partner check, it's insecure.
-    // BUT the user is determining the requirements.
-    // I will keep the partner check because it's "Partner Portal".
-
-    const filter: any = { spaceId, isDeleted: false };
+    // SECURED: We now explicitly mandate that the booking's partnerId matches the logged-in user!
+    const filter: any = {
+      spaceId,
+      partnerId: userId, // <-- THIS PLUGS THE DATA LEAK
+      isDeleted: false,
+    };
 
     // Date Filtering
     let startDate: Date, endDate: Date;
@@ -196,12 +344,10 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
       startDate = new Date(currentYear, monthIndex, 1);
       endDate = new Date(currentYear, monthIndex + 1, 0, 23, 59, 59);
     } else {
-      // Full Year
       startDate = new Date(currentYear, 0, 1);
       endDate = new Date(currentYear, 11, 31, 23, 59, 59);
     }
 
-    // Filter bookings that overlap with the date range
     filter.$or = [
       { startDate: { $gte: startDate, $lte: endDate } },
       { endDate: { $gte: startDate, $lte: endDate } },
@@ -211,11 +357,8 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     const bookings = await BookingModel.find(filter)
       .populate("user", "fullName email phone")
       .sort({ startDate: -1 });
-    console.log("bookings", bookings);
-    res.status(200).json({
-      success: true,
-      data: bookings,
-    });
+
+    res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     console.error("Get partner bookings error:", error);
     res
@@ -1404,11 +1547,18 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
         {
           userId,
           kycId: profileId,
-          type: isPartner ? "partner" : isBusinessInfoDoc ? "business" : "individual"
-        }
+          type: isPartner
+            ? "partner"
+            : isBusinessInfoDoc
+              ? "business"
+              : "individual",
+        },
       );
     } catch (notifError) {
-      console.error("[submitKYCForReview] Failed to send notification:", notifError);
+      console.error(
+        "[submitKYCForReview] Failed to send notification:",
+        notifError,
+      );
     }
 
     res.status(200).json({
@@ -1879,5 +2029,56 @@ export const redeemReward = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to redeem reward" });
+  }
+};
+
+// ============ MAIL ============
+
+export const getUserMails = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const userEmail = user.email.trim();
+
+    // Case-insensitive exact match
+    const mails = await Mail.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: mails });
+  } catch (error) {
+    console.error("Get user mails error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch mails" });
+  }
+};
+
+// ============ VISITS ============
+
+export const getUserVisits = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const userEmail = user.email.trim();
+
+    // Case-insensitive exact match
+    const visits = await Visit.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: visits });
+  } catch (error) {
+    console.error("Get user visits error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };

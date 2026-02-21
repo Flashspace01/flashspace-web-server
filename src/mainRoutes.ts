@@ -18,6 +18,27 @@ import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 export const mainRoutes = Router();
 
+import mongoose from "mongoose";
+
+// /api/health - Check server and DB status
+mainRoutes.get("/health", (req, res) => {
+    const dbStatus = mongoose.connection.readyState;
+    const statusMap = {
+        0: "Disconnected",
+        1: "Connected",
+        2: "Connecting",
+        3: "Disconnecting",
+    };
+    res.json({
+        success: true,
+        message: "Server is running",
+        // dbStatus: statusMap[dbStatus] || "Unknown",
+        dbReadyState: dbStatus,
+        envPort: process.env.PORT,
+        timestamp: new Date()
+    });
+});
+
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
@@ -49,6 +70,7 @@ mainRoutes.use("/meetings", meetingSchedulerRoutes);
 mainRoutes.use("/coupon", couponRoutes);
 // /api/mail
 mainRoutes.use("/mail", mailRoutes);
+
 
 
 

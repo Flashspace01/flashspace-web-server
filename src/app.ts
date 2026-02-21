@@ -74,7 +74,6 @@ app.use(cors({
   }
 }));
 console.log(`CORS enabled for origin: ${corsOptions.origin} with credentials support`);
-console.log(process.env.MONGODB_URI)
 
 
 // Middleware
