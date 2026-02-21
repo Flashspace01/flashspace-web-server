@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
+import { UserRole } from "../authModule/models/user.model";
 import {
   createCoworkingSpace,
   getAllCoworkingSpaces,
@@ -18,7 +19,7 @@ const upload = multer();
 coworkingSpaceRoutes.post(
   "/create",
   AuthMiddleware.authenticate,
-  upload.none(),
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
   createCoworkingSpace,
 );
 
@@ -35,7 +36,6 @@ coworkingSpaceRoutes.get("/getById/:coworkingSpaceId", getCoworkingSpaceById);
 coworkingSpaceRoutes.put(
   "/update/:coworkingSpaceId",
   AuthMiddleware.authenticate,
-  upload.none(),
   updateCoworkingSpace,
 );
 

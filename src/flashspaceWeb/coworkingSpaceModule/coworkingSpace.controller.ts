@@ -1,80 +1,132 @@
 import { Request, Response } from "express";
-import { Types } from "mongoose";
-import { CoworkingSpaceModel } from "./coworkingSpace.model";
+import { CoworkingSpaceService } from "./coworkingSpace.service";
+import {
+  createCoworkingSpaceSchema,
+  updateCoworkingSpaceSchema,
+} from "./coworkingSpace.validation";
+
+const sendError = (
+  res: Response,
+  status: number,
+  message: string,
+  error: any = null,
+) => {
+  return res.status(status).json({
+    success: false,
+    message,
+    data: {},
+    error:
+      process.env.NODE_ENV === "development" ? error : "Internal Server Error",
+  });
+};
 
 export const createCoworkingSpace = async (req: Request, res: Response) => {
   try {
+    const validation = createCoworkingSpaceSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(
+        res,
+        400,
+        "Validation Error",
+        validation.error.issues.map((err) => ({
+          path: err.path.join("."),
+          message: err.message,
+        })),
+      );
+    }
+
     const {
       name,
       address,
       city,
       area,
-      price,
-      priceYearly,
-      originalPrice,
-      rating,
-      reviews,
-      type,
-      features,
-      availability,
+      capacity,
+      inventory,
+      operatingHours,
+      amenities,
+      location,
+      images,
       popular,
-      coordinates,
-      image,
-    } = req.body;
+    } = validation.data.body;
 
-    const createdSpace = await CoworkingSpaceModel.create({
-      name,
-      address,
-      city,
-      area,
-      price,
-      priceYearly,
-      originalPrice,
-      rating,
-      reviews,
-      type,
-      features,
-      availability,
-      popular,
-      coordinates,
-      image,
-    });
+    const partnerId = (req as any).user?.id;
+    if (!partnerId)
+      return sendError(res, 401, "Unauthorized: No partner found");
 
-    if (!createdSpace) {
-      return res.status(400).json({
-        success: false,
-        message: "Issue with database",
-        data: {},
-        error: "Issue with Database",
-      });
-    }
+    const createdSpace = await CoworkingSpaceService.createSpace(
+      {
+        name,
+        address,
+        city,
+        area,
+        capacity,
+        inventory,
+        operatingHours,
+        amenities,
+        location,
+        images,
+        popular,
+      },
+      partnerId,
+    );
 
     res.status(201).json({
       success: true,
       message: "Coworking space created successfully",
       data: createdSpace,
-      error: {},
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
+    sendError(res, 500, "Failed to create space", err);
+  }
+};
+
+export const updateCoworkingSpace = async (req: Request, res: Response) => {
+  try {
+    const validation = updateCoworkingSpaceSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(
+        res,
+        400,
+        "Validation Error",
+        validation.error.issues.map((err) => ({
+          path: err.path.join("."),
+          message: err.message,
+        })),
+      );
+    }
+
+    const { coworkingSpaceId } = validation.data.params;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+
+    const updatedSpace = await CoworkingSpaceService.updateSpace(
+      coworkingSpaceId,
+      validation.data.body,
+      userId,
+      userRole,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Updated successfully",
+      data: updatedSpace,
     });
+  } catch (err: any) {
+    if (err.message === "Space not found or unauthorized")
+      return sendError(res, 404, err.message);
+    if (err.message.startsWith("Unauthorized"))
+      return sendError(res, 403, err.message);
+    sendError(res, 500, "Update failed", err);
   }
 };
 
 export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
   try {
     const { deleted } = req.query;
-    const query: any =
-      String(deleted) === "true" ? { isDeleted: true } : { isDeleted: false };
-    const allSpaces = await CoworkingSpaceModel.find(query).sort({
-      createdAt: -1,
-    });
+    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const spaces = await CoworkingSpaceService.getSpaces(query);
 
-    if (allSpaces.length === 0) {
+    if (spaces.length === 0) {
       return res.status(200).json({
         success: true,
         message: "No coworking spaces found",
@@ -82,74 +134,41 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
         error: {},
       });
     }
-
     res.status(200).json({
       success: true,
       message: "Coworking spaces retrieved successfully",
-      data: allSpaces,
-      error: {},
+      data: spaces,
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
-    });
+    sendError(res, 500, "Failed to retrieve spaces", err);
   }
 };
 
 export const getCoworkingSpaceById = async (req: Request, res: Response) => {
   try {
-    const coworkingSpaceId = req.params.coworkingSpaceId as string;
-
-    if (!Types.ObjectId.isValid(coworkingSpaceId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid coworking space ID format",
-        data: {},
-        error: "Invalid ObjectId",
-      });
-    }
-
-    const space = await CoworkingSpaceModel.findOne({
-      _id: coworkingSpaceId,
-      isDeleted: false,
-    });
-
-    if (!space) {
-      return res.status(404).json({
-        success: false,
-        message: "Coworking space not found",
-        data: {},
-        error: "Coworking space not found",
-      });
-    }
-
+    const { coworkingSpaceId } = req.params;
+    const space = await CoworkingSpaceService.getSpaceById(
+      coworkingSpaceId as string,
+    );
+    if (!space) return sendError(res, 404, "Coworking space not found");
     res.status(200).json({
       success: true,
       message: "Coworking space retrieved successfully",
       data: space,
-      error: {},
     });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
-    });
+  } catch (err: any) {
+    if (err.message === "Invalid ID format")
+      return sendError(res, 400, err.message);
+    sendError(res, 500, "Failed to retrieve space", err);
   }
 };
 
 export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
   try {
-    const city = req.params.city as string;
-
-    const spaces = await CoworkingSpaceModel.find({
-      city: new RegExp(`^${city}$`, "i"), // Case-insensitive match
-      isDeleted: false,
-    }).sort({ popular: -1, rating: -1 });
+    const { city } = req.params;
+    const spaces = await CoworkingSpaceService.getSpaces({
+      city: new RegExp(`^${city}$`, "i"),
+    });
 
     if (spaces.length === 0) {
       return res.status(200).json({
@@ -159,175 +178,49 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
         error: {},
       });
     }
-
     res.status(200).json({
       success: true,
       message: `Coworking spaces in ${city} retrieved successfully`,
       data: spaces,
-      error: {},
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
-    });
+    sendError(res, 500, "Failed to retrieve spaces by city", err);
   }
 };
 
-export const updateCoworkingSpace = async (req: Request, res: Response) => {
+export const getPartnerSpaces = async (req: Request, res: Response) => {
   try {
-    const coworkingSpaceId = req.params.coworkingSpaceId as string;
-    const {
-      name,
-      address,
-      city,
-      area,
-      price,
-      priceYearly,
-      originalPrice,
-      rating,
-      reviews,
-      type,
-      features,
-      availability,
-      popular,
-      coordinates,
-      image,
-    } = req.body;
-
-    if (!Types.ObjectId.isValid(coworkingSpaceId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid coworking space ID format",
-        data: {},
-        error: "Invalid ObjectId",
-      });
-    }
-
-    const updatedSpace = await CoworkingSpaceModel.findOneAndUpdate(
-      { _id: coworkingSpaceId, isDeleted: false },
-      {
-        ...(name && { name }),
-        ...(address && { address }),
-        ...(city && { city }),
-        ...(area && { area }),
-        ...(price && { price }),
-        ...(priceYearly && { priceYearly }),
-        ...(originalPrice && { originalPrice }),
-        ...(rating !== undefined && { rating }),
-        ...(reviews !== undefined && { reviews }),
-        ...(type && { type }),
-        ...(features && { features }),
-        ...(availability && { availability }),
-        ...(popular !== undefined && { popular }),
-        ...(coordinates && { coordinates }),
-        ...(image && { image }),
-      },
-      { new: true, runValidators: true },
-    );
-
-    if (!updatedSpace) {
-      return res.status(404).json({
-        success: false,
-        message: "Coworking space not found",
-        data: {},
-        error: "Coworking space not found",
-      });
-    }
-
+    const userId = (req as any).user?.id;
+    const spaces = await CoworkingSpaceService.getSpaces({
+      $or: [{ partner: userId }, { managers: userId }],
+    });
     res.status(200).json({
       success: true,
-      message: "Coworking space updated successfully",
-      data: updatedSpace,
-      error: {},
+      message: "Partner spaces retrieved successfully",
+      data: spaces,
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
-    });
+    sendError(res, 500, "Failed to retrieve partner spaces", err);
   }
 };
 
 export const deleteCoworkingSpace = async (req: Request, res: Response) => {
   try {
-    const coworkingSpaceId = req.params.coworkingSpaceId as string;
-    const { restore } = req.query;
+    const { coworkingSpaceId } = req.params;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
 
-    if (!Types.ObjectId.isValid(coworkingSpaceId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid coworking space ID format",
-        data: {},
-        error: "Invalid ObjectId",
-      });
-    }
+    if (!userId) return sendError(res, 401, "Unauthorized");
 
-    const isRestoring = String(restore) === "true";
-
-    const updatedSpace = await CoworkingSpaceModel.findOneAndUpdate(
-      { _id: coworkingSpaceId },
-      {
-        isDeleted: !isRestoring,
-        isActive: isRestoring,
-      },
-      { new: true },
-    );
-
-    if (!updatedSpace) {
-      return res.status(404).json({
-        success: false,
-        message: "Coworking space not found",
-        data: {},
-        error: "Coworking space not found",
-      });
-    }
-
+    await CoworkingSpaceService.deleteSpace(coworkingSpaceId as string, userId, userRole);
     res.status(200).json({
       success: true,
-      message: isRestoring
-        ? "Coworking space restored successfully"
-        : "Coworking space deleted successfully",
-      data: updatedSpace,
-      error: {},
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
+      message: "Coworking space deleted successfully",
       data: {},
-      error: err,
     });
-  }
-};
-
-// --- Partner Portal APIs ---
-
-export const getPartnerSpaces = async (req: Request, res: Response) => {
-  try {
-    const userId = (req as any).user.userId; // Extracted from AuthMiddleware
-
-    const spaces = await CoworkingSpaceModel.find({
-      $or: [{ partner: userId }, { managers: userId }],
-      isDeleted: false,
-    }).select("name address city type images");
-
-    res.status(200).json({
-      success: true,
-      message: "Partner spaces retrieved successfully",
-      data: spaces,
-      error: {},
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong !!",
-      data: {},
-      error: err,
-    });
+  } catch (err: any) {
+    if (err.message === "Space not found or unauthorized")
+      return sendError(res, 404, err.message);
+    sendError(res, 500, "Failed to delete space", err);
   }
 };
