@@ -64,7 +64,6 @@ export interface Message {
 @index({ category: 1 })
 @index({ assignee: 1 })
 @index({ updatedAt: -1 })
-@index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
 @index({ bookingId: 1 })
 export class Ticket extends TimeStamps {
   public _id!: Types.ObjectId;

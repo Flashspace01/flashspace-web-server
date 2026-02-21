@@ -79,6 +79,10 @@ export class NotificationService {
         return await NotificationModel.findByIdAndUpdate(notificationId, { read: true }, { new: true });
     }
 
+    static async markAllAsRead(userId: string) {
+        return await NotificationModel.updateMany({ recipient: userId, read: false }, { read: true });
+    }
+
     static async getUserNotifications(userId: string, limit = 20) {
         return await NotificationModel.find({ recipient: userId })
             .sort({ createdAt: -1 })
@@ -93,6 +97,10 @@ export class NotificationService {
 
     static async deleteNotification(notificationId: string) {
         return await NotificationModel.findByIdAndDelete(notificationId);
+    }
+
+    static async deleteAllForUser(userId: string) {
+        return await NotificationModel.deleteMany({ recipient: userId });
     }
 
     static async deleteAllForAdmin() {

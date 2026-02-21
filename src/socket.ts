@@ -52,43 +52,16 @@ export const initSocket = (httpServer: HttpServer) => {
 
     // Join user specific notification feed
     socket.on("join_user_feed", (userId: string) => {
-      socket.join(userId);
-      console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
+      if (userId) {
+        socket.join(userId);
+        console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
+      }
     });
 
-    io.on("connection", (socket: Socket) => {
-        console.log("New client connected", socket.id);
-
-        // Join ticket room
-        socket.on("join_ticket", (ticketId: string) => {
-            socket.join(ticketId);
-            console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
-        });
-
-        // Join user specific notification feed
-        socket.on("join_user_feed", (userId: string) => {
-            socket.join(userId);
-            console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
-        });
-
-        // Join admin feed
-        socket.on("join_admin_feed", () => {
-            socket.join("admin_feed");
-            console.log(`Socket ${socket.id} joined admin_feed`);
-        });
-
-        // Handle typing events
-        socket.on("typing", (data: { ticketId: string; user: string }) => {
-            socket.to(data.ticketId).emit("typing", data);
-        });
-
-        socket.on("stop_typing", (data: { ticketId: string }) => {
-            socket.to(data.ticketId).emit("stop_typing", data);
-        });
-
-        socket.on("disconnect", () => {
-            console.log("Client disconnected", socket.id);
-        });
+    // Join admin feed
+    socket.on("join_admin_feed", () => {
+      socket.join("admin_feed");
+      console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
     // Handle typing events
