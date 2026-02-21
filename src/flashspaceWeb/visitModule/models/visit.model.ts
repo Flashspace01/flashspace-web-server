@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IVisit extends Document {
+    visitId: string;
     client: string;
     visitor: string;
     email: string;
@@ -13,6 +14,7 @@ export interface IVisit extends Document {
 }
 
 const VisitSchema: Schema = new Schema({
+    visitId: { type: String },
     client: { type: String, required: true },
     visitor: { type: String, required: true },
     email: { type: String, required: true },

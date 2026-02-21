@@ -9,7 +9,10 @@ export const createMail = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
+        const mailId = `MAIL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
         const newMail = new Mail({
+            mailId,
             client,
             email: email.trim(), // Sanitize email
             sender,
@@ -42,6 +45,11 @@ export const updateMailStatus = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { status } = req.body;
 
+        const validStatuses = ['Pending Action', 'Forwarded', 'Collected'];
+        if (!status || !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid or missing status provided.' });
+        }
+
         const updatedMail = await Mail.findByIdAndUpdate(
             id,
             { status },
@@ -53,7 +61,12 @@ export const updateMailStatus = async (req: Request, res: Response) => {
         }
 
         res.status(200).json({ success: true, data: updatedMail });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to update mail status', error });
+    } catch (error: any) {
+        console.error("Error updating mail status:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update mail status',
+            error: error.message || error
+        });
     }
 };
