@@ -9,13 +9,22 @@ export enum CouponStatus {
   ACTIVE = "active",
   USED = "used",
   EXPIRED = "expired",
+<<<<<<< HEAD
   DISABLED = "disabled",
+=======
+    DISABLED = "disabled"
+>>>>>>> 60d2433aec382aa11ef64d3e0e9bed4f4df9a6ac
 }
 
 @modelOptions({
   schemaOptions: {
+<<<<<<< HEAD
     timestamps: true,
   },
+=======
+        timestamps: true
+    }
+>>>>>>> 60d2433aec382aa11ef64d3e0e9bed4f4df9a6ac
 })
 @index({ code: 1 }, { unique: true })
 @index({ assignedClientId: 1 })
