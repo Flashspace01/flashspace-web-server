@@ -7,6 +7,7 @@ import {
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
 import { Property } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 @modelOptions({
   schemaOptions: { timestamps: true },
@@ -15,16 +16,38 @@ export class VirtualOffice {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
 
-  // --- UPDATED: Explicitly named as Per Year ---
+  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  public approvalStatus!: SpaceApprovalStatus;
+
+  // --- Split Pricing: GST Plan ---
   @prop({ required: false })
-  public gstPlanPricePerYear?: number;
+  public partnerGstPricePerYear?: number;
 
   @prop({ required: false })
-  public mailingPlanPricePerYear?: number;
+  public adminMarkupGstPerYear?: number;
 
   @prop({ required: false })
-  public brPlanPricePerYear?: number;
-  // ---------------------------------------------
+  public finalGstPricePerYear?: number; // Calculated virtual field equivalent
+
+  // --- Split Pricing: Mailing Plan ---
+  @prop({ required: false })
+  public partnerMailingPricePerYear?: number;
+
+  @prop({ required: false })
+  public adminMarkupMailingPerYear?: number;
+
+  @prop({ required: false })
+  public finalMailingPricePerYear?: number;
+
+  // --- Split Pricing: Business Registration Plan ---
+  @prop({ required: false })
+  public partnerBrPricePerYear?: number;
+
+  @prop({ required: false })
+  public adminMarkupBrPerYear?: number;
+
+  @prop({ required: false })
+  public finalBrPricePerYear?: number;
 
   @prop({ required: true, default: 0 })
   public avgRating!: number;
@@ -44,7 +67,7 @@ export class VirtualOffice {
   @prop({ default: false })
   public isDeleted?: boolean;
 
-  @prop({ default: true })
+  @prop({ default: false })
   public isActive?: boolean;
 
   @prop({ ref: () => User, required: true })

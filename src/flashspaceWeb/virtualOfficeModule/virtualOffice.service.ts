@@ -1,7 +1,9 @@
 import { VirtualOfficeModel } from "./virtualOffice.model";
 import { UserRole } from "../authModule/models/user.model";
-import { PropertyService } from "../propertyModule/property.service";
 import { PropertyModel } from "../propertyModule/property.model";
+import { PropertyService } from "../propertyModule/property.service";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class VirtualOfficeService {
   static async createOffice(data: any, partnerId: string) {
     const property = await PropertyService.createProperty(data, partnerId);
@@ -10,8 +12,14 @@ export class VirtualOfficeService {
       ...data,
       property: property._id,
       partner: partnerId,
+      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
     });
-    return await office.save();
+    const savedOffice = await office.save();
+
+    // Check if we can automatically advance it
+    await checkAndAdvanceSpaceStatus(partnerId, property._id.toString());
+
+    return savedOffice;
   }
 
   static async updateOffice(

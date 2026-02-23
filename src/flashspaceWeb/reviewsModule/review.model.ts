@@ -21,11 +21,6 @@ import {
   MeetingRoom,
   MeetingRoomModel,
 } from "../meetingRoomModule/meetingRoom.model";
-import {
-  EventSpace,
-  EventSpaceModel,
-} from "../eventSpaceModule/eventSpace.model";
-
 @modelOptions({ schemaOptions: { timestamps: true } })
 @index({ space: 1, createdAt: -1 })
 @index({ user: 1, space: 1 }, { unique: true })
@@ -72,11 +67,11 @@ export class Review {
     refPath: "spaceModel",
     required: true,
   })
-  public space!: Ref<CoworkingSpace | VirtualOffice | MeetingRoom | EventSpace>;
+  public space!: Ref<CoworkingSpace | VirtualOffice | MeetingRoom>;
 
   @prop({
     required: true,
-    enum: ["CoworkingSpace", "VirtualOffice", "MeetingRoom", "EventSpace"],
+    enum: ["CoworkingSpace", "VirtualOffice", "MeetingRoom"],
   })
   public spaceModel!: string;
 
@@ -126,9 +121,6 @@ export class Review {
         break;
       case "MeetingRoom":
         await MeetingRoomModel.findByIdAndUpdate(spaceId, updateData);
-        break;
-      case "EventSpace":
-        await EventSpaceModel.findByIdAndUpdate(spaceId, updateData);
         break;
       default:
         console.warn(`Unknown spaceModelName: ${spaceModelName}`);

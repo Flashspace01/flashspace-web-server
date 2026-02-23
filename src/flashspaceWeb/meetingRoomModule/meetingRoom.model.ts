@@ -8,6 +8,7 @@ import {
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
 import { Property } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 // --- ADDED: Consistent Operating Hours ---
 class OperatingHours {
@@ -41,11 +42,28 @@ export class MeetingRoom {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
 
+  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  public approvalStatus!: SpaceApprovalStatus;
+
+  // --- Split Pricing (Per Hour) ---
   @prop({ required: true })
-  public pricePerHour!: number;
+  public partnerPricePerHour!: number;
+
+  @prop({ required: true })
+  public adminMarkupPerHour!: number;
+
+  @prop({ required: true })
+  public finalPricePerHour!: number;
+
+  // --- Split Pricing (Per Day) ---
+  @prop({ required: false })
+  public partnerPricePerDay?: number;
 
   @prop({ required: false })
-  public pricePerDay?: number; // ADDED
+  public adminMarkupPerDay?: number;
+
+  @prop({ required: false })
+  public finalPricePerDay?: number;
 
   // --- ADDED: Timing & Booking Rules ---
   @prop({ type: () => OperatingHours, _id: false })
@@ -73,7 +91,7 @@ export class MeetingRoom {
   @prop({ default: false })
   public popular!: boolean;
 
-  @prop({ default: true })
+  @prop({ default: false })
   public isActive!: boolean;
 
   @prop({ default: false })

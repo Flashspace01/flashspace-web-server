@@ -3,6 +3,8 @@ import { FilterQuery, Types } from "mongoose";
 import { UserRole } from "../authModule/models/user.model";
 import { PropertyService } from "../propertyModule/property.service";
 import { PropertyModel } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 
 export class CoworkingSpaceService {
   static generateSeatsForFloors(floors?: any[]) {
@@ -33,13 +35,19 @@ export class CoworkingSpaceService {
       data.floors = this.generateSeatsForFloors(data.floors);
     }
 
-    return await CoworkingSpaceModel.create({
+    const savedSpace = await CoworkingSpaceModel.create({
       ...data,
       property: property._id,
       partner: partnerId,
+      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
       avgRating: 0,
       totalReviews: 0,
     });
+
+    // Check if we can automatically advance it
+    await checkAndAdvanceSpaceStatus(partnerId, property._id.toString());
+
+    return savedSpace;
   }
 
   // FIXED: Added userRole and dynamic RBAC query
