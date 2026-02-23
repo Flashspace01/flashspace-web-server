@@ -26,8 +26,19 @@ const razorpay = new Razorpay({
 async function createBookingAndInvoice(payment: any) {
   try {
     // Generate booking number
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    // Generate a collision-safe booking number by finding the current max sequence
+    // (countDocuments fails when bookings are deleted — the sequence desync causes duplicates)
+    const lastBooking = await BookingModel.findOne({}, { bookingNumber: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
+    const year = new Date().getFullYear();
+    let nextSeq = 1;
+    if (lastBooking?.bookingNumber) {
+      const parts = lastBooking.bookingNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    }
+    const bookingNumber = `FS-${year}-${String(nextSeq).padStart(5, "0")}`;
 
     // Get space details for snapshot
     let spaceSnapshot: any = {
@@ -157,8 +168,18 @@ async function createBookingAndInvoice(payment: any) {
     });
 
     // Generate invoice number
-    const invoiceCount = await InvoiceModel.countDocuments();
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+    // Collision-safe invoice number (same approach as booking number)
+    const lastInvoice = await InvoiceModel.findOne({}, { invoiceNumber: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
+    const invYear = new Date().getFullYear();
+    let nextInvSeq = 1;
+    if (lastInvoice?.invoiceNumber) {
+      const parts = lastInvoice.invoiceNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) nextInvSeq = lastSeq + 1;
+    }
+    const invoiceNumber = `INV-${invYear}-${String(nextInvSeq).padStart(5, "0")}`;
 
     // Calculate tax (18% GST)
     const subtotal = payment.totalAmount;

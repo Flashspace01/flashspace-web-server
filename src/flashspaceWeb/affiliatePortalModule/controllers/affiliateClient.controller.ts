@@ -3,10 +3,12 @@ import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { UserModel } from "../../authModule/models/user.model";
 import mongoose from "mongoose";
 
+const COMMISSION_RATE = 0.15; // 15% commission on (paidAmount - discountAmount)
+
 /**
  * GET /api/affiliate/clients
- * Returns all real bookings attributed to the logged-in affiliate
- * (i.e., bookings where `affiliateId` matches the affiliate's user id)
+ * Returns all bookings attributed to the logged-in affiliate, with per-booking commission.
+ * Commission = (paidAmount - discountAmount) * 15%
  */
 export const getMyClients = async (req: Request, res: Response) => {
     try {
@@ -35,9 +37,15 @@ export const getMyClients = async (req: Request, res: Response) => {
             userMap[u._id.toString()] = u;
         });
 
-        // Merge user info into each booking for the response
-        const clients = bookings.map((b) => {
+        // Merge user info + compute commission per booking
+        const clients = bookings.map((b: any) => {
             const user = userMap[b.user?.toString() || ""] || {};
+
+            const paidAmount: number = b.plan?.price || 0;
+            // plan.price is already the net amount (original - discount)
+            // so Commission = paidAmount * 15%
+            const commissionAmount = parseFloat((paidAmount * COMMISSION_RATE).toFixed(2));
+
             return {
                 bookingId: b._id,
                 bookingNumber: b.bookingNumber,
@@ -51,7 +59,9 @@ export const getMyClients = async (req: Request, res: Response) => {
                 city: b.spaceSnapshot?.city || "—",
                 plan: b.plan?.name || "—",
                 tenure: b.plan?.tenure ? `${b.plan.tenure} months` : "—",
-                amount: b.plan?.price || 0,
+                amount: paidAmount,
+                discountAmount: b.discountAmount || 0, // Keep discountAmount for display if needed
+                commissionAmount,
                 couponCode: b.couponCode || "—",
                 status: b.status,
                 startDate: b.startDate,
@@ -61,8 +71,13 @@ export const getMyClients = async (req: Request, res: Response) => {
         });
 
         // Summary stats
-        const totalRevenue = clients.reduce((sum, c) => sum + c.amount, 0);
+        const totalCommission = parseFloat(
+            clients.reduce((sum, c) => sum + c.commissionAmount, 0).toFixed(2)
+        );
         const activeBookings = clients.filter((c) => c.status === "active").length;
+        const successfulBookings = clients.filter((c) =>
+            ["active", "completed"].includes(c.status)
+        ).length;
 
         return res.status(200).json({
             success: true,
@@ -70,8 +85,10 @@ export const getMyClients = async (req: Request, res: Response) => {
                 clients,
                 stats: {
                     totalClients: clients.length,
-                    totalRevenue,
+                    totalCommission,
                     activeBookings,
+                    successfulBookings,
+                    commissionRate: COMMISSION_RATE * 100,
                 },
             },
         });
