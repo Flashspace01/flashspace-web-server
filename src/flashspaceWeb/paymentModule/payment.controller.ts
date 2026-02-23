@@ -15,6 +15,7 @@ import {
 import { NotificationType } from "../notificationModule/models/Notification";
 import { NotificationService } from "../notificationModule/services/notification.service";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -451,6 +452,29 @@ export const verifyPayment = async (req: Request, res: Response) => {
         console.error("Failed to create booking:", err);
       }
 
+      // --- MARK COUPON AS USED (DEV MODE) ---
+      if (payment.couponCode) {
+        try {
+          const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+          if (coupon) {
+            if (coupon.isAffiliateCoupon) {
+              await CouponModel.updateOne(
+                { _id: coupon._id },
+                { $addToSet: { usedBy: payment.userId.toString() } }
+              );
+            } else {
+              coupon.status = CouponStatus.USED;
+              coupon.usedAt = new Date();
+              coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+              await coupon.save();
+            }
+          }
+        } catch (couponErr) {
+          console.error("Failed to mark coupon as used in DEV MODE:", couponErr);
+        }
+      }
+      // -------------------------------------
+
       return res.status(200).json({
         success: true,
         message: "Payment verified successfully (DEV MODE)",
@@ -526,22 +550,33 @@ export const verifyPayment = async (req: Request, res: Response) => {
     try {
       bookingData = await createBookingAndInvoice(payment);
 
-      // --- NOTIFICATION LOGIC (PROD MODE) ---
-      await NotificationService.notifyUser(
-        payment.userId.toString(),
-        "Booking Confirmed! 🎉",
-        `Your booking for ${payment.spaceName} has been successfully confirmed.`,
-        NotificationType.SUCCESS,
-        {
-          bookingId: bookingData?.booking?._id,
-          paymentId: payment._id,
-          type: "booking_confirmation",
-        }
-      );
       // -------------------------------------
     } catch (err) {
       console.error("Failed to create booking:", err);
     }
+
+    // --- MARK COUPON AS USED (PROD MODE) ---
+    if (payment.couponCode) {
+      try {
+        const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+        if (coupon) {
+          if (coupon.isAffiliateCoupon) {
+            await CouponModel.updateOne(
+              { _id: coupon._id },
+              { $addToSet: { usedBy: payment.userId.toString() } }
+            );
+          } else {
+            coupon.status = CouponStatus.USED;
+            coupon.usedAt = new Date();
+            coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+            await coupon.save();
+          }
+        }
+      } catch (couponErr) {
+        console.error("Failed to mark coupon as used in PROD MODE:", couponErr);
+      }
+    }
+    // ---------------------------------------
 
     res.status(200).json({
       success: true,

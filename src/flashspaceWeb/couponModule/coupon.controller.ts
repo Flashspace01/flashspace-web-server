@@ -176,20 +176,34 @@ export const couponController = {
                 });
             }
 
-            // 2. Check status
-            if (coupon.status !== CouponStatus.ACTIVE) {
-                return res.status(400).json({
-                    success: false,
-                    valid: false,
-                    message: `Coupon is ${coupon.status}`,
-                });
+            // 2. Check status & usage logic
+            if (coupon.isAffiliateCoupon) {
+                // Affiliate coupons are multi-use globally but once-per-user
+                if (coupon.usedBy?.includes(userId?.toString() || "")) {
+                    return res.status(400).json({
+                        success: false,
+                        valid: false,
+                        message: "You have already used this referral code once",
+                    });
+                }
+            } else {
+                // Regular coupons are one-time use globally (original logic)
+                if (coupon.status !== CouponStatus.ACTIVE) {
+                    return res.status(400).json({
+                        success: false,
+                        valid: false,
+                        message: `Coupon is ${coupon.status}`,
+                    });
+                }
             }
 
             // 3. Check expiry
             if (new Date() > new Date(coupon.expiryDate)) {
-                // Auto-expire if date passed
-                coupon.status = CouponStatus.EXPIRED;
-                await coupon.save();
+                if (!coupon.isAffiliateCoupon) {
+                    // Auto-expire regular coupons if date passed
+                    coupon.status = CouponStatus.EXPIRED;
+                    await coupon.save();
+                }
                 return res.status(400).json({
                     success: false,
                     valid: false,
@@ -227,29 +241,37 @@ export const couponController = {
      */
     markUsed: async (req: Request, res: Response) => {
         try {
-            const { code } = req.body;
-            // Ideally verify that the request comes from trusted internal source or is part of a transaction
-            // For now, we assume it's protected by auth and called by frontend after payment success, 
-            // BUT stricter implementation would call this inside the payment success webhook/logic.
-            // Since we must not touch existing payment logic, we expose this endpoint.
+            const { code, userId } = req.body;
+            // Ideally verify that the request comes from trusted internal source...
 
-            const coupon = await CouponModel.findOne({ code });
+            const coupon = await CouponModel.findOne({ code, isDeleted: { $ne: true } });
 
             if (!coupon) {
                 return res.status(404).json({ success: false, message: "Coupon not found" });
             }
 
-            if (coupon.status !== CouponStatus.ACTIVE) {
-                return res.status(400).json({ success: false, message: "Coupon is not active" });
+            if (coupon.isAffiliateCoupon) {
+                // For affiliate coupons, we don't mark as USED globally. 
+                // We just record THIS user has used it.
+                if (userId) {
+                    await CouponModel.updateOne(
+                        { _id: coupon._id },
+                        { $addToSet: { usedBy: userId.toString() } }
+                    );
+                }
+            } else {
+                // Regular coupon: original logic
+                coupon.status = CouponStatus.USED;
+                coupon.usedAt = new Date();
+                if (userId) {
+                    coupon.usedBy = [...(coupon.usedBy || []), userId.toString()];
+                }
+                await coupon.save();
             }
-
-            coupon.status = CouponStatus.USED;
-            coupon.usedAt = new Date();
-            await coupon.save();
 
             return res.status(200).json({
                 success: true,
-                message: "Coupon marked as used"
+                message: "Coupon usage recorded"
             });
 
         } catch (error: any) {
