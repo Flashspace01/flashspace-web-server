@@ -25,15 +25,15 @@ export enum CreditType {
 // FIXED: Index for fast user history lookups
 @index({ user: 1, createdAt: -1 })
 // FIXED: Compound index specifically designed to make the Midnight Cron Job lightning fast
-@index({ isExpired: 1, remainingAmount: 1, expiryDate: 1 }) 
+@index({ isExpired: 1, remainingAmount: 1, expiryDate: 1 })
 export class CreditLedger {
   @prop({ ref: () => User, required: true })
   public user!: Ref<User>;
 
   @prop({ required: true })
-  public amount!: number; 
+  public amount!: number;
 
-  @prop({ required: true, enum: CreditType })
+  @prop({ type: () => String, required: true, enum: CreditType })
   public type!: CreditType;
 
   @prop()
@@ -41,13 +41,13 @@ export class CreditLedger {
 
   // FIXED: Converted to ObjectId for relational integrity
   @prop({ type: () => mongoose.Types.ObjectId })
-  public bookingId?: mongoose.Types.ObjectId; 
+  public bookingId?: mongoose.Types.ObjectId;
 
   @prop()
-  public serviceName?: string; 
+  public serviceName?: string;
 
   @prop()
-  public referenceId?: string; 
+  public referenceId?: string;
 
   @prop({ required: true })
   public balanceAfter!: number;
@@ -56,7 +56,7 @@ export class CreditLedger {
   public expiryDate?: Date;
 
   @prop({ default: 0 })
-  public remainingAmount?: number; 
+  public remainingAmount?: number;
 
   @prop({ default: false })
   public isExpired?: boolean;

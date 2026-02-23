@@ -21,8 +21,10 @@ async function seed() {
     property: property._id,
     partner: property.partner, // ADD THIS
     capacity: 50,
-    pricePerMonth: 1000,
-    pricePerDay: 50,
+    partnerPricePerMonth: 800,
+    adminMarkupPerMonth: 200,
+    finalPricePerMonth: 1000,
+    isActive: true,
     avgRating: 4.5,
     totalReviews: 120,
     operatingHours: {

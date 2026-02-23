@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { BookingModel } from "../../bookingModule/booking.model";
 import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
-import { InvoiceModel } from "../models/invoice.model";
+import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
 import Mail from "../../mailModule/models/mail.model";
@@ -75,6 +75,8 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       usageBreakdown.find((u) => u._id === "virtual_office")?.count || 0;
     const coworkingCount =
       usageBreakdown.find((u) => u._id === "coworking_space")?.count || 0;
+    const meetingRoomCount =
+      usageBreakdown.find((u) => u._id === "meeting_room")?.count || 0;
 
     // Monthly bookings (last 6 months)
     const sixMonthsAgo = new Date();
@@ -133,6 +135,10 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
             totalBookings > 0
               ? Math.round((coworkingCount / totalBookings) * 100)
               : 0,
+          meetingRoom:
+            totalBookings > 0
+              ? Math.round((meetingRoomCount / totalBookings) * 100)
+              : 0,
         },
         monthlyBookings: formattedMonthly,
       },
@@ -163,9 +169,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     const filter = { partner: userId, isDeleted: false };
 
     const [coworkingSpaces, meetingRooms, virtualOffices] = await Promise.all([
-      CoworkingSpaceModel.find(filter),
-      MeetingRoomModel.find(filter),
-      VirtualOfficeModel.find(filter),
+      CoworkingSpaceModel.find(filter).populate("property"),
+      MeetingRoomModel.find(filter).populate("property"),
+      VirtualOfficeModel.find(filter).populate("property"),
     ]);
 
     const spaces: any[] = [];
@@ -298,9 +304,9 @@ export const getPartnerDashboardOverview = async (
     // Get all bookings where the partner is the logged-in user
     const userObjectId = new mongoose.Types.ObjectId(userId);
     const partnerBookings = await BookingModel.find({
-      user: userObjectId,
+      partnerId: userObjectId,
       isDeleted: false,
-    }).populate("user", "fullName email phone company");
+    }).populate("user", "fullName email phoneNumber company");
     console.log("Partner Bookings:", partnerBookings);
     // Map bookings to the frontend Client structure
     const clients = partnerBookings.map((b: any) => {
@@ -1142,8 +1148,6 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
         if (registeredAddress)
           businessInfo.registeredAddress = registeredAddress;
         if (industry) businessInfo.industry = industry;
-        if (profileName) businessInfo.profileName = profileName;
-
         if (profileName) businessInfo.profileName = profileName;
 
         // Ensure status is in_progress if it was not started, but don't revert pending/approved
@@ -2248,11 +2252,14 @@ export const redeemReward = async (req: Request, res: Response) => {
         .json({ success: false, message: "Insufficient credits" });
     }
 
-    // Deduct ALL Credits
-    const currentCredits = user.credits || 0;
+    // Deduct 5000 Credits
+    const REWARD_COST = 5000;
     await UserModel.findByIdAndUpdate(userId, {
-      $set: { credits: 0 }, // Reset to zero using $set
+      $inc: { credits: -REWARD_COST }, // Deduct using $inc
     });
+
+    // Fetch updated user to get accurate balance for the ledger entry
+    const updatedUser = await UserModel.findById(userId);
 
     // Create Booking (Free)
     const bookingCount = await BookingModel.countDocuments();
@@ -2275,7 +2282,7 @@ export const redeemReward = async (req: Request, res: Response) => {
         {
           status: "redeemed",
           date: new Date(),
-          note: `Redeemed ${currentCredits} credits for free meeting room`,
+          note: `Redeemed ${REWARD_COST} credits for free meeting room`,
           by: "User",
         },
       ],
@@ -2288,12 +2295,12 @@ export const redeemReward = async (req: Request, res: Response) => {
     // Ledger Entry
     await CreditLedgerModel.create({
       user: userId,
-      amount: -currentCredits, // Deduct everything
+      amount: -REWARD_COST, // Deduct the reward cost
       type: CreditType.SPENT,
-      description: `Redeemed ${currentCredits} credits for 1 Hour Free Meeting Room`,
+      description: `Redeemed ${REWARD_COST} credits for 1 Hour Free Meeting Room`,
       referenceId: booking._id?.toString(),
       bookingId: booking._id,
-      balanceAfter: 0,
+      balanceAfter: updatedUser?.credits || 0,
     });
 
     res.status(200).json({
