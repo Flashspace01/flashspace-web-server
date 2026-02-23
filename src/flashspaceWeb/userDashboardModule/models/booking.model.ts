@@ -91,9 +91,13 @@ export class Booking {
   partnerId!: mongoose.Types.ObjectId; // The Seller
 
   @prop({
-    required: true,
-    // <-- FIXED: Added event_space
-    enum: ["virtual_office", "coworking_space", "meeting_room", "event_space"], 
+    enum: [
+      "virtual_office",
+      "coworking_space",
+      "meeting_room",
+      "event_space",
+      "seat_booking",
+    ],
   })
   type!: string;
 

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { VirtualOfficeService } from "./virtualOffice.service";
+import { flattenProperty } from "../propertyModule/property.service";
 import {
   createVirtualOfficeSchema,
   updateVirtualOfficeSchema,
@@ -16,8 +17,7 @@ const sendError = (
     success: false,
     message,
     data: {},
-    error:
-      process.env.NODE_ENV === "development" ? error : "Internal Server Error",
+    error: error,
   });
 };
 
@@ -45,14 +45,13 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       partnerId,
     );
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Virtual office created successfully",
-        data: createdOffice,
-      });
-  } catch (err) {
+    res.status(201).json({
+      success: true,
+      message: "Virtual office created successfully",
+      data: flattenProperty(createdOffice),
+    });
+  } catch (err: any) {
+    console.error("VO Create Error:", err);
     sendError(res, 500, "Failed to create virtual office", err);
   }
 };
@@ -85,13 +84,11 @@ export const updateVirtualOffice = async (req: Request, res: Response) => {
       userRole,
     );
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Virtual office updated successfully",
-        data: updatedOffice,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Virtual office updated successfully",
+      data: flattenProperty(updatedOffice),
+    });
   } catch (err: any) {
     if (err.message === "Virtual office not found or unauthorized")
       return sendError(res, 404, err.message);
@@ -112,13 +109,11 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
         .json({ success: true, message: "No virtual offices found", data: [] });
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Virtual offices retrieved successfully",
-        data: offices,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Virtual offices retrieved successfully",
+      data: offices.map(flattenProperty),
+    });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve virtual offices", err);
   }
@@ -133,13 +128,11 @@ export const getVirtualOfficeById = async (req: Request, res: Response) => {
 
     if (!office) return sendError(res, 404, "Virtual office not found");
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Virtual office retrieved successfully",
-        data: office,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Virtual office retrieved successfully",
+      data: flattenProperty(office),
+    });
   } catch (err: any) {
     if (err.kind === "ObjectId")
       return sendError(res, 400, "Invalid ID format");
@@ -155,22 +148,18 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     });
 
     if (offices.length === 0) {
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: `No virtual offices found in ${city}`,
-          data: [],
-        });
+      return res.status(200).json({
+        success: true,
+        message: `No virtual offices found in ${city}`,
+        data: [],
+      });
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: `Virtual offices in ${city} retrieved successfully`,
-        data: offices,
-      });
+    res.status(200).json({
+      success: true,
+      message: `Virtual offices in ${city} retrieved successfully`,
+      data: offices.map(flattenProperty),
+    });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve offices by city", err);
   }
@@ -181,18 +170,16 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const offices = await VirtualOfficeService.getOffices({ partner: userId });
 
-    const formattedSpaces = offices.map((space) => {
-      const s = space.toObject ? space.toObject() : space;
+    const formattedSpaces = offices.map((space: any) => {
+      const s = flattenProperty(space);
       return { ...s, type: "Virtual Office", images: s.images || [] };
     });
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Partner virtual offices retrieved",
-        data: formattedSpaces,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Partner virtual offices retrieved",
+      data: formattedSpaces,
+    });
   } catch (err) {
     sendError(res, 500, "Failed to fetch partner virtual offices", err);
   }

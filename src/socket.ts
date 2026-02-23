@@ -26,12 +26,19 @@ export const initSocket = (httpServer: HttpServer) => {
   const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
   const subClient = pubClient.duplicate();
 
-  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log(
-      `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
-    );
-  });
+  Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log(
+        `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
+      );
+    })
+    .catch((err) => {
+      console.log(
+        "Redis connection failed, running socket.io without Redis adapter: ",
+        err.message,
+      );
+    });
 
   io = new Server(httpServer, {
     cors: {

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { MeetingRoomService } from "./meetingRoom.service";
+import { flattenProperty } from "../propertyModule/property.service";
 import {
   createMeetingRoomSchema,
   updateMeetingRoomSchema,
@@ -50,7 +51,7 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "Meeting room created successfully",
-      data: createdRoom,
+      data: flattenProperty(createdRoom),
     });
   } catch (err) {
     sendError(res, 500, "Failed to create meeting room", err);
@@ -88,7 +89,7 @@ export const updateMeetingRoom = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Meeting room updated successfully",
-      data: updatedRoom,
+      data: flattenProperty(updatedRoom),
     });
   } catch (err: any) {
     if (err.message === "Meeting room not found or unauthorized")
@@ -118,13 +119,11 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
         .json({ success: true, message: "No meeting rooms found", data: [] });
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Meeting rooms retrieved successfully",
-        data: rooms,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Meeting rooms retrieved successfully",
+      data: rooms.map(flattenProperty),
+    });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve meeting rooms", err);
   }
@@ -137,13 +136,11 @@ export const getMeetingRoomById = async (req: Request, res: Response) => {
 
     if (!room) return sendError(res, 404, "Meeting room not found");
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Meeting room retrieved successfully",
-        data: room,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Meeting room retrieved successfully",
+      data: flattenProperty(room),
+    });
   } catch (err: any) {
     if (err.kind === "ObjectId")
       return sendError(res, 400, "Invalid ID format");
@@ -169,22 +166,18 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
     const rooms = await MeetingRoomService.getRooms(query);
 
     if (rooms.length === 0) {
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: `No meeting rooms found in ${city}`,
-          data: [],
-        });
+      return res.status(200).json({
+        success: true,
+        message: `No meeting rooms found in ${city}`,
+        data: [],
+      });
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: `Meeting rooms in ${city} retrieved successfully`,
-        data: rooms,
-      });
+    res.status(200).json({
+      success: true,
+      message: `Meeting rooms in ${city} retrieved successfully`,
+      data: rooms.map(flattenProperty),
+    });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve rooms by city", err);
   }
@@ -207,13 +200,11 @@ export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
 
     const rooms = await MeetingRoomService.getRooms(query);
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Partner meeting rooms retrieved successfully",
-        data: rooms,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Partner meeting rooms retrieved successfully",
+      data: rooms.map(flattenProperty),
+    });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve partner meeting rooms", err);
   }
@@ -233,13 +224,11 @@ export const deleteMeetingRoom = async (req: Request, res: Response) => {
       userRole,
     ); // <--- ADDED: Pass to service
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Meeting room deleted successfully",
-        data: {},
-      });
+    res.status(200).json({
+      success: true,
+      message: "Meeting room deleted successfully",
+      data: {},
+    });
   } catch (err: any) {
     if (err.message === "Meeting room not found or unauthorized")
       return sendError(res, 404, err.message);
