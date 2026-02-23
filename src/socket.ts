@@ -2,7 +2,6 @@ import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
-import jwt from "jsonwebtoken";
 
 let io: Server;
 
@@ -26,12 +25,16 @@ export const initSocket = (httpServer: HttpServer) => {
   const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
   const subClient = pubClient.duplicate();
 
-  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log(
-      `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
-    );
-  });
+  Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log(
+        `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
+      );
+    })
+    .catch((err) => {
+      console.error("Failed to connect Socket.io Redis adapter:", err);
+    });
 
   io = new Server(httpServer, {
     cors: {

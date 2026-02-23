@@ -9,10 +9,17 @@ export const createMail = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
+        // Partner who is logging this
+        const partnerId = req.user?.id;
+        if (!partnerId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized. Partner ID missing.' });
+        }
+
         const mailId = `MAIL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         const newMail = new Mail({
             mailId,
+            partnerId,
             client,
             email: email.trim(), // Sanitize email
             sender,
@@ -32,7 +39,18 @@ export const createMail = async (req: Request, res: Response) => {
 
 export const getMails = async (req: Request, res: Response) => {
     try {
-        const mails = await Mail.find().sort({ createdAt: -1 });
+        const { email } = req.query;
+        let filter: any = {};
+
+        // If a specific email is requested (e.g. from the client dashboard)
+        if (email) {
+            filter.email = { $regex: new RegExp('^' + email.toString().trim() + '$', 'i') };
+        } else if (req.user && req.user.role === 'partner') {
+            // If it's the partner dashboard requesting all records, only show THEIR records
+            filter.partnerId = req.user.id;
+        }
+
+        const mails = await Mail.find(filter).sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: mails });
     } catch (error) {
         console.error('[getMails] Error:', error);

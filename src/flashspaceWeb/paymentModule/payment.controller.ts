@@ -7,17 +7,14 @@ import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
-import { UserModel } from "../authModule/models/user.model";
+import { UserModel, UserRole } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
   CreditSource,
 } from "../userDashboardModule/models/creditLedger.model";
-import {
-  NotificationModel,
-  NotificationType,
-  NotificationRecipientType,
-} from "../notificationModule/models/Notification";
-import { getIO } from "../../socket";
+import { NotificationType } from "../notificationModule/models/Notification";
+import { NotificationService } from "../notificationModule/services/notification.service";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -64,9 +61,46 @@ async function createBookingAndInvoice(payment: any) {
           coordinates: space.location?.coordinates || [],
         };
       }
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.images?.[0] || "",
+          coordinates: space.location?.coordinates || [],
+        };
+      }
     }
-    // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
-    // or we could add specific MeetingRoomModel lookup later.
+
+    // Get partner ID from the space model directly (used for security & fast queries)
+    let partnerId;
+    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+      const space = await VirtualOfficeModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
+      const space = await CoworkingSpaceModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    }
+
+    // Fallback: If no partner is assigned to the space, find the first admin to assign as partner
+    // This prevents booking failure when space data is incomplete.
+    if (!partnerId) {
+      console.warn(`Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`);
+      const adminUser = await UserModel.findOne({ role: UserRole.ADMIN, isDeleted: { $ne: true } });
+      if (adminUser) {
+        partnerId = adminUser._id;
+      } else {
+        // Last resort: Use the user themselves or keep undefined if we really have no admins (unlikely)
+        console.error("No admin found for fallback. Booking might still fail validation.");
+      }
+    }
 
     // Calculate dates
     const startDate = payment.startDate
@@ -79,6 +113,7 @@ async function createBookingAndInvoice(payment: any) {
     const booking = await BookingModel.create({
       bookingNumber,
       user: payment.userId,
+      partnerId: partnerId, // Added partnerId which is required by the model
       type:
         payment.paymentType === PaymentType.VIRTUAL_OFFICE
           ? "virtual_office"
@@ -373,30 +408,17 @@ export const verifyPayment = async (req: Request, res: Response) => {
         bookingData = await createBookingAndInvoice(payment);
 
         // --- NOTIFICATION LOGIC (DEV MODE) ---
-        const notification = await NotificationModel.create({
-          recipient: payment.userId,
-          recipientType: NotificationRecipientType.USER,
-          type: NotificationType.SUCCESS,
-          title: "Booking Confirmed! 🎉",
-          message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
-          read: false,
-          metadata: {
+        await NotificationService.notifyUser(
+          payment.userId.toString(),
+          "Booking Confirmed! 🎉",
+          `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          NotificationType.SUCCESS,
+          {
             bookingId: bookingData?.booking?._id,
             paymentId: payment._id,
             type: "booking_confirmation",
-          },
-        });
-
-        // Emit Socket Event
-        try {
-          const io = getIO();
-          io.to(payment.userId.toString()).emit(
-            "notification:new",
-            notification,
-          );
-        } catch (socketError) {
-          console.error("Socket emission failed:", socketError);
-        }
+          }
+        );
         // -------------------------------------
       } catch (err) {
         console.error("Failed to create booking:", err);
@@ -478,27 +500,17 @@ export const verifyPayment = async (req: Request, res: Response) => {
       bookingData = await createBookingAndInvoice(payment);
 
       // --- NOTIFICATION LOGIC (PROD MODE) ---
-      const notification = await NotificationModel.create({
-        recipient: payment.userId,
-        recipientType: NotificationRecipientType.USER,
-        type: NotificationType.SUCCESS,
-        title: "Booking Confirmed! 🎉",
-        message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
-        read: false,
-        metadata: {
+      await NotificationService.notifyUser(
+        payment.userId.toString(),
+        "Booking Confirmed! 🎉",
+        `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+        NotificationType.SUCCESS,
+        {
           bookingId: bookingData?.booking?._id,
           paymentId: payment._id,
           type: "booking_confirmation",
-        },
-      });
-
-      // Emit Socket Event
-      try {
-        const io = getIO();
-        io.to(payment.userId.toString()).emit("notification:new", notification);
-      } catch (socketError) {
-        console.error("Socket emission failed:", socketError);
-      }
+        }
+      );
       // -------------------------------------
     } catch (err) {
       console.error("Failed to create booking:", err);
