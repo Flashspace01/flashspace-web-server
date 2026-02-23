@@ -8,6 +8,7 @@ import {
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
 import { Property } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 export class Seat {
   @prop({ required: true })
@@ -68,13 +69,18 @@ export class CoworkingSpace {
   @prop({ default: false })
   public popular!: boolean;
 
-  // --- Long-Term Pricing ---
-  @prop({ required: false, default: 0 })
-  public pricePerMonth!: number;
+  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  public approvalStatus!: SpaceApprovalStatus;
 
-  // --- Short-Term "Day Pass" Pricing ---
-  @prop({ required: false })
-  public pricePerDay!: number;
+  // --- Long-Term Pricing (Monthly Desk) ---
+  @prop({ required: false, default: 0 })
+  public partnerPricePerMonth!: number;
+
+  @prop({ required: false, default: 0 })
+  public adminMarkupPerMonth!: number;
+
+  @prop({ required: false, default: 0 })
+  public finalPricePerMonth!: number;
 
   @prop({ type: () => [Floor] })
   public floors!: Floor[];
@@ -88,7 +94,7 @@ export class CoworkingSpace {
   @prop({ default: 0 })
   public totalReviews!: number;
 
-  @prop({ default: true })
+  @prop({ default: false })
   public isActive!: boolean;
 
   @prop({ default: false })

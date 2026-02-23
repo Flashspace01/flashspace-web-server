@@ -147,7 +147,6 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 import { PartnerKYCModel } from "../models/partnerKYC.model";
 import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
-import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 
 export const getAllPartnerSpaces = async (req: Request, res: Response) => {
@@ -160,13 +159,11 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     // Fetch spaces across all 4 models
     const filter = { partner: userId, isDeleted: false };
 
-    const [coworkingSpaces, meetingRooms, eventSpaces, virtualOffices] =
-      await Promise.all([
-        CoworkingSpaceModel.find(filter),
-        MeetingRoomModel.find(filter),
-        EventSpaceModel.find(filter),
-        VirtualOfficeModel.find(filter),
-      ]);
+    const [coworkingSpaces, meetingRooms, virtualOffices] = await Promise.all([
+      CoworkingSpaceModel.find(filter),
+      MeetingRoomModel.find(filter),
+      VirtualOfficeModel.find(filter),
+    ]);
 
     const spaces: any[] = [];
 
@@ -202,22 +199,6 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
         cabins: 0,
         status: s.isActive ? "ACTIVE" : "INACTIVE",
         type: "Meeting Room",
-      });
-    });
-
-    // Map Event Spaces
-    eventSpaces.forEach((s: any) => {
-      spaces.push({
-        id: s._id.toString(),
-        name: (s.property as any)?.name || "N/A",
-        city: (s.property as any)?.city || "N/A",
-        location: (s.property as any)?.area || "N/A",
-        availableSeats: s.capacity || 0,
-        totalSeats: s.capacity || 0,
-        meetingRooms: 0,
-        cabins: 0,
-        status: s.isActive ? "ACTIVE" : "INACTIVE",
-        type: "Event Space",
       });
     });
 

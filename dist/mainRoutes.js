@@ -20,6 +20,10 @@ const affiliate_routes_1 = require("./flashspaceWeb/affiliatePortalModule/routes
 const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
 const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
+const meetingRoom_routes_1 = require("./flashspaceWeb/meetingRoomModule/meetingRoom.routes");
+// Importing seat booking routes
+const booking_routes_1 = require("./flashspaceWeb/bookingModule/booking.routes");
+const review_routes_1 = require("./flashspaceWeb/reviewsModule/review.routes");
 const mail_routes_1 = __importDefault(require("./flashspaceWeb/mailModule/routes/mail.routes"));
 exports.mainRoutes = (0, express_1.Router)();
 const mongoose_1 = __importDefault(require("mongoose"));
@@ -38,7 +42,7 @@ exports.mainRoutes.get("/health", (req, res) => {
         // dbStatus: statusMap[dbStatus] || "Unknown",
         dbReadyState: dbStatus,
         envPort: process.env.PORT,
-        timestamp: new Date()
+        timestamp: new Date(),
     });
 });
 // /api/auth
@@ -72,10 +76,15 @@ exports.mainRoutes.use("/meetings", meetingScheduler_routes_1.meetingSchedulerRo
 exports.mainRoutes.use("/coupon", coupon_routes_1.couponRoutes);
 // /api/mail
 exports.mainRoutes.use("/mail", mail_routes_1.default);
-exports.mainRoutes.use('/tickets', ticket_routes_1.ticketRoutes);
+// /api/meetingRoom
+exports.mainRoutes.use("/meetingRoom", meetingRoom_routes_1.meetingRoomRoutes);
+// /api/seat-bookings
+exports.mainRoutes.use("/seat-bookings", booking_routes_1.SeatBookingRoutes);
+exports.mainRoutes.use("/reviews", review_routes_1.reviewRoutes);
+exports.mainRoutes.use("/tickets", ticket_routes_1.ticketRoutes);
 // /api/notifications
 const notification_routes_1 = require("./flashspaceWeb/notificationModule/routes/notification.routes");
-exports.mainRoutes.use('/notifications', notification_routes_1.notificationRoutes);
+exports.mainRoutes.use("/notifications", notification_routes_1.notificationRoutes);
 // /api/visit
 const visit_routes_1 = __importDefault(require("./flashspaceWeb/visitModule/routes/visit.routes"));
-exports.mainRoutes.use('/visit', visit_routes_1.default);
+exports.mainRoutes.use("/visit", visit_routes_1.default);

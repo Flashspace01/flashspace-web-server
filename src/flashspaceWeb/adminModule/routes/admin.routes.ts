@@ -184,6 +184,19 @@ adminRoutes.put(
   AdminController.updateBusinessInfoStatus,
 );
 
+// --- B2B2C Space Onboarding & Approval ---
+adminRoutes.get(
+  "/spaces/pending",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.getPendingSpaces,
+);
+
+adminRoutes.put(
+  "/spaces/:spaceType/:id/approve",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.approveSpace,
+);
+
 // 6. Ticket Management Routes (from ticket module)
 adminRoutes.use("/tickets", ticketRoutes);
 
