@@ -27,6 +27,8 @@ import {
 } from "../flashspaceWeb/creditLedgerModule/creditLedger.model";
 import { SupportTicketModel } from "../flashspaceWeb/userDashboardModule/models/supportTicket.model";
 import { KYCDocumentModel } from "../flashspaceWeb/userDashboardModule/models/kyc.model";
+import { SeatBookingModel } from "../flashspaceWeb/seatingModule/seating.model";
+import { CoworkingSpaceService } from "../flashspaceWeb/coworkingSpaceModule/coworkingSpace.service";
 
 const hashPassword = async (password: string) => {
   const salt = await bcrypt.genSalt(10);
@@ -132,27 +134,16 @@ const runSeed = async () => {
       adminMarkupPerMonth: 1000,
       finalPricePerMonth: 5000,
       isActive: true,
-      inventory: [
-        {
-          type: "DEDICATED_DESK",
-          totalUnits: 20,
-          availableUnits: 15,
-          pricePerMonth: 5000,
-        },
-        {
-          type: "HOT_DESK",
-          totalUnits: 50,
-          availableUnits: 50,
-          pricePerMonth: 4000,
-        },
-      ],
-      floors: [
+      floors: CoworkingSpaceService.generateSeatsForFloors([
         {
           floorNumber: 1,
-          name: "Ground Floor",
-          tables: [{ tableNumber: "T1", numberOfSeats: 10 }],
+          name: "Main Floor",
+          tables: [
+            { tableNumber: "T1", numberOfSeats: 10 },
+            { tableNumber: "T2", numberOfSeats: 10 },
+          ],
         },
-      ],
+      ]),
       operatingHours: {
         openTime: "08:00",
         closeTime: "20:00",
@@ -246,17 +237,131 @@ const runSeed = async () => {
       amountPaid: 11800,
     });
 
-    await InvoiceModel.create({
-      invoiceNumber: `INV-VO-${Date.now()}`,
+    console.log("🔨 Seeding Coworking Bookings...");
+    const cwOrderMockId = `order_cw_${Date.now()}`;
+    const cwPayment = await PaymentModel.create({
+      userId: standardUser._id,
+      userEmail: standardUser.email,
+      userName: standardUser.fullName,
+      razorpayOrderId: cwOrderMockId,
+      razorpayPaymentId: `pay_cw_${Date.now()}`,
+      razorpaySignature: "mock_signature",
+      spaceId: coworkingSpace._id,
+      spaceName: property.name + " (Coworking)",
+      planName: "Monthly Hot Desk",
+      planKey: "monthly_hot_desk",
+      tenure: 1,
+      yearlyPrice: 5000,
+      amount: 590000,
+      totalAmount: 5900,
+      status: PaymentStatus.COMPLETED,
+      paymentType: PaymentType.COWORKING_SPACE,
+    });
+
+    const cwBooking = await BookingModel.create({
+      bookingNumber: `FS-CW-${Date.now()}`,
       user: standardUser._id,
       partnerId: partnerUser._id,
-      bookingId: voBooking._id,
-      paymentId: voPayment._id,
-      description: "Virtual Office Booking Invoice",
-      subtotal: 10000,
-      total: 11800,
+      type: "coworking_space",
+      status: "active",
+      startDate: new Date(),
+      endDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+      spaceId: coworkingSpace._id,
+      spaceSnapshot: {
+        name: property.name,
+        propertyId: property._id.toString(),
+      },
+      plan: {
+        name: "Monthly Hot Desk",
+        price: 5000,
+        tenure: 1,
+        tenureUnit: "months",
+      },
+      paymentId: cwPayment._id,
+      amountPaid: 5900,
+    });
+
+    await InvoiceModel.create({
+      invoiceNumber: `INV-CW-${Date.now()}`,
+      user: standardUser._id,
+      partnerId: partnerUser._id,
+      bookingId: cwBooking._id,
+      paymentId: cwPayment._id,
+      description: "Coworking Space Booking Invoice",
+      subtotal: 5000,
+      total: 5900,
       status: "paid",
-      pdfUrl: "https://example.com/invoice_vo.pdf",
+    });
+
+    console.log("🔨 Seeding Meeting Room Bookings...");
+    const mrOrderMockId = `order_mr_${Date.now()}`;
+    const mrPayment = await PaymentModel.create({
+      userId: standardUser._id,
+      userEmail: standardUser.email,
+      userName: standardUser.fullName,
+      razorpayOrderId: mrOrderMockId,
+      razorpayPaymentId: `pay_mr_${Date.now()}`,
+      razorpaySignature: "mock_signature",
+      spaceId: meetingRoom._id,
+      spaceName: property.name + " (Meeting Room)",
+      planName: "Hourly Booking",
+      planKey: "hourly_2_hours",
+      tenure: 2,
+      yearlyPrice: 500,
+      amount: 118000,
+      totalAmount: 1180,
+      status: PaymentStatus.COMPLETED,
+      paymentType: PaymentType.MEETING_ROOM,
+    });
+
+    const mrBooking = await BookingModel.create({
+      bookingNumber: `FS-MR-${Date.now()}`,
+      user: standardUser._id,
+      partnerId: partnerUser._id,
+      type: "meeting_room",
+      status: "active",
+      startDate: new Date(),
+      endDate: new Date(new Date().setHours(new Date().getHours() + 2)),
+      spaceId: meetingRoom._id,
+      spaceSnapshot: {
+        name: property.name,
+        propertyId: property._id.toString(),
+      },
+      plan: {
+        name: "Hourly Booking",
+        price: 1000,
+        tenure: 2,
+        tenureUnit: "hours",
+      },
+      paymentId: mrPayment._id,
+      amountPaid: 1180,
+    });
+
+    await InvoiceModel.create({
+      invoiceNumber: `INV-MR-${Date.now()}`,
+      user: standardUser._id,
+      partnerId: partnerUser._id,
+      bookingId: mrBooking._id,
+      paymentId: mrPayment._id,
+      description: "Meeting Room Booking Invoice",
+      subtotal: 1000,
+      total: 1180,
+      status: "paid",
+    });
+
+    console.log("🔨 Seeding Seat Bookings...");
+    const seatId1 = (coworkingSpace.floors[0].tables[0] as any).seats[0]._id;
+    const seatId2 = (coworkingSpace.floors[0].tables[0] as any).seats[1]._id;
+
+    await SeatBookingModel.create({
+      space: coworkingSpace._id,
+      user: standardUser._id,
+      startTime: new Date(),
+      endTime: new Date(new Date().setHours(new Date().getHours() + 4)),
+      seatIds: [seatId1, seatId2],
+      totalAmount: 1000,
+      status: "confirmed",
+      paymentId: "mock_payment_seat_1",
     });
 
     console.log("🔨 Seeding Credits Ledger...");

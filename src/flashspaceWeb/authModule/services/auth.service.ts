@@ -111,6 +111,8 @@ export class AuthService {
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified
         }
+          credits: user.credits || 0,
+        },
       };
     } catch (error) {
       console.error('Signup error:', error);
@@ -197,6 +199,7 @@ export class AuthService {
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified
+          credits: user.credits || 0,
         },
         tokens
       };
@@ -311,6 +314,7 @@ export class AuthService {
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified
+          credits: user.credits || 0,
         },
         tokens
       };
@@ -487,7 +491,7 @@ export class AuthService {
       if (!user) {
         return {
           success: false,
-          message: 'User not found'
+          message: "User not found",
         };
       }
 
@@ -724,6 +728,7 @@ export class AuthService {
           role: verifiedUser.role,
           isEmailVerified: verifiedUser.isEmailVerified,
           kycVerified: verifiedUser.kycVerified
+          credits: verifiedUser.credits || 0,
         },
         tokens
       };
