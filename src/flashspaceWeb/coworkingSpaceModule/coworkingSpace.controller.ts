@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
 import { CoworkingSpaceService } from "./coworkingSpace.service";
+import { flattenProperty } from "../propertyModule/property.service";
 import {
   createCoworkingSpaceSchema,
   updateCoworkingSpaceSchema,
 } from "./coworkingSpace.validation";
+import { CoworkingSpaceModel } from "./coworkingSpace.model";
+import { PropertyModel } from "../propertyModule/property.model";
 
 const sendError = (
   res: Response,
@@ -41,7 +44,9 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       city,
       area,
       capacity,
-      inventory,
+      pricePerMonth,
+      pricePerDay,
+      floors,
       operatingHours,
       amenities,
       location,
@@ -60,7 +65,9 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         city,
         area,
         capacity,
-        inventory,
+        pricePerMonth,
+        pricePerDay,
+        floors,
         operatingHours,
         amenities,
         location,
@@ -73,7 +80,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       message: "Coworking space created successfully",
-      data: createdSpace,
+      data: flattenProperty(createdSpace),
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to create space", err);
@@ -109,7 +116,7 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Updated successfully",
-      data: updatedSpace,
+      data: flattenProperty(updatedSpace),
     });
   } catch (err: any) {
     if (err.message === "Space not found or unauthorized")
@@ -137,7 +144,7 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Coworking spaces retrieved successfully",
-      data: spaces,
+      data: spaces.map(flattenProperty),
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces", err);
@@ -154,7 +161,7 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Coworking space retrieved successfully",
-      data: space,
+      data: flattenProperty(space),
     });
   } catch (err: any) {
     if (err.message === "Invalid ID format")
@@ -181,7 +188,7 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: `Coworking spaces in ${city} retrieved successfully`,
-      data: spaces,
+      data: spaces.map(flattenProperty),
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces by city", err);
@@ -197,7 +204,7 @@ export const getPartnerSpaces = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Partner spaces retrieved successfully",
-      data: spaces,
+      data: spaces.map(flattenProperty),
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner spaces", err);
@@ -212,7 +219,11 @@ export const deleteCoworkingSpace = async (req: Request, res: Response) => {
 
     if (!userId) return sendError(res, 401, "Unauthorized");
 
-    await CoworkingSpaceService.deleteSpace(coworkingSpaceId as string, userId, userRole);
+    await CoworkingSpaceService.deleteSpace(
+      coworkingSpaceId as string,
+      userId,
+      userRole,
+    );
     res.status(200).json({
       success: true,
       message: "Coworking space deleted successfully",
@@ -221,6 +232,48 @@ export const deleteCoworkingSpace = async (req: Request, res: Response) => {
   } catch (err: any) {
     if (err.message === "Space not found or unauthorized")
       return sendError(res, 404, err.message);
-    sendError(res, 500, "Failed to delete space", err);
+    return sendError(res, 500, "Failed to completely delete space", err);
+  }
+};
+
+export const seedDummy = async (req: Request, res: Response) => {
+  try {
+    const property = await PropertyModel.findOne();
+    if (!property)
+      return sendError(res, 404, "No property found to attach space to.");
+
+    const dummySpace = await CoworkingSpaceModel.create({
+      property: property._id,
+      partner: property.partner,
+      capacity: 50,
+      pricePerMonth: 1000,
+      pricePerDay: 50,
+      avgRating: 4.5,
+      totalReviews: 120,
+      operatingHours: {
+        openTime: "09:00",
+        closeTime: "18:00",
+        daysOpen: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      },
+      floors: CoworkingSpaceService.generateSeatsForFloors([
+        {
+          floorNumber: 1,
+          name: "Ground Floor",
+          tables: [
+            { tableNumber: "T1", numberOfSeats: 4 },
+            { tableNumber: "T2", numberOfSeats: 4 },
+          ],
+        },
+      ]),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Dummy coworking space created",
+      data: dummySpace,
+    });
+  } catch (error: any) {
+    console.error("SEED DUMMY ERROR:", error);
+    return sendError(res, 500, "Failed to seed dummy data", error);
   }
 };

@@ -1,0 +1,407 @@
+{
+  "spaceKeys": [
+    "_id",
+    "property",
+    "capacity",
+    "sponsored",
+    "popular",
+    "pricePerMonth",
+    "pricePerDay",
+    "floors",
+    "operatingHours",
+    "avgRating",
+    "totalReviews",
+    "isActive",
+    "isDeleted",
+    "partner",
+    "createdAt",
+    "updatedAt",
+    "__v"
+  ],
+  "propKeys": [
+    "_id",
+    "name",
+    "address",
+    "city",
+    "area",
+    "features",
+    "images",
+    "partner",
+    "createdAt",
+    "updatedAt",
+    "__v"
+  ],
+  "space": {
+    "_id": "699be905923fa614f3d4cd01",
+    "property": "699be905923fa614f3d4ccff",
+    "capacity": 120,
+    "sponsored": false,
+    "popular": false,
+    "pricePerMonth": 15000,
+    "pricePerDay": 800,
+    "floors": [
+      {
+        "floorNumber": 1,
+        "name": "Main Floor",
+        "tables": [
+          {
+            "tableNumber": "A",
+            "seats": [
+              {
+                "seatNumber": "A-1",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd04"
+              },
+              {
+                "seatNumber": "A-2",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd05"
+              },
+              {
+                "seatNumber": "A-3",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd06"
+              },
+              {
+                "seatNumber": "A-4",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd07"
+              },
+              {
+                "seatNumber": "A-5",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd08"
+              },
+              {
+                "seatNumber": "A-6",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd09"
+              },
+              {
+                "seatNumber": "A-7",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0a"
+              },
+              {
+                "seatNumber": "A-8",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0b"
+              },
+              {
+                "seatNumber": "A-9",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0c"
+              },
+              {
+                "seatNumber": "A-10",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0d"
+              },
+              {
+                "seatNumber": "A-11",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0e"
+              },
+              {
+                "seatNumber": "A-12",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd0f"
+              },
+              {
+                "seatNumber": "A-13",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd10"
+              },
+              {
+                "seatNumber": "A-14",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd11"
+              },
+              {
+                "seatNumber": "A-15",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd12"
+              },
+              {
+                "seatNumber": "A-16",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd13"
+              },
+              {
+                "seatNumber": "A-17",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd14"
+              },
+              {
+                "seatNumber": "A-18",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd15"
+              },
+              {
+                "seatNumber": "A-19",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd16"
+              },
+              {
+                "seatNumber": "A-20",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd17"
+              }
+            ],
+            "_id": "699be905923fa614f3d4cd03"
+          },
+          {
+            "tableNumber": "B",
+            "seats": [
+              {
+                "seatNumber": "B-1",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd19"
+              },
+              {
+                "seatNumber": "B-2",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1a"
+              },
+              {
+                "seatNumber": "B-3",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1b"
+              },
+              {
+                "seatNumber": "B-4",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1c"
+              },
+              {
+                "seatNumber": "B-5",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1d"
+              },
+              {
+                "seatNumber": "B-6",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1e"
+              },
+              {
+                "seatNumber": "B-7",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd1f"
+              },
+              {
+                "seatNumber": "B-8",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd20"
+              },
+              {
+                "seatNumber": "B-9",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd21"
+              },
+              {
+                "seatNumber": "B-10",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd22"
+              },
+              {
+                "seatNumber": "B-11",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd23"
+              },
+              {
+                "seatNumber": "B-12",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd24"
+              },
+              {
+                "seatNumber": "B-13",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd25"
+              },
+              {
+                "seatNumber": "B-14",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd26"
+              },
+              {
+                "seatNumber": "B-15",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd27"
+              },
+              {
+                "seatNumber": "B-16",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd28"
+              },
+              {
+                "seatNumber": "B-17",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd29"
+              },
+              {
+                "seatNumber": "B-18",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd2a"
+              },
+              {
+                "seatNumber": "B-19",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd2b"
+              },
+              {
+                "seatNumber": "B-20",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd2c"
+              }
+            ],
+            "_id": "699be905923fa614f3d4cd18"
+          },
+          {
+            "tableNumber": "C",
+            "seats": [
+              {
+                "seatNumber": "C-1",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd2e"
+              },
+              {
+                "seatNumber": "C-2",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd2f"
+              },
+              {
+                "seatNumber": "C-3",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd30"
+              },
+              {
+                "seatNumber": "C-4",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd31"
+              },
+              {
+                "seatNumber": "C-5",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd32"
+              },
+              {
+                "seatNumber": "C-6",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd33"
+              },
+              {
+                "seatNumber": "C-7",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd34"
+              },
+              {
+                "seatNumber": "C-8",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd35"
+              },
+              {
+                "seatNumber": "C-9",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd36"
+              },
+              {
+                "seatNumber": "C-10",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd37"
+              },
+              {
+                "seatNumber": "C-11",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd38"
+              },
+              {
+                "seatNumber": "C-12",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd39"
+              },
+              {
+                "seatNumber": "C-13",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3a"
+              },
+              {
+                "seatNumber": "C-14",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3b"
+              },
+              {
+                "seatNumber": "C-15",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3c"
+              },
+              {
+                "seatNumber": "C-16",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3d"
+              },
+              {
+                "seatNumber": "C-17",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3e"
+              },
+              {
+                "seatNumber": "C-18",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd3f"
+              },
+              {
+                "seatNumber": "C-19",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd40"
+              },
+              {
+                "seatNumber": "C-20",
+                "isActive": true,
+                "_id": "699be905923fa614f3d4cd41"
+              }
+            ],
+            "_id": "699be905923fa614f3d4cd2d"
+          }
+        ],
+        "_id": "699be905923fa614f3d4cd02"
+      }
+    ],
+    "operatingHours": {
+      "openTime": "08:00",
+      "closeTime": "22:00",
+      "daysOpen": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ]
+    },
+    "avgRating": 0,
+    "totalReviews": 0,
+    "isActive": true,
+    "isDeleted": false,
+    "partner": "698d858b4472b4b4545e2dd9",
+    "createdAt": "2026-02-23T05:43:33.628Z",
+    "updatedAt": "2026-02-23T05:43:33.628Z",
+    "__v": 0
+  },
+  "prop": {
+    "_id": "69999c3f54febd31e40ebaef",
+    "name": "Test VO",
+    "address": "123 Test St",
+    "city": "TestCity",
+    "area": "TestArea",
+    "features": [
+      "WiFi"
+    ],
+    "images": [
+      "image1.jpg"
+    ],
+    "partner": "69999a5af12ff1a58e97b7cf",
+    "createdAt": "2026-02-21T11:51:27.133Z",
+    "updatedAt": "2026-02-21T11:51:27.133Z",
+    "__v": 0
+  }
+}

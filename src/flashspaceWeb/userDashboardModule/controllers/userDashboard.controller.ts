@@ -174,9 +174,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     coworkingSpaces.forEach((s: any) => {
       spaces.push({
         id: s._id.toString(),
-        name: s.name,
-        city: s.city,
-        location: s.area || "N/A",
+        name: (s.property as any)?.name || "N/A",
+        city: (s.property as any)?.city || "N/A",
+        location: (s.property as any)?.area || "N/A",
         availableSeats: s.capacity || 0, // Placeholder calculation
         totalSeats: s.capacity || 0,
         meetingRooms: 0, // In a real scenario, count nested or linked meeting rooms
@@ -193,9 +193,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     meetingRooms.forEach((s: any) => {
       spaces.push({
         id: s._id.toString(),
-        name: s.name,
-        city: s.city,
-        location: s.area || "N/A",
+        name: (s.property as any)?.name || "N/A",
+        city: (s.property as any)?.city || "N/A",
+        location: (s.property as any)?.area || "N/A",
         availableSeats: s.capacity || 0,
         totalSeats: s.capacity || 0,
         meetingRooms: 1,
@@ -209,9 +209,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     eventSpaces.forEach((s: any) => {
       spaces.push({
         id: s._id.toString(),
-        name: s.name,
-        city: s.city,
-        location: s.area || "N/A",
+        name: (s.property as any)?.name || "N/A",
+        city: (s.property as any)?.city || "N/A",
+        location: (s.property as any)?.area || "N/A",
         availableSeats: s.capacity || 0,
         totalSeats: s.capacity || 0,
         meetingRooms: 0,
@@ -225,9 +225,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     virtualOffices.forEach((s: any) => {
       spaces.push({
         id: s._id.toString(),
-        name: s.name,
-        city: s.city,
-        location: s.area || "N/A",
+        name: (s.property as any)?.name || "N/A",
+        city: (s.property as any)?.city || "N/A",
+        location: (s.property as any)?.area || "N/A",
         availableSeats: "N/A",
         totalSeats: "N/A",
         meetingRooms: 0,
@@ -247,19 +247,77 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
   }
 };
 
+export const getPartnerActiveRequests = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const partnerId = new mongoose.Types.ObjectId(userId);
+    const bookings = await BookingModel.find({
+      partnerId,
+      isDeleted: false,
+      status: { $in: ["pending_payment", "pending_kyc"] },
+    }).populate("user", "fullName email");
+
+    const requests = bookings.map((b: any) => {
+      const name = b.user?.fullName || "Unknown";
+      const initials =
+        name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .substring(0, 2)
+          .toUpperCase() || "UN";
+
+      return {
+        id: b.bookingNumber || b._id.toString(),
+        user: {
+          name,
+          email: b.user?.email || "Unknown",
+          avatar: initials,
+        },
+        space: b.spaceSnapshot?.name || "Unknown Space",
+        type: b.type,
+        date: b.createdAt
+          ? new Date(b.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+          : "Unknown",
+        kycStatus: b.kycStatus || "pending",
+        status: b.status,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: requests,
+    });
+  } catch (error) {
+    console.error("Failed to fetch partner active requests:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch active requests" });
+  }
+};
+
 export const getPartnerDashboardOverview = async (
   req: Request,
   res: Response,
 ) => {
   try {
     const userId = req.user?.id;
-
+    console.log("Partner ID:", userId);
     // Get all bookings where the partner is the logged-in user
+    const userObjectId = new mongoose.Types.ObjectId(userId);
     const partnerBookings = await BookingModel.find({
-      partnerId: userId,
+      user: userObjectId,
       isDeleted: false,
     }).populate("user", "fullName email phone company");
-
+    console.log("Partner Bookings:", partnerBookings);
     // Map bookings to the frontend Client structure
     const clients = partnerBookings.map((b: any) => {
       // Determine Status
@@ -365,6 +423,240 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch bookings" });
+  }
+};
+
+export const getPartnerClients = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    // 1. Fetch all bookings for this partner
+    const bookings = await BookingModel.find({
+      partnerId: userId,
+      isDeleted: false,
+    }).populate("user", "fullName email");
+
+    // 2. Fetch business info for all users in these bookings to get company names
+    const userIds = [
+      ...new Set(bookings.map((b: any) => b.user?._id || b.user)),
+    ];
+    const businessInfos = await BusinessInfoModel.find({
+      user: { $in: userIds },
+      isDeleted: false,
+    });
+
+    // Create a map for quick lookup
+    const businessMap = new Map(
+      businessInfos.map((info) => [info.user.toString(), info]),
+    );
+
+    // 3. Group bookings by user and select the best representative booking
+    const clientMap = new Map<string, any>();
+
+    bookings.forEach((booking: any) => {
+      const user = booking.user;
+      const userIdStr = user?._id?.toString() || user?.toString();
+      if (!userIdStr) return;
+
+      const business = businessMap.get(userIdStr);
+
+      // Determine Status for this booking
+      let status = "INACTIVE";
+      if (booking.status === "active") {
+        const now = new Date();
+        const endDate = new Date(booking.endDate);
+        const diffDays = Math.ceil(
+          (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        status = diffDays <= 30 && diffDays > 0 ? "EXPIRING_SOON" : "ACTIVE";
+      }
+
+      const clientData = {
+        id: booking.bookingNumber,
+        userId: userIdStr,
+        companyName: business?.companyName || user?.fullName || "N/A",
+        contactName: user?.fullName || "N/A",
+        plan: booking.plan?.name || "N/A",
+        space: booking.spaceSnapshot?.name || "N/A",
+        startDate: booking.startDate
+          ? new Date(booking.startDate).toISOString().split("T")[0]
+          : "N/A",
+        endDate: booking.endDate
+          ? new Date(booking.endDate).toISOString().split("T")[0]
+          : "N/A",
+        status,
+        kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+      };
+
+      // If user already exists in map, decide which booking to keep
+      // Priority: ACTIVE > EXPIRING_SOON > INACTIVE
+      const existing = clientMap.get(userIdStr);
+      if (!existing) {
+        clientMap.set(userIdStr, clientData);
+      } else {
+        const priority: Record<string, number> = {
+          ACTIVE: 3,
+          EXPIRING_SOON: 2,
+          INACTIVE: 1,
+        };
+        if (priority[status] > priority[existing.status]) {
+          clientMap.set(userIdStr, clientData);
+        }
+      }
+    });
+
+    res
+      .status(200)
+      .json({ success: true, data: Array.from(clientMap.values()) });
+  } catch (error) {
+    console.error("Get partner clients error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch clients" });
+  }
+};
+
+export const getPartnerClientDetails = async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params; // This is now the User ID
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // 1. Find the specific booking to identify the client context
+    // We prioritize active bookings for this partner
+    const mainBooking = await BookingModel.findOne({
+      user: clientId,
+      partnerId: userId,
+      isDeleted: false,
+    })
+      .sort({ status: 1, createdAt: -1 }) // Sort to get most relevant if multiple (Simplified)
+      .populate("user", "fullName email phoneNumber");
+
+    if (!mainBooking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Client not found for this partner" });
+    }
+
+    const clientUserId = clientId;
+
+    // 2. Fetch all related data
+    const [businessInfo, kycProfile, invoices, allUserBookings] =
+      await Promise.all([
+        BusinessInfoModel.findOne({ user: clientUserId, isDeleted: false }),
+        KYCDocumentModel.findOne({ user: clientUserId }),
+        InvoiceModel.find({ user: clientUserId, isDeleted: false }).sort({
+          createdAt: -1,
+        }),
+        BookingModel.find({
+          user: clientUserId,
+          partnerId: userId,
+          isDeleted: false,
+        }).sort({ startDate: -1 }),
+      ]);
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    // 3. Resolve Agreement from Documents
+    const agreementDoc = (mainBooking.documents || []).find(
+      (doc: any) =>
+        doc.type?.toLowerCase().includes("agreement") ||
+        doc.name?.toLowerCase().includes("agreement"),
+    );
+
+    const agreementUrl =
+      agreementDoc?.url && agreementDoc.url !== "#"
+        ? agreementDoc.url.startsWith("http")
+          ? agreementDoc.url
+          : `${baseUrl}${agreementDoc.url.startsWith("/") ? "" : "/"}${agreementDoc.url}`
+        : "#";
+
+    // 4. Map to frontend ClientDetails format
+    const details = {
+      id: mainBooking.bookingNumber,
+      companyName:
+        businessInfo?.companyName ||
+        (mainBooking.user as any)?.fullName ||
+        "N/A",
+      contactName: (mainBooking.user as any)?.fullName || "N/A",
+      email: (mainBooking.user as any)?.email || "N/A",
+      phone: (mainBooking.user as any)?.phoneNumber || "N/A",
+      plan: mainBooking.plan?.name || "N/A",
+      space: mainBooking.spaceSnapshot?.name || "N/A",
+      startDate: mainBooking.startDate
+        ? new Date(mainBooking.startDate).toISOString().split("T")[0]
+        : "N/A",
+      endDate: mainBooking.endDate
+        ? new Date(mainBooking.endDate).toISOString().split("T")[0]
+        : "N/A",
+      status: mainBooking.status.toUpperCase(),
+      kyc: {
+        status:
+          kycProfile?.overallStatus === "approved"
+            ? "VERIFIED"
+            : kycProfile?.overallStatus === "rejected"
+              ? "REJECTED"
+              : "PENDING",
+        documents: (kycProfile?.documents || []).map(
+          (doc: any, index: number) => ({
+            id: `DOC-${index}`,
+            type: doc.type,
+            fileUrl:
+              doc.fileUrl && doc.fileUrl !== "#"
+                ? doc.fileUrl.startsWith("http")
+                  ? doc.fileUrl
+                  : `${baseUrl}${doc.fileUrl.startsWith("/") ? "" : "/"}${doc.fileUrl}`
+                : "#",
+            uploadedAt: doc.uploadedAt
+              ? new Date(doc.uploadedAt).toISOString().split("T")[0]
+              : "N/A",
+          }),
+        ),
+      },
+      agreement: {
+        status: agreementDoc ? "SIGNED" : "PENDING",
+        agreementUrl,
+        signedAt: agreementDoc?.generatedAt
+          ? new Date(agreementDoc.generatedAt).toISOString().split("T")[0]
+          : mainBooking.startDate
+            ? new Date(mainBooking.startDate).toISOString().split("T")[0]
+            : "N/A",
+        validTill: mainBooking.endDate
+          ? new Date(mainBooking.endDate).toISOString().split("T")[0]
+          : "N/A",
+      },
+      bookings: allUserBookings.map((b) => ({
+        id: b.bookingNumber,
+        date: b.startDate
+          ? new Date(b.startDate).toISOString().split("T")[0]
+          : "N/A",
+        slot: "Full Access",
+        status: b.status.toUpperCase(),
+        amount: b.plan?.price || 0,
+      })),
+      invoices: invoices.map((inv) => ({
+        id: inv._id,
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.total,
+        status: (inv.status || "pending").toUpperCase(),
+        pdfUrl: inv.pdfUrl || "#",
+        createdAt: inv.createdAt
+          ? new Date(inv.createdAt).toISOString().split("T")[0]
+          : "N/A",
+      })),
+    };
+
+    res.status(200).json({ success: true, data: details });
+  } catch (error) {
+    console.error("Get partner client details error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch client details" });
   }
 };
 
@@ -2088,7 +2380,10 @@ export const getUserMails = async (req: Request, res: Response) => {
 
     const userEmail = user.email.trim();
 
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
+    // Case-insensitive exact match
+    const mails = await Mail.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, "i") },
+    }).sort({ createdAt: -1 });
 
     const mails = await Mail.find({
       $or: [
@@ -2126,7 +2421,10 @@ export const getUserVisits = async (req: Request, res: Response) => {
 
     const userEmail = user.email.trim();
 
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
+    // Case-insensitive exact match
+    const visits = await Visit.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, "i") },
+    }).sort({ createdAt: -1 });
 
     const visits = await Visit.find({
       $or: [

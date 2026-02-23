@@ -23,7 +23,10 @@ import {
   getCredits,
   redeemReward,
   getPartnerDashboardOverview,
+  getPartnerActiveRequests,
   getPartnerSpaceBookings,
+  getPartnerClients,
+  getPartnerClientDetails,
   getAllPartnerSpaces,
   getUserMails,
   getUserVisits,
@@ -44,8 +47,11 @@ router.get("/dashboard", getDashboardOverview);
 
 // ============ PARTNER BOOKINGS ============
 router.get("/partner/dashboard", getPartnerDashboardOverview);
+router.get("/partner/active-requests", getPartnerActiveRequests);
 router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
+router.get("/partner/clients", getPartnerClients);
+router.get("/partner/clients/:clientId", getPartnerClientDetails);
 
 // ============ BOOKINGS ============
 router.get("/bookings", getAllBookings);

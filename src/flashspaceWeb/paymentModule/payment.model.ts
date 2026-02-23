@@ -1,4 +1,10 @@
-import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  modelOptions,
+  index,
+  Ref,
+} from "@typegoose/typegoose";
 import { Types } from "mongoose";
 
 export enum PaymentStatus {
@@ -7,18 +13,19 @@ export enum PaymentStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   REFUNDED = "refunded",
-  CANCELLED = "cancelled"
+  CANCELLED = "cancelled",
 }
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
   COWORKING_SPACE = "coworking_space",
-  MEETING_ROOM = "meeting_room"
+  MEETING_ROOM = "meeting_room",
+  SEAT_BOOKING = "seat_booking",
 }
 
 @modelOptions({
   schemaOptions: {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 })
 @index({ razorpayPaymentId: 1 })
 @index({ userId: 1 })
@@ -101,6 +108,9 @@ export class Payment {
 
   @prop()
   public notes?: string;
+
+  @prop()
+  public holdId?: string;
 
   @prop()
   public errorMessage?: string;
