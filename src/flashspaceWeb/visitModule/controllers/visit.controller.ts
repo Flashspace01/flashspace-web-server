@@ -3,7 +3,18 @@ import Visit from '../models/visit.model';
 
 export const getVisits = async (req: Request, res: Response) => {
     try {
-        const visits = await Visit.find().sort({ createdAt: -1 });
+        const { email } = req.query;
+        let filter: any = {};
+
+        // If a specific email is requested (e.g. from the client dashboard)
+        if (email) {
+            filter.email = { $regex: new RegExp('^' + email.toString().trim() + '$', 'i') };
+        } else if (req.user && req.user.role === 'partner') {
+            // If it's the partner dashboard requesting all records, only show THEIR records
+            filter.partnerId = req.user.id;
+        }
+
+        const visits = await Visit.find(filter).sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: visits });
     } catch (error: any) {
         console.error("Error fetching visits:", error);
@@ -23,7 +34,14 @@ export const createVisit = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
+        // Partner who is logging this
+        const partnerId = req.user?.id;
+        if (!partnerId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized. Partner ID missing.' });
+        }
+
         const newVisit = new Visit({
+            partnerId,
             client,
             visitor,
             email: email.trim(), // Sanitize email
