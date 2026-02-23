@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
-import { BookingModel } from "../models/booking.model";
+import { BookingModel } from "../../bookingModule/booking.model";
 import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";

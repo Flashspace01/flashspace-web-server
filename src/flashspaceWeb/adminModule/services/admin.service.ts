@@ -3,7 +3,7 @@
   AuthProvider,
   UserRole,
 } from "../../authModule/models/user.model";
-import { BookingModel } from "../../userDashboardModule/models/booking.model";
+import { BookingModel } from "../../bookingModule/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PartnerKYCModel } from "../../userDashboardModule/models/partnerKYC.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";

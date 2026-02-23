@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { PaymentModel, PaymentStatus, PaymentType } from "./payment.model";
-import { BookingModel } from "../userDashboardModule/models/booking.model";
+import { BookingModel } from "../bookingModule/booking.model";
 import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";

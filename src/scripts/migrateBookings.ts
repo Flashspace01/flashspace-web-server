@@ -1,6 +1,6 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { BookingModel } from "../flashspaceWeb/userDashboardModule/models/booking.model";
+import { BookingModel } from "../flashspaceWeb/bookingModule/booking.model";
 
 /**
  * MIGRATION SCRIPT
