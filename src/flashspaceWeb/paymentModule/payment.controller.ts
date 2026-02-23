@@ -252,33 +252,55 @@ async function createBookingAndInvoice(payment: any) {
       });
     }
 
-    // Credits & Rewards Logic (Only for Meeting Rooms)
-    if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const creditPercentage = 0.5; // 50%
-      const creditsEarned = Math.floor(payment.totalAmount * creditPercentage); // totalAmount is in INR (not paise here, wait. Payment model says totalAmount is in paise? No. Payment model says amount is in paise, totalAmount is number. let's check creating order.
-      // In createOrder: amount: totalAmount * 100. payment.totalAmount is raw amount.
-      // So if 1200 INR, totalAmount is 1200.
+    // Credits & Rewards Logic - Updated: 1% Earning on ALL spends
+    const earningsRate = 0.01;
+    const creditsEarned = Math.floor(payment.totalAmount * earningsRate);
 
-      if (creditsEarned > 0) {
-        // Update User
-        await UserModel.findByIdAndUpdate(payment.userId, {
-          $inc: { credits: creditsEarned },
-        });
+    if (creditsEarned > 0) {
+      // Update User credits
+      await UserModel.findByIdAndUpdate(payment.userId, {
+        $inc: { credits: creditsEarned },
+      });
 
-        // Get updated user to get new balance
-        const user = await UserModel.findById(payment.userId);
+      // Get updated user for ledger record
+      const updatedUser = await UserModel.findById(payment.userId);
 
-        // Create Ledger Entry
-        await CreditLedgerModel.create({
-          user: payment.userId,
-          amount: creditsEarned,
-          type: CreditType.EARNED,
-          description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
-          referenceId: booking._id?.toString(),
-          bookingId: booking._id,
-          balanceAfter: user?.credits || 0,
-        });
-      }
+      // Create Ledger Entry for Earning
+      await CreditLedgerModel.create({
+        user: payment.userId,
+        amount: creditsEarned,
+        type: CreditType.EARNED,
+        description: `Earned credits (1%) for booking #${bookingNumber}`,
+        referenceId: booking
+          ? booking._id?.toString()
+          : payment._id?.toString(),
+        bookingId: booking ? booking._id : undefined,
+        balanceAfter: updatedUser?.credits || 0,
+      });
+    }
+
+    // Credits Deduction if used
+    if (payment.creditsUsed && payment.creditsUsed > 0) {
+      // Deduct Credits
+      await UserModel.findByIdAndUpdate(payment.userId, {
+        $inc: { credits: -payment.creditsUsed },
+      });
+
+      // Get updated user for ledger record
+      const updatedUser = await UserModel.findById(payment.userId);
+
+      // Create Ledger Entry for Spend
+      await CreditLedgerModel.create({
+        user: payment.userId,
+        amount: -payment.creditsUsed,
+        type: CreditType.SPENT,
+        description: `Used credits for meeting room booking #${bookingNumber}`,
+        referenceId: booking
+          ? booking._id?.toString()
+          : payment._id?.toString(),
+        bookingId: booking ? booking._id : undefined,
+        balanceAfter: updatedUser?.credits || 0,
+      });
     }
 
     return { booking, invoiceNumber };
@@ -311,6 +333,7 @@ export const createOrder = async (req: Request, res: Response) => {
       paymentType = PaymentType.VIRTUAL_OFFICE,
       startDate,
       holdId,
+      creditsToUse = 0,
     } = req.body;
 
     // Validation
@@ -330,6 +353,34 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
+    // Verify credits if being used
+    let adjustedTotalAmount = totalAmount;
+    if (creditsToUse > 0) {
+      if (paymentType !== PaymentType.MEETING_ROOM) {
+        return res.status(400).json({
+          success: false,
+          message: "Credits can only be used for meeting room bookings",
+        });
+      }
+
+      const user = await UserModel.findById(userId);
+      if (!user || user.credits < creditsToUse) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient credits",
+        });
+      }
+
+      if (creditsToUse > totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: "Credits used cannot exceed total amount",
+        });
+      }
+
+      adjustedTotalAmount = totalAmount - creditsToUse;
+    }
+
     // Check Razorpay Keys
     let razorpayOrder;
 
@@ -343,7 +394,7 @@ export const createOrder = async (req: Request, res: Response) => {
       );
       razorpayOrder = {
         id: `order_mock_${Date.now()}`,
-        amount: Math.round(totalAmount * 100),
+        amount: Math.round(adjustedTotalAmount * 100),
         currency: "INR",
       };
     } else {
@@ -351,7 +402,7 @@ export const createOrder = async (req: Request, res: Response) => {
       const receiptId = `ord_${Date.now().toString(36)}`;
       try {
         razorpayOrder = await razorpay.orders.create({
-          amount: Math.round(totalAmount * 100), // Convert to paise and ensure integer
+          amount: Math.round(adjustedTotalAmount * 100), // Convert to paise and ensure integer
           currency: "INR",
           receipt: receiptId,
           notes: {
@@ -394,6 +445,7 @@ export const createOrder = async (req: Request, res: Response) => {
       discountAmount: discountAmount || 0,
       startDate: startDate ? new Date(startDate) : undefined,
       holdId,
+      creditsUsed: creditsToUse,
     });
 
     res.status(201).json({

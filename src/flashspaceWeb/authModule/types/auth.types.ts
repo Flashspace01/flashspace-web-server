@@ -4,7 +4,7 @@ export interface SignupRequest {
   confirmPassword: string;
   fullName: string;
   phoneNumber?: string;
-  role?: 'user' | 'partner';
+  role?: "user" | "partner";
 }
 
 export interface LoginRequest {
@@ -21,6 +21,7 @@ export interface AuthResponse {
     fullName: string;
     role: string;
     isEmailVerified: boolean;
+    credits?: number;
   };
   tokens?: {
     accessToken: string;
@@ -99,6 +100,7 @@ export interface AuthUser {
   email: string;
   role: string;
   fullName?: string;
+  credits?: number;
 }
 
 // Extend Express Request globally

@@ -111,6 +111,9 @@ export class Payment {
   @prop()
   public holdId?: string;
 
+  @prop({ default: 0 })
+  public creditsUsed?: number;
+
   @prop()
   public errorMessage?: string;
 

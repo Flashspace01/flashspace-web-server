@@ -1,13 +1,13 @@
-import { Request, Response } from 'express';
-import { AuthService } from '../services/auth.service';
-import { AuthMiddleware } from '../middleware/auth.middleware';
+import { Request, Response } from "express";
+import { AuthService } from "../services/auth.service";
+import { AuthMiddleware } from "../middleware/auth.middleware";
 import {
   SignupRequest,
   LoginRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  ChangePasswordRequest
-} from '../types/auth.types';
+  ChangePasswordRequest,
+} from "../types/auth.types";
 
 export class AuthController {
   private authService: AuthService;
@@ -20,15 +20,15 @@ export class AuthController {
   signup = async (req: Request, res: Response): Promise<void> => {
     try {
       const signupData: SignupRequest = req.body;
-      console.log('Signup Request Body:', JSON.stringify(signupData, null, 2)); // DEBUG LOG
+      console.log("Signup Request Body:", JSON.stringify(signupData, null, 2)); // DEBUG LOG
 
       // Basic validation
       if (!signupData.email || !signupData.password || !signupData.fullName) {
         res.status(400).json({
           success: false,
-          message: 'Email, password, and full name are required',
+          message: "Email, password, and full name are required",
           data: {},
-          error: 'Missing required fields'
+          error: "Missing required fields",
         });
         return;
       }
@@ -40,23 +40,23 @@ export class AuthController {
           success: true,
           message: result.message,
           data: result.user,
-          error: {}
+          error: {},
         });
       } else {
         res.status(400).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Signup controller error:', error);
+      console.error("Signup controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -70,9 +70,9 @@ export class AuthController {
       if (!loginData.email || !loginData.password) {
         res.status(400).json({
           success: false,
-          message: 'Email and password are required',
+          message: "Email and password are required",
           data: {},
-          error: 'Missing required fields'
+          error: "Missing required fields",
         });
         return;
       }
@@ -81,32 +81,36 @@ export class AuthController {
 
       if (result.success && result.tokens) {
         // Set secure cookies
-        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
 
         res.status(200).json({
           success: true,
           message: result.message,
           data: {
             user: result.user,
-            tokens: result.tokens
+            tokens: result.tokens,
           },
-          error: {}
+          error: {},
         });
       } else {
         res.status(401).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Login controller error:', error);
+      console.error("Login controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -116,12 +120,12 @@ export class AuthController {
     try {
       const { token } = req.query;
 
-      if (!token || typeof token !== 'string') {
+      if (!token || typeof token !== "string") {
         res.status(400).json({
           success: false,
-          message: 'Verification token is required',
+          message: "Verification token is required",
           data: {},
-          error: 'Missing verification token'
+          error: "Missing verification token",
         });
         return;
       }
@@ -133,23 +137,23 @@ export class AuthController {
           success: true,
           message: result.message,
           data: result.user,
-          error: {}
+          error: {},
         });
       } else {
         res.status(400).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Email verification controller error:', error);
+      console.error("Email verification controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -162,9 +166,9 @@ export class AuthController {
       if (!forgotPasswordData.email) {
         res.status(400).json({
           success: false,
-          message: 'Email is required',
+          message: "Email is required",
           data: {},
-          error: 'Missing email'
+          error: "Missing email",
         });
         return;
       }
@@ -175,15 +179,15 @@ export class AuthController {
         success: true,
         message: result.message,
         data: {},
-        error: {}
+        error: {},
       });
     } catch (error) {
-      console.error('Forgot password controller error:', error);
+      console.error("Forgot password controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -193,12 +197,16 @@ export class AuthController {
     try {
       const resetPasswordData: ResetPasswordRequest = req.body;
 
-      if (!resetPasswordData.token || !resetPasswordData.password || !resetPasswordData.confirmPassword) {
+      if (
+        !resetPasswordData.token ||
+        !resetPasswordData.password ||
+        !resetPasswordData.confirmPassword
+      ) {
         res.status(400).json({
           success: false,
-          message: 'Token, password, and confirmPassword are required',
+          message: "Token, password, and confirmPassword are required",
           data: {},
-          error: 'Missing required fields'
+          error: "Missing required fields",
         });
         return;
       }
@@ -210,23 +218,23 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {},
-          error: {}
+          error: {},
         });
       } else {
         res.status(400).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Reset password controller error:', error);
+      console.error("Reset password controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -237,26 +245,34 @@ export class AuthController {
       if (!req.user) {
         res.status(401).json({
           success: false,
-          message: 'Authentication required',
+          message: "Authentication required",
           data: {},
-          error: 'Not authenticated'
+          error: "Not authenticated",
         });
         return;
       }
 
       const changePasswordData: ChangePasswordRequest = req.body;
 
-      if (!changePasswordData.currentPassword || !changePasswordData.newPassword || !changePasswordData.confirmPassword) {
+      if (
+        !changePasswordData.currentPassword ||
+        !changePasswordData.newPassword ||
+        !changePasswordData.confirmPassword
+      ) {
         res.status(400).json({
           success: false,
-          message: 'Current password, new password, and confirm password are required',
+          message:
+            "Current password, new password, and confirm password are required",
           data: {},
-          error: 'Missing required fields'
+          error: "Missing required fields",
         });
         return;
       }
 
-      const result = await this.authService.changePassword(req.user.id, changePasswordData);
+      const result = await this.authService.changePassword(
+        req.user.id,
+        changePasswordData,
+      );
 
       if (result.success) {
         // Clear cookies to force re-login with new password
@@ -266,23 +282,23 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {},
-          error: {}
+          error: {},
         });
       } else {
         res.status(400).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Change password controller error:', error);
+      console.error("Change password controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -295,9 +311,9 @@ export class AuthController {
       if (!refreshToken) {
         res.status(401).json({
           success: false,
-          message: 'Refresh token required',
+          message: "Refresh token required",
           data: {},
-          error: 'Missing refresh token'
+          error: "Missing refresh token",
         });
         return;
       }
@@ -306,13 +322,17 @@ export class AuthController {
 
       if (result.success && result.tokens) {
         // Set new cookies
-        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
 
         res.status(200).json({
           success: true,
           message: result.message,
           data: {},
-          error: {}
+          error: {},
         });
       } else {
         AuthMiddleware.clearTokenCookies(res);
@@ -320,16 +340,16 @@ export class AuthController {
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Refresh token controller error:', error);
+      console.error("Refresh token controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -340,9 +360,9 @@ export class AuthController {
       if (!req.user) {
         res.status(401).json({
           success: false,
-          message: 'Authentication required',
+          message: "Authentication required",
           data: {},
-          error: 'Not authenticated'
+          error: "Not authenticated",
         });
         return;
       }
@@ -357,17 +377,17 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Logged out successfully',
+        message: "Logged out successfully",
         data: {},
-        error: {}
+        error: {},
       });
     } catch (error) {
-      console.error('Logout controller error:', error);
+      console.error("Logout controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -378,9 +398,9 @@ export class AuthController {
       if (!req.user) {
         res.status(401).json({
           success: false,
-          message: 'Authentication required',
+          message: "Authentication required",
           data: {},
-          error: 'Not authenticated'
+          error: "Not authenticated",
         });
         return;
       }
@@ -390,17 +410,17 @@ export class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Logged out from all devices successfully',
+        message: "Logged out from all devices successfully",
         data: {},
-        error: {}
+        error: {},
       });
     } catch (error) {
-      console.error('Logout all controller error:', error);
+      console.error("Logout all controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -411,9 +431,9 @@ export class AuthController {
       if (!req.user) {
         res.status(401).json({
           success: false,
-          message: 'Authentication required',
+          message: "Authentication required",
           data: {},
-          error: 'Not authenticated'
+          error: "Not authenticated",
         });
         return;
       }
@@ -423,7 +443,7 @@ export class AuthController {
       if (user) {
         res.status(200).json({
           success: true,
-          message: 'Profile retrieved successfully',
+          message: "Profile retrieved successfully",
           data: {
             id: user._id.toString(),
             email: user.email,
@@ -435,25 +455,25 @@ export class AuthController {
             isEmailVerified: user.isEmailVerified,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
-            updatedAt: user.updatedAt
+            updatedAt: user.updatedAt,
           },
-          error: {}
+          error: {},
         });
       } else {
         res.status(404).json({
           success: false,
-          message: 'User not found',
+          message: "User not found",
           data: {},
-          error: 'User not found'
+          error: "User not found",
         });
       }
     } catch (error) {
-      console.error('Get profile controller error:', error);
+      console.error("Get profile controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -468,7 +488,7 @@ export class AuthController {
         if (user) {
           res.status(200).json({
             success: true,
-            message: 'User is authenticated',
+            message: "User is authenticated",
             data: {
               isAuthenticated: true,
               user: {
@@ -482,38 +502,38 @@ export class AuthController {
                 isEmailVerified: user.isEmailVerified,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
-                updatedAt: user.updatedAt
-              }
+                updatedAt: user.updatedAt,
+              },
             },
-            error: {}
+            error: {},
           });
         } else {
           res.status(200).json({
             success: true,
-            message: 'User is not authenticated',
+            message: "User is not authenticated",
             data: {
-              isAuthenticated: false
+              isAuthenticated: false,
             },
-            error: {}
+            error: {},
           });
         }
       } else {
         res.status(200).json({
           success: true,
-          message: 'User is not authenticated',
+          message: "User is not authenticated",
           data: {
-            isAuthenticated: false
+            isAuthenticated: false,
           },
-          error: {}
+          error: {},
         });
       }
     } catch (error) {
-      console.error('Check auth controller error:', error);
+      console.error("Check auth controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -527,9 +547,9 @@ export class AuthController {
       if (!email || !otp) {
         res.status(400).json({
           success: false,
-          message: 'Email and OTP are required',
+          message: "Email and OTP are required",
           data: {},
-          error: 'Missing required fields'
+          error: "Missing required fields",
         });
         return;
       }
@@ -538,9 +558,9 @@ export class AuthController {
       if (!/^\d{6}$/.test(otp)) {
         res.status(400).json({
           success: false,
-          message: 'Invalid OTP format. Please enter a 6-digit code.',
+          message: "Invalid OTP format. Please enter a 6-digit code.",
           data: {},
-          error: 'Invalid OTP format'
+          error: "Invalid OTP format",
         });
         return;
       }
@@ -549,31 +569,35 @@ export class AuthController {
 
       if (result.success && result.tokens) {
         // Set secure cookies
-        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
 
         res.status(200).json({
           success: true,
           message: result.message,
           data: {
-            user: result.user
+            user: result.user,
           },
-          error: {}
+          error: {},
         });
       } else {
         res.status(400).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Verify OTP controller error:', error);
+      console.error("Verify OTP controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -587,9 +611,9 @@ export class AuthController {
       if (!email) {
         res.status(400).json({
           success: false,
-          message: 'Email is required',
+          message: "Email is required",
           data: {},
-          error: 'Missing required field'
+          error: "Missing required field",
         });
         return;
       }
@@ -601,7 +625,7 @@ export class AuthController {
           success: true,
           message: result.message,
           data: {},
-          error: {}
+          error: {},
         });
       } else {
         const statusCode = result.retryAfter ? 429 : 400;
@@ -609,16 +633,16 @@ export class AuthController {
           success: false,
           message: result.message,
           data: result.retryAfter ? { retryAfter: result.retryAfter } : {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Resend OTP controller error:', error);
+      console.error("Resend OTP controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -631,9 +655,9 @@ export class AuthController {
       if (!idToken) {
         res.status(400).json({
           success: false,
-          message: 'Google ID token is required',
+          message: "Google ID token is required",
           data: {},
-          error: 'Missing ID token'
+          error: "Missing ID token",
         });
         return;
       }
@@ -643,31 +667,35 @@ export class AuthController {
 
       if (result.success && result.tokens) {
         // Set secure cookies
-        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
 
         res.status(200).json({
           success: true,
           message: result.message,
           data: {
-            user: result.user
+            user: result.user,
           },
-          error: {}
+          error: {},
         });
       } else {
         res.status(401).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Google auth controller error:', error);
+      console.error("Google auth controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };
@@ -680,9 +708,9 @@ export class AuthController {
       if (!idToken) {
         res.status(400).json({
           success: false,
-          message: 'Google ID token is required',
+          message: "Google ID token is required",
           data: {},
-          error: 'Missing ID token'
+          error: "Missing ID token",
         });
         return;
       }
@@ -690,31 +718,35 @@ export class AuthController {
       const result = await this.authService.googleAuthWithToken(idToken);
 
       if (result.success && result.tokens) {
-        AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
 
         res.status(200).json({
           success: true,
           message: result.message,
           data: {
-            user: result.user
+            user: result.user,
           },
-          error: {}
+          error: {},
         });
       } else {
         res.status(401).json({
           success: false,
           message: result.message,
           data: {},
-          error: result.message
+          error: result.message,
         });
       }
     } catch (error) {
-      console.error('Google callback controller error:', error);
+      console.error("Google callback controller error:", error);
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: "Internal server error",
         data: {},
-        error: 'Internal server error'
+        error: "Internal server error",
       });
     }
   };

@@ -103,8 +103,9 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
-        }
+          isEmailVerified: user.isEmailVerified,
+          credits: user.credits || 0,
+        },
       };
     } catch (error) {
       console.error('Signup error:', error);
@@ -186,7 +187,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          credits: user.credits || 0,
         },
         tokens
       };
@@ -293,7 +295,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          credits: user.credits || 0,
         },
         tokens
       };
@@ -469,7 +472,7 @@ export class AuthService {
       if (!user) {
         return {
           success: false,
-          message: 'User not found'
+          message: "User not found",
         };
       }
 
@@ -704,7 +707,8 @@ export class AuthService {
           email: verifiedUser.email,
           fullName: verifiedUser.fullName,
           role: verifiedUser.role,
-          isEmailVerified: verifiedUser.isEmailVerified
+          isEmailVerified: verifiedUser.isEmailVerified,
+          credits: verifiedUser.credits || 0,
         },
         tokens
       };
