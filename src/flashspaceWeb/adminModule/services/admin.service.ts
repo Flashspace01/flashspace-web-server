@@ -436,6 +436,10 @@ export class AdminService {
           doc.status = "approved";
         } else if (type === "business") {
           doc.status = "approved";
+          await UserModel.findByIdAndUpdate(doc.user, { kycVerified: true });
+        } else if (type === "partner") {
+          doc.status = "approved";
+          await UserModel.findByIdAndUpdate(doc.user, { kycVerified: true });
         }
 
         doc.progress = 100;
@@ -1072,8 +1076,14 @@ export class AdminService {
       } else {
         partner.rejectionReason = undefined; // Clear rejection reason if approved
       }
-
       await partner.save();
+
+      // Sync user kycVerified flag
+      if (partner.user) {
+        await UserModel.findByIdAndUpdate(partner.user, {
+          kycVerified: action === "approve",
+        });
+      }
 
       // Recalculate partnerCount in the user's KYC document
       // Rely on user ID to find the main KYC profile
@@ -1296,6 +1306,13 @@ export class AdminService {
       businessInfo.updatedAt = new Date();
 
       await businessInfo.save();
+
+      // Sync user kycVerified flag
+      if (businessInfo.user) {
+        await UserModel.findByIdAndUpdate(businessInfo.user, {
+          kycVerified: action === "approve",
+        });
+      }
 
       // Recalculate businessInfoCount in main KYC Profile
       if (businessInfo.user) {

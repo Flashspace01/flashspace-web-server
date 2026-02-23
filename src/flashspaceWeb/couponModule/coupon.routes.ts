@@ -42,3 +42,18 @@ couponRoutes.post(
     AuthMiddleware.authenticate,
     (req, res) => couponController.markUsed(req, res)
 );
+
+// Affiliate Specific Routes
+couponRoutes.post(
+    "/affiliate/generate",
+    AuthMiddleware.authenticate,
+    AuthMiddleware.requireRole(UserRole.AFFILIATE),
+    (req, res) => couponController.generateAffiliateCoupon(req, res)
+);
+
+couponRoutes.get(
+    "/affiliate/my-coupon",
+    AuthMiddleware.authenticate,
+    AuthMiddleware.requireRole(UserRole.AFFILIATE),
+    (req, res) => couponController.getAffiliateCoupon(req, res)
+);

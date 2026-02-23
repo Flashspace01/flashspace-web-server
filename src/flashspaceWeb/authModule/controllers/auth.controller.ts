@@ -433,6 +433,7 @@ export class AuthController {
             role: user.role,
             authProvider: user.authProvider,
             isEmailVerified: user.isEmailVerified,
+            kycVerified: user.kycVerified,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
@@ -480,6 +481,7 @@ export class AuthController {
                 role: user.role,
                 authProvider: user.authProvider,
                 isEmailVerified: user.isEmailVerified,
+                kycVerified: user.kycVerified,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt
@@ -626,7 +628,7 @@ export class AuthController {
   // Google OAuth - Verify ID token from frontend
   googleAuth = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { idToken } = req.body;
+      const { idToken, role } = req.body;
 
       if (!idToken) {
         res.status(400).json({
@@ -639,7 +641,8 @@ export class AuthController {
       }
 
       // Verify token with Google and authenticate user
-      const result = await this.authService.googleAuthWithToken(idToken);
+      console.log('Google Auth with Role:', role);
+      const result = await this.authService.googleAuthWithToken(idToken, role);
 
       if (result.success && result.tokens) {
         // Set secure cookies
@@ -675,7 +678,8 @@ export class AuthController {
   // Google OAuth callback (alternative method for server-side flow)
   googleCallback = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { idToken } = req.body;
+      const { idToken, role } = req.body;
+      console.log('Google Callback Request Body:', JSON.stringify(req.body, null, 2));
 
       if (!idToken) {
         res.status(400).json({
@@ -687,7 +691,8 @@ export class AuthController {
         return;
       }
 
-      const result = await this.authService.googleAuthWithToken(idToken);
+      console.log('Google Callback - Processing role:', role);
+      const result = await this.authService.googleAuthWithToken(idToken, role);
 
       if (result.success && result.tokens) {
         AuthMiddleware.setTokenCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
