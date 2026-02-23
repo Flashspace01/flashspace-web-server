@@ -206,6 +206,9 @@ export const couponController = {
                     code: coupon.code,
                     discountType: coupon.discountType,
                     discountValue: coupon.discountValue,
+                    // Affiliate attribution fields — passed through to payment & booking
+                    isAffiliateCoupon: coupon.isAffiliateCoupon || false,
+                    affiliateId: coupon.affiliateId?.toString() || null,
                 }
             });
 

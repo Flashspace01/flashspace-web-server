@@ -152,6 +152,8 @@ async function createBookingAndInvoice(payment: any) {
         "Mail Handling",
         "GST Registration Support",
       ],
+      couponCode: payment.couponCode || undefined,
+      affiliateId: payment.affiliateId ? payment.affiliateId : undefined,
     });
 
     // Generate invoice number
@@ -268,6 +270,8 @@ export const createOrder = async (req: Request, res: Response) => {
       discountAmount,
       paymentType = PaymentType.VIRTUAL_OFFICE,
       startDate,
+      couponCode,
+      affiliateId,
     } = req.body;
 
     // Validation
@@ -346,6 +350,8 @@ export const createOrder = async (req: Request, res: Response) => {
       discountPercent: discountPercent || 0,
       discountAmount: discountAmount || 0,
       startDate: startDate ? new Date(startDate) : undefined,
+      couponCode: couponCode || undefined,
+      affiliateId: affiliateId || undefined,
     });
 
     res.status(201).json({
