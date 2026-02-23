@@ -61,11 +61,16 @@ export class Payment {
   @prop({ required: true, default: "INR" })
   public currency!: string;
 
-  @prop({ required: true, enum: PaymentStatus, default: PaymentStatus.PENDING })
+  @prop({
+    type: () => String,
+    required: true,
+    enum: PaymentStatus,
+    default: PaymentStatus.PENDING,
+  })
   public status!: PaymentStatus;
 
   // Booking Details
-  @prop({ required: true, enum: PaymentType })
+  @prop({ type: () => String, required: true, enum: PaymentType })
   public paymentType!: PaymentType;
 
   @prop({ required: true })

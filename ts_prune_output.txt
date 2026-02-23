@@ -1,0 +1,83 @@
+src/flashspaceWeb/authModule/index.ts:2 - User
+src/flashspaceWeb/authModule/index.ts:2 - UserModel
+src/flashspaceWeb/authModule/index.ts:2 - AuthProvider
+src/flashspaceWeb/authModule/index.ts:2 - UserRole
+src/flashspaceWeb/authModule/index.ts:5 - AuthService
+src/flashspaceWeb/authModule/index.ts:8 - AuthController
+src/flashspaceWeb/authModule/index.ts:11 - UserRepository
+src/flashspaceWeb/authModule/index.ts:14 - AuthMiddleware
+src/flashspaceWeb/authModule/index.ts:17 - authRoutes
+src/flashspaceWeb/authModule/index.ts:23 - JwtUtil
+src/flashspaceWeb/authModule/index.ts:24 - PasswordUtil
+src/flashspaceWeb/authModule/index.ts:25 - EmailUtil
+src/flashspaceWeb/authModule/index.ts:1 - SignupRequest
+src/flashspaceWeb/authModule/index.ts:10 - LoginRequest
+src/flashspaceWeb/authModule/index.ts:15 - AuthResponse
+src/flashspaceWeb/authModule/index.ts:31 - JwtPayload
+src/flashspaceWeb/authModule/index.ts:39 - GoogleProfile
+src/flashspaceWeb/authModule/index.ts:57 - ForgotPasswordRequest
+src/flashspaceWeb/authModule/index.ts:61 - ResetPasswordRequest
+src/flashspaceWeb/authModule/index.ts:67 - ChangePasswordRequest
+src/flashspaceWeb/authModule/index.ts:73 - VerifyOTPRequest
+src/flashspaceWeb/authModule/index.ts:78 - ResendOTPRequest
+src/flashspaceWeb/authModule/index.ts:82 - OTPResponse
+src/flashspaceWeb/authModule/index.ts:89 - ApiResponse
+src/flashspaceWeb/authModule/index.ts:96 - AuthUser
+src/flashspaceWeb/bookingModule/booking.routes.ts:38 - default
+src/flashspaceWeb/contactFormModule/contactForm.model.ts:3 - VirtualOfficeSolutions (used in module)
+src/flashspaceWeb/contactFormModule/contactForm.model.ts:11 - contactForm (used in module)
+src/flashspaceWeb/couponModule/coupon.model.ts:15 - Coupon (used in module)
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.model.ts:13 - Seat (used in module)
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.model.ts:21 - Table (used in module)
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.model.ts:29 - Floor (used in module)
+src/flashspaceWeb/creditLedgerModule/creditExpiration.cron.ts:6 - initCreditExpirationJob
+src/flashspaceWeb/creditLedgerModule/creditLedger.model.ts:19 - CreditLedger (used in module)
+src/flashspaceWeb/feebackModule/feedback.model.ts:5 - Feedback (used in module)
+src/flashspaceWeb/invoiceModule/invoice.model.ts:47 - Invoice (used in module)
+src/flashspaceWeb/invoiceModule/invoice.routes.ts:25 - default
+src/flashspaceWeb/meetingSchedulerModule/email.util.ts:4 - MeetingEmailOptions (used in module)
+src/flashspaceWeb/meetingSchedulerModule/index.ts:2 - Meeting
+src/flashspaceWeb/meetingSchedulerModule/index.ts:2 - MeetingModel
+src/flashspaceWeb/meetingSchedulerModule/index.ts:2 - MeetingStatus
+src/flashspaceWeb/meetingSchedulerModule/index.ts:5 - MeetingSchedulerService
+src/flashspaceWeb/meetingSchedulerModule/index.ts:6 - GoogleCalendarService
+src/flashspaceWeb/meetingSchedulerModule/index.ts:9 - getAvailability
+src/flashspaceWeb/meetingSchedulerModule/index.ts:9 - bookMeeting
+src/flashspaceWeb/meetingSchedulerModule/index.ts:9 - getMeetingDetails
+src/flashspaceWeb/meetingSchedulerModule/index.ts:12 - meetingSchedulerRoutes
+src/flashspaceWeb/meetingSchedulerModule/index.ts:15 - validateAvailabilityRequest
+src/flashspaceWeb/meetingSchedulerModule/index.ts:15 - validateBooking
+src/flashspaceWeb/meetingSchedulerModule/index.ts:18 - MeetingEmailUtil
+src/flashspaceWeb/partnerInquiryModule/partnerInquiry.model.ts:3 - PartnerInquiry (used in module)
+src/flashspaceWeb/paymentModule/payment.model.ts:25 - Payment (used in module)
+src/flashspaceWeb/propertyModule/property.model.ts:21 - PropertyStatus (used in module)
+src/flashspaceWeb/reviewsModule/review.model.ts:24 - Review (used in module)
+src/flashspaceWeb/seatingModule/cron.ts:7 - startBookingCleanupJob
+src/flashspaceWeb/seatingModule/seating.model.ts:12 - SeatBooking (used in module)
+src/flashspaceWeb/affiliatePortalModule/controllers/affiliateBooking.controller.ts:3 - getBookings
+src/flashspaceWeb/affiliatePortalModule/controllers/affiliateBooking.controller.ts:15 - createBooking
+src/flashspaceWeb/affiliatePortalModule/controllers/affiliateBooking.controller.ts:27 - getBookingById
+src/flashspaceWeb/affiliatePortalModule/controllers/affiliateMarketing.controller.ts:4 - getMarketingStats
+src/flashspaceWeb/affiliatePortalModule/controllers/affiliateMarketing.controller.ts:16 - createCampaign
+src/flashspaceWeb/affiliatePortalModule/models/affiliateBooking.model.ts:13 - AffiliateBooking (used in module)
+src/flashspaceWeb/affiliatePortalModule/models/affiliateCampaign.model.ts:5 - AffiliateCampaign (used in module)
+src/flashspaceWeb/affiliatePortalModule/models/affiliatePayout.model.ts:12 - AffiliatePayout (used in module)
+src/flashspaceWeb/affiliatePortalModule/models/supportTicket.model.ts:43 - AffiliateSupportTicket (used in module)
+src/flashspaceWeb/affiliatePortalModule/models/supportTicket.model.ts:112 - AffiliateSupportTicketModel (used in module)
+src/flashspaceWeb/authModule/utils/email.util.ts:5 - EmailOptions (used in module)
+src/flashspaceWeb/authModule/utils/otp.util.ts:3 - OTPData (used in module)
+src/flashspaceWeb/mailModule/models/mail.model.ts:3 - IMail (used in module)
+src/flashspaceWeb/notificationModule/models/Notification.ts:19 - INotification (used in module)
+src/flashspaceWeb/spacePartnerModule/models/partnerFinancials.model.ts:3 - IPartnerInvoice (used in module)
+src/flashspaceWeb/spacePartnerModule/models/partnerFinancials.model.ts:16 - IPartnerPayment (used in module)
+src/flashspaceWeb/spacePartnerModule/models/space.model.ts:9 - PricingType (used in module)
+src/flashspaceWeb/spacePartnerModule/models/space.model.ts:16 - ISpace (used in module)
+src/flashspaceWeb/spacePartnerModule/models/spaceMedia.model.ts:9 - ISpaceMedia (used in module)
+src/flashspaceWeb/ticketModule/models/Ticket.ts:39 - Message (used in module)
+src/flashspaceWeb/ticketModule/services/ticket.service.ts:15 - CreateTicketDTO (used in module)
+src/flashspaceWeb/ticketModule/services/ticket.service.ts:24 - UpdateTicketDTO (used in module)
+src/flashspaceWeb/ticketModule/services/ticket.service.ts:32 - ReplyDTO (used in module)
+src/flashspaceWeb/userDashboardModule/models/businessInfo.model.ts:11 - BusinessInfo (used in module)
+src/flashspaceWeb/userDashboardModule/models/partnerKYC.model.ts:11 - PartnerKYC (used in module)
+src/flashspaceWeb/userDashboardModule/models/supportTicket.model.ts:24 - SupportTicket (used in module)
+src/flashspaceWeb/visitModule/models/visit.model.ts:3 - IVisit (used in module)

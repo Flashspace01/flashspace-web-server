@@ -69,7 +69,11 @@ export class CoworkingSpace {
   @prop({ default: false })
   public popular!: boolean;
 
-  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  @prop({
+    type: () => String,
+    enum: SpaceApprovalStatus,
+    default: SpaceApprovalStatus.DRAFT,
+  })
   public approvalStatus!: SpaceApprovalStatus;
 
   // --- Long-Term Pricing (Monthly Desk) ---

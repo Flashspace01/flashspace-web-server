@@ -16,7 +16,11 @@ export class VirtualOffice {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
 
-  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  @prop({
+    type: () => String,
+    enum: SpaceApprovalStatus,
+    default: SpaceApprovalStatus.DRAFT,
+  })
   public approvalStatus!: SpaceApprovalStatus;
 
   // --- Split Pricing: GST Plan ---

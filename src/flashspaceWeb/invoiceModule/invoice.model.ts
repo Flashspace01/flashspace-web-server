@@ -1,5 +1,11 @@
-import { prop, getModelForClass, Ref, modelOptions, Severity } from "@typegoose/typegoose";
-import { User } from "../../authModule/models/user.model";
+import {
+  prop,
+  getModelForClass,
+  Ref,
+  modelOptions,
+  Severity,
+} from "@typegoose/typegoose";
+import { User } from "../authModule/models/user.model";
 
 class LineItem {
   @prop({ required: true })
@@ -46,6 +52,9 @@ export class Invoice {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
+  @prop({ ref: () => User, required: true })
+  partnerId!: Ref<User>;
+
   @prop()
   bookingId?: string;
 
@@ -73,7 +82,10 @@ export class Invoice {
   @prop({ required: true })
   total!: number;
 
-  @prop({ enum: ["paid", "pending", "overdue", "cancelled"], default: "pending" })
+  @prop({
+    enum: ["paid", "pending", "overdue", "cancelled"],
+    default: "pending",
+  })
   status?: string;
 
   @prop()

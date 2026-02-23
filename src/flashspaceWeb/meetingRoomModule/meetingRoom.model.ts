@@ -42,7 +42,11 @@ export class MeetingRoom {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
 
-  @prop({ enum: SpaceApprovalStatus, default: SpaceApprovalStatus.DRAFT })
+  @prop({
+    type: () => String,
+    enum: SpaceApprovalStatus,
+    default: SpaceApprovalStatus.DRAFT,
+  })
   public approvalStatus!: SpaceApprovalStatus;
 
   // --- Split Pricing (Per Hour) ---
@@ -76,7 +80,7 @@ export class MeetingRoom {
   @prop({ required: true })
   public capacity!: number;
 
-  @prop({ required: true, enum: MeetingRoomType })
+  @prop({ type: () => String, required: true, enum: MeetingRoomType })
   public type!: MeetingRoomType;
 
   @prop({ default: 0 })
