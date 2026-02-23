@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { BookingService } from "./booking.service";
+import { BookingService } from "./seating.service";
 
 const sendError = (
   res: Response,
