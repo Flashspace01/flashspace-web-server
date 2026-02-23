@@ -1,16 +1,55 @@
+
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from '../../ticketModule/routes/ticket.routes';
-
-
+import { reviewSpaceUserKycDocument, reviewSpaceUserKycOverall, getAllSpacePartnerKyc, getSpacePartnerKycById } from '../../spacePartnerModule/controllers/spacekyc.controller';
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
-
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
+// Space Partner KYC Document Review (admin)
+adminRoutes.put(
+    '/spacePartner/kyc/document/review',
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    reviewSpaceUserKycDocument
+);
+
+// Space Partner KYC Overall Review (admin)
+adminRoutes.put(
+    '/spacePartner/kyc/overall/review',
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    reviewSpaceUserKycOverall
+);
+
+// Authentication removed as requested
+// Space Partner KYC routes (admin, protected)
+adminRoutes.get(
+    '/spacePartner/kyc',
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    getAllSpacePartnerKyc
+);
+adminRoutes.get(
+    '/spacePartner/kyc/:id',
+    RBACMiddleware.requireAnyPermission([
+        Permission.MANAGE_ALL_USERS,
+        Permission.MANAGE_OWN_SPACES
+    ]),
+    getSpacePartnerKycById
+);
+
+// 1. Authenticate all users (removed as per request)
 
 // 2. Dashboard - Accessible by Admins, Partners, Space Managers, Sales
 // We check if they have at least one relevant permission to be here
