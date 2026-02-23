@@ -1,5 +1,5 @@
 import { Types, startSession } from "mongoose";
-import { SeatBookingModel } from "./booking.model";
+import { SeatBookingModel } from "./seating.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { UserRole } from "../authModule/models/user.model";
 

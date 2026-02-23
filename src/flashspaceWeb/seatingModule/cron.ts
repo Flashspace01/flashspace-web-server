@@ -1,4 +1,4 @@
-import { BookingService } from "./booking.service";
+import { BookingService } from "./seating.service";
 
 /**
  * Periodically cleans up expired holds by running a background check.

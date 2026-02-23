@@ -6,7 +6,7 @@ import {
   cancelBooking,
   getUserBookings,
   getBookingById,
-} from "./booking.controller";
+} from "./seating.controller";
 import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 
 export const SeatBookingRoutes = Router();

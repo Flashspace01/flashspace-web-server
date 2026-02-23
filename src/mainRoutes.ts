@@ -16,7 +16,7 @@ import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 import { meetingRoomRoutes } from "./flashspaceWeb/meetingRoomModule/meetingRoom.routes";
 // Importing seat booking routes
-import { SeatBookingRoutes } from "./flashspaceWeb/bookingModule/booking.routes";
+import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes";
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 export const mainRoutes = Router();

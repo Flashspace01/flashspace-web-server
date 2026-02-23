@@ -9,7 +9,10 @@ import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
 import Mail from "../../mailModule/models/mail.model";
 import Visit from "../../visitModule/models/visit.model";
-import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
+import {
+  CreditLedgerModel,
+  CreditType,
+} from "../../creditLedgerModule/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
 import { NotificationService } from "../../notificationModule/services/notification.service";
@@ -2211,7 +2214,7 @@ export const getCredits = async (req: Request, res: Response) => {
 
     // Calculate total earned (optional, or just use history)
     const totalEarned = await CreditLedgerModel.aggregate([
-      { $match: { user: userId, source: CreditSource.BOOKING } },
+      { $match: { user: userId, type: CreditType.EARNED } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]);
 
@@ -2286,9 +2289,10 @@ export const redeemReward = async (req: Request, res: Response) => {
     await CreditLedgerModel.create({
       user: userId,
       amount: -currentCredits, // Deduct everything
-      source: CreditSource.REDEEM,
+      type: CreditType.SPENT,
       description: `Redeemed ${currentCredits} credits for 1 Hour Free Meeting Room`,
       referenceId: booking._id?.toString(),
+      bookingId: booking._id,
       balanceAfter: 0,
     });
 

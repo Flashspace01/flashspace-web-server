@@ -11,15 +11,15 @@ import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
 import { UserModel } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
-  CreditSource,
-} from "../userDashboardModule/models/creditLedger.model";
+  CreditType,
+} from "../creditLedgerModule/creditLedger.model";
 import {
   NotificationModel,
   NotificationType,
   NotificationRecipientType,
 } from "../notificationModule/models/Notification";
 import { getIO } from "../../socket";
-import { BookingService } from "../bookingModule/booking.service";
+import { BookingService } from "../seatingModule/seating.service";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -262,9 +262,10 @@ async function createBookingAndInvoice(payment: any) {
         await CreditLedgerModel.create({
           user: payment.userId,
           amount: creditsEarned,
-          source: CreditSource.BOOKING,
+          type: CreditType.EARNED,
           description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
           referenceId: booking._id?.toString(),
+          bookingId: booking._id,
           balanceAfter: user?.credits || 0,
         });
       }
