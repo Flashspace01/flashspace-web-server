@@ -53,6 +53,9 @@ export class Coupon {
 
   @prop({ default: false })
   public isDeleted?: boolean;
+
+  @prop({ type: () => [String], default: [] })
+  public usedBy?: string[];
 }
 
 export const CouponModel = getModelForClass(Coupon);
