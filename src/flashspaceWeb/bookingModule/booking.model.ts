@@ -5,7 +5,7 @@ import {
   modelOptions,
   Severity,
 } from "@typegoose/typegoose";
-import { User } from "../../authModule/models/user.model";
+import { User } from "../authModule/models/user.model";
 import mongoose from "mongoose";
 
 class PlanDetails {
@@ -20,6 +20,15 @@ class PlanDetails {
 
   @prop({ default: 0 })
   discount?: number;
+
+  @prop()
+  partnerPrice?: number;
+
+  @prop()
+  adminMarkup?: number;
+
+  @prop()
+  finalPrice?: number;
 
   @prop({ required: true })
   tenure!: number;
@@ -91,13 +100,9 @@ export class Booking {
   partnerId!: mongoose.Types.ObjectId; // The Seller
 
   @prop({
-    enum: [
-      "virtual_office",
-      "coworking_space",
-      "meeting_room",
-      "event_space",
-      "seat_booking",
-    ],
+    required: true,
+    // <-- FIXED: Added event_space
+    enum: ["virtual_office", "coworking_space", "meeting_room"],
   })
   type!: string;
 
