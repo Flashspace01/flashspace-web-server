@@ -30,8 +30,9 @@ export class AdminController {
     const limit = parseInt(req.query.limit as string) || 10;
     const search = req.query.search as string;
     const deleted = String(req.query.deleted) === "true";
+    const role = req.query.role as string;
 
-    const result = await adminService.getUsers(page, limit, search, deleted);
+    const result = await adminService.getUsers(page, limit, search, deleted, role);
     if (result.success) {
       res.status(200).json(result);
     } else {

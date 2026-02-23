@@ -127,6 +127,7 @@ export class AuthService {
       // Find user with password field for authentication
       const user = await this.userRepository.findByEmailForAuth(email);
       if (!user) {
+        console.log(`⚠️ Login failed: User not found with email ${email}`);
         return {
           success: false,
           message: 'Invalid email or password'
@@ -152,6 +153,7 @@ export class AuthService {
       // Verify password
       const isPasswordValid = await PasswordUtil.compare(password, user.password);
       if (!isPasswordValid) {
+        console.log(`⚠️ Login failed: Invalid password for ${email}`);
         return {
           success: false,
           message: 'Invalid email or password'
@@ -160,6 +162,7 @@ export class AuthService {
 
       // Check if email is verified
       if (!user.isEmailVerified) {
+        console.log(`⚠️ Login failed: Email not verified for ${email}`);
         return {
           success: false,
           message: 'Please verify your email before logging in'
@@ -210,7 +213,9 @@ export class AuthService {
       const { GoogleUtil } = await import('../utils/google.util');
 
       // Verify the token with Google
+      console.log('🔍 Verifying Google ID Token...');
       const profile = await GoogleUtil.verifyIdToken(idToken);
+      console.log('✅ Google Profile retrieved:', profile ? profile.emails[0].value : 'NULL');
 
       if (!profile) {
         return {

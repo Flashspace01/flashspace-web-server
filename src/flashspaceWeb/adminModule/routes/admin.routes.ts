@@ -19,6 +19,7 @@ adminRoutes.get(
     Permission.MANAGE_ALL_SPACES,
     Permission.MANAGE_OWN_SPACES,
     Permission.VIEW_ALL_SPACES,
+    Permission.VIEW_DASHBOARD,
   ]),
   AdminController.getDashboardStats,
 );
@@ -37,7 +38,7 @@ adminRoutes.get(
 // 3. User Management - Currently Super Admin only
 adminRoutes.get(
   "/users",
-  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  RBACMiddleware.requireAnyPermission([Permission.MANAGE_ALL_USERS, Permission.VIEW_ALL_USERS]),
   AdminController.getUsers,
 );
 adminRoutes.post(

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { TicketService } from "../services/ticket.service";
 import { TicketCategory, TicketModel, TicketStatus } from "../models/Ticket";
+import { UserRole } from "../../authModule/models/user.model";
 import { getIO } from "../../../socket";
 
 // Extend Request type locally if needed
@@ -107,7 +108,7 @@ export const getTicketById = async (
 ) => {
   try {
     const userId = req.user?._id;
-    const userRole = req.user?.role;
+    const userRole = req.user?.role as UserRole;
     const ticketId = req.params.ticketId as string;
 
     if (!userId) {
@@ -118,11 +119,22 @@ export const getTicketById = async (
       });
     }
 
-    // If user is admin, they can access any ticket
+    const staffRoles = [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.SALES,
+      UserRole.AFFILIATE_MANAGER,
+      UserRole.SPACE_PARTNER_MANAGER
+    ];
+
+    const isStaff = staffRoles.includes(userRole);
+
+    // If user is staff, they can access any ticket
     // If user is regular user, they can only access their own tickets
     const ticket = await TicketService.getTicketById(
       ticketId,
-      userRole === "admin" ? undefined : userId,
+      isStaff ? undefined : userId,
     );
 
     if (!ticket) {
@@ -166,7 +178,14 @@ export const replyToTicket = async (
       });
     }
 
-    const sender = userRole === "admin" ? "admin" : "user";
+    const sender = [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.SUPPORT,
+      UserRole.SALES,
+      UserRole.AFFILIATE_MANAGER,
+      UserRole.SPACE_PARTNER_MANAGER
+    ].includes(userRole as UserRole) ? "admin" : "user";
 
     const ticket = await TicketService.addReply(ticketId, {
       userId,

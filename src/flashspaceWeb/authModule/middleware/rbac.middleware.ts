@@ -39,7 +39,7 @@ export class RBACMiddleware {
                 console.log(`✅ RBAC Debug: Permission ${permission} GRANTED for ${userRole}`);
                 next();
             } else {
-                console.log(`❌ RBAC Debug: Permission ${permission} DENIED for ${userRole}`);
+                console.log(`❌ RBAC Debug: Permission ${permission} DENIED for ${userRole}. User has: [${allowedPermissions.join(', ')}]`);
                 return res.status(403).json({
                     success: false,
                     message: `Insufficient permissions. Required: ${permission}`
@@ -70,10 +70,10 @@ export class RBACMiddleware {
             const hasPermission = permissions.some(p => userPermissions.includes(p));
 
             if (hasPermission) {
-                console.log(`✅ RBAC Debug: User has at least one required permission`);
+                console.log(`✅ RBAC Debug: User has at least one required permission from [${permissions.join(', ')}]`);
                 next();
             } else {
-                console.log(`❌ RBAC Debug: User has none of the required permissions`);
+                console.log(`❌ RBAC Debug: User has NONE of the required permissions [${permissions.join(', ')}]. User has: [${userPermissions.join(', ')}]`);
                 return res.status(403).json({
                     success: false,
                     message: "Insufficient permissions"

@@ -25,22 +25,24 @@ export enum Permission {
     MANAGE_SYSTEM = "manage_system", // CMS, SEO, Commission, etc.
 
     // Dashboard Access (common for all admin roles)
-    VIEW_DASHBOARD = "view_dashboard"
+    VIEW_DASHBOARD = "view_dashboard",
+
+    // View All Users (Read-only for lists)
+    VIEW_ALL_USERS = "view_all_users"
 }
 
+export const STAFF_ROLES = [
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.SUPPORT,
+    UserRole.SALES,
+    UserRole.AFFILIATE_MANAGER,
+    UserRole.SPACE_PARTNER_MANAGER
+];
+
 export const RolePermissions: Record<UserRole, Permission[]> = {
-    [UserRole.ADMIN]: [
-        Permission.MANAGE_ALL_SPACES,
-        Permission.VIEW_ALL_SPACES,
-        Permission.VIEW_ALL_BOOKINGS,
-        Permission.MANAGE_BOOKINGS,
-        Permission.MANAGE_ALL_USERS,
-        Permission.VIEW_FINANCIALS,
-        Permission.MANAGE_LEADS,
-        Permission.VIEW_LEADS,
-        Permission.MANAGE_SYSTEM,
-        Permission.VIEW_DASHBOARD
-    ],
+    [UserRole.SUPER_ADMIN]: Object.values(Permission), // Full unrestricted access
+    [UserRole.ADMIN]: Object.values(Permission), // Admins also have nearly full scope
     [UserRole.PARTNER]: [
         Permission.MANAGE_OWN_SPACES,
         Permission.VIEW_OWN_BOOKINGS,
@@ -53,7 +55,8 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.MANAGE_BOOKINGS, // Can create manual bookings
         Permission.MANAGE_LEADS,
         Permission.VIEW_LEADS,
-        Permission.VIEW_DASHBOARD
+        Permission.VIEW_DASHBOARD,
+        Permission.VIEW_ALL_USERS
     ],
     [UserRole.USER]: [], // Basic user permissions (booking, etc.) are public/authenticated scope
 
@@ -61,5 +64,25 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
         Permission.MANAGE_LEADS,
         Permission.VIEW_LEADS,
         Permission.VIEW_DASHBOARD
+    ],
+    [UserRole.AFFILIATE_MANAGER]: [
+        Permission.VIEW_DASHBOARD,
+        Permission.MANAGE_SYSTEM // required to access settings
+    ],
+    [UserRole.SPACE_PARTNER_MANAGER]: [
+        Permission.VIEW_DASHBOARD,
+        Permission.MANAGE_ALL_SPACES,
+        Permission.VIEW_ALL_SPACES,
+        Permission.MANAGE_SYSTEM // required to access settings
+    ],
+    [UserRole.SUPPORT]: [
+        Permission.VIEW_DASHBOARD,
+        // Typically support needs to see users and bookings to help them
+        Permission.MANAGE_ALL_USERS,
+        Permission.VIEW_ALL_BOOKINGS,
+        Permission.VIEW_ALL_SPACES, // Required for the main dashboard endpoint
+        Permission.MANAGE_OWN_SPACES, // Required for some specific KPI views
+        Permission.MANAGE_SYSTEM, // required to access settings
+        Permission.VIEW_ALL_USERS
     ],
 };

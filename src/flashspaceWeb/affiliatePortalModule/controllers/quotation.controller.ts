@@ -45,8 +45,9 @@ export const getRecent = async (
 ): Promise<void> => {
     try {
         const affiliateId = req.user?.id;
-        const isAdmin = req.user?.role === "admin";
-        
+        const staffRoles = ["super_admin", "admin", "support", "sales", "affiliate_manager", "space_partner_manager"];
+        const isAdmin = staffRoles.includes(req.user?.role as string);
+
         if (!affiliateId && !isAdmin) {
             res.status(401).json({
                 success: false,
@@ -79,7 +80,8 @@ export const getAll = async (
 ): Promise<void> => {
     try {
         const affiliateId = req.user?.id;
-        const isAdmin = req.user?.role === "admin";
+        const staffRoles = ["super_admin", "admin", "support", "sales", "affiliate_manager", "space_partner_manager"];
+        const isAdmin = staffRoles.includes(req.user?.role as string);
 
         if (!affiliateId && !isAdmin) {
             res.status(401).json({
@@ -112,8 +114,9 @@ export const getStats = async (
 ): Promise<void> => {
     try {
         const affiliateId = req.user?.id;
-        const isAdmin = req.user?.role === "admin";
-        
+        const staffRoles = ["super_admin", "admin", "support", "sales", "affiliate_manager", "space_partner_manager"];
+        const isAdmin = staffRoles.includes(req.user?.role as string);
+
         if (!affiliateId && !isAdmin) {
             res.status(401).json({
                 success: false,
