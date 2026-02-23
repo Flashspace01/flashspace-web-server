@@ -64,10 +64,10 @@ export const initSocket = (httpServer: HttpServer) => {
       console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
+
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.id);
     });
-  });
 
     // Handle typing events
     socket.on("typing", (data: { ticketId: string; user: string }) => {
@@ -78,9 +78,7 @@ export const initSocket = (httpServer: HttpServer) => {
       socket.to(data.ticketId).emit("stop_typing", data);
     });
 
-    socket.on("disconnect", () => {
-      console.log("Client disconnected", socket.id);
-    });
+    // The disconnect handler is already present above, so no need to duplicate it
   });
 
   return io;
