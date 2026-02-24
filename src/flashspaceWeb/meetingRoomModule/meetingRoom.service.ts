@@ -56,7 +56,7 @@ export class MeetingRoomService {
     return room;
   }
 
-  static async getRooms(filter: any = {}) {
+  static async getRooms(filter: any = {}, limit: number = 100) {
     if (filter.isDeleted === undefined) {
       filter.isDeleted = false;
     }
@@ -81,7 +81,8 @@ export class MeetingRoomService {
 
     return await MeetingRoomModel.find(filter)
       .populate("property")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(limit);
   }
   static async getRoomById(roomId: string) {
     return await MeetingRoomModel.findById(roomId)

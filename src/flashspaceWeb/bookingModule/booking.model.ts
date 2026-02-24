@@ -6,6 +6,8 @@ import {
   Severity,
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
+import { Payment } from "../paymentModule/payment.model";
+import { KYCDocument } from "../userDashboardModule/models/kyc.model";
 import mongoose from "mongoose";
 
 class PlanDetails {
@@ -96,17 +98,20 @@ export class Booking {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
-  @prop({ required: true }) // <-- NEW: ADDED FOR SECURITY & FAST QUERIES
-  partnerId!: mongoose.Types.ObjectId; // The Seller
+  @prop({ ref: () => User, required: true })
+  partner!: Ref<User>;
 
   @prop({
     required: true,
     // <-- FIXED: Added event_space
-    enum: ["virtual_office", "coworking_space", "meeting_room"],
+    enum: ["VirtualOffice", "CoworkingSpace", "MeetingRoom"],
   })
   type!: string;
 
-  @prop({ required: true })
+  @prop({
+    required: true,
+    refPath: "type",
+  })
   spaceId!: mongoose.Types.ObjectId;
 
   @prop({ type: () => SpaceSnapshot })
@@ -115,8 +120,8 @@ export class Booking {
   @prop({ type: () => PlanDetails, required: true })
   plan!: PlanDetails;
 
-  @prop()
-  paymentId?: string;
+  @prop({ ref: () => Payment })
+  payment?: Ref<Payment>;
 
   @prop()
   razorpayOrderId?: string;
@@ -131,8 +136,8 @@ export class Booking {
   })
   status!: string;
 
-  @prop()
-  kycProfileId?: string; // Reference to the KYC profile used for this booking
+  @prop({ ref: () => KYCDocument })
+  kycProfile?: Ref<KYCDocument>; // Reference to the KYC profile used for this booking
 
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],

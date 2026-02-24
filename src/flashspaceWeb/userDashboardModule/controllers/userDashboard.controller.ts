@@ -17,6 +17,10 @@ import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
+import {
+  getCreditsSchema,
+  redeemRewardSchema,
+} from "../userDashboard.validation";
 
 // ============ DASHBOARD ============
 
@@ -72,11 +76,11 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
     const totalBookings = usageBreakdown.reduce((sum, u) => sum + u.count, 0);
     const virtualOfficeCount =
-      usageBreakdown.find((u) => u._id === "virtual_office")?.count || 0;
+      usageBreakdown.find((u) => u._id === "VirtualOffice")?.count || 0;
     const coworkingCount =
-      usageBreakdown.find((u) => u._id === "coworking_space")?.count || 0;
+      usageBreakdown.find((u) => u._id === "CoworkingSpace")?.count || 0;
     const meetingRoomCount =
-      usageBreakdown.find((u) => u._id === "meeting_room")?.count || 0;
+      usageBreakdown.find((u) => u._id === "MeetingRoom")?.count || 0;
 
     // Monthly bookings (last 6 months)
     const sixMonthsAgo = new Date();
@@ -246,7 +250,7 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
 
     const partnerId = new mongoose.Types.ObjectId(userId);
     const bookings = await BookingModel.find({
-      partnerId,
+      partner: partnerId,
       isDeleted: false,
       status: { $in: ["pending_payment", "pending_kyc"] },
     }).populate("user", "fullName email");
@@ -304,7 +308,7 @@ export const getPartnerDashboardOverview = async (
     // Get all bookings where the partner is the logged-in user
     const userObjectId = new mongoose.Types.ObjectId(userId);
     const partnerBookings = await BookingModel.find({
-      partnerId: userObjectId,
+      partner: userObjectId,
       isDeleted: false,
     }).populate("user", "fullName email phoneNumber company");
     console.log("Partner Bookings:", partnerBookings);
@@ -327,8 +331,8 @@ export const getPartnerDashboardOverview = async (
 
       // Determine Plan name
       let planName = b.plan?.name || "Standard";
-      if (b.type === "virtual_office") planName = "Virtual Office " + planName;
-      if (b.type === "coworking_space") planName = "Coworking " + planName;
+      if (b.type === "VirtualOffice") planName = "Virtual Office " + planName;
+      if (b.type === "CoworkingSpace") planName = "Coworking " + planName;
 
       return {
         id: b.bookingNumber || b._id.toString(),
@@ -376,10 +380,10 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
 
     const userId = req.user?.id; // This is the partner requesting the data
 
-    // SECURED: We now explicitly mandate that the booking's partnerId matches the logged-in user!
+    // SECURED: We now explicitly mandate that the booking's partner matches the logged-in user!
     const filter: any = {
       spaceId,
-      partnerId: userId, // <-- THIS PLUGS THE DATA LEAK
+      partner: userId, // <-- THIS PLUGS THE DATA LEAK
       isDeleted: false,
     };
 
@@ -424,7 +428,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     }
     // 1. Fetch all bookings for this partner
     const bookings = await BookingModel.find({
-      partnerId: userId,
+      partner: userId,
       isDeleted: false,
     }).populate("user", "fullName email");
 
@@ -521,7 +525,7 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
     // We prioritize active bookings for this partner
     const mainBooking = await BookingModel.findOne({
       user: clientId,
-      partnerId: userId,
+      partner: userId,
       isDeleted: false,
     })
       .sort({ status: 1, createdAt: -1 }) // Sort to get most relevant if multiple (Simplified)
@@ -545,7 +549,7 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
         }),
         BookingModel.find({
           user: clientUserId,
-          partnerId: userId,
+          partner: userId,
           isDeleted: false,
         }).sort({ startDate: -1 }),
       ]);
@@ -872,7 +876,7 @@ export const linkBookingToProfile = async (req: Request, res: Response) => {
     }
 
     // Link profile to booking
-    booking.kycProfileId = profileId;
+    booking.kycProfile = profileId as any;
     booking.kycStatus = "approved";
     booking.status = "active";
 
@@ -2005,14 +2009,15 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       if (toDate) filter.createdAt.$lte = new Date(toDate as string);
     }
 
-    const limitNum = Number(limit) || 100;
-    const skip = (Number(page) - 1) * limitNum;
+    const _page = Math.max(Number(page) || 1, 1);
+    const _limit = Math.min(Number(limit) || 10, 100);
+    const skip = (_page - 1) * _limit;
 
     const [invoices, total, summary] = await Promise.all([
       InvoiceModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limitNum),
+        .limit(_limit),
       InvoiceModel.countDocuments(filter),
       InvoiceModel.aggregate([
         { $match: { user: userId, isDeleted: false } },
@@ -2058,6 +2063,12 @@ export const getInvoiceById = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { invoiceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(invoiceId as string)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Invoice ID format" });
+    }
 
     const invoice = await InvoiceModel.findOne({
       _id: invoiceId,
@@ -2246,7 +2257,21 @@ export const replyToTicket = async (req: Request, res: Response) => {
 
 export const getCredits = async (req: Request, res: Response) => {
   try {
+    const validation = getCreditsSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
     const userId = req.user?.id;
+    const { page, limit } = validation.data.query;
+
+    // Default to 1 and 20 if not provided
+    const _page = page || 1;
+    const _limit = limit || 20;
 
     // Get User for current balance
     const user = await UserModel.findById(userId);
@@ -2254,7 +2279,8 @@ export const getCredits = async (req: Request, res: Response) => {
     // Get Credit History
     const history = await CreditLedgerModel.find({ user: userId })
       .sort({ createdAt: -1 })
-      .limit(20);
+      .skip((_page - 1) * _limit)
+      .limit(_limit);
 
     // Calculate total earned (optional, or just use history)
     const totalEarned = await CreditLedgerModel.aggregate([
@@ -2282,77 +2308,114 @@ export const getCredits = async (req: Request, res: Response) => {
 
 export const redeemReward = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { spaceId, spaceName, date, timeSlot } = req.body; // Expecting meeting details
-
-    const user = await UserModel.findById(userId);
-    if (!user || (user.credits || 0) < 5000) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Insufficient credits" });
+    const validation = redeemRewardSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
     }
 
-    // Deduct 5000 Credits
+    const userId = req.user?.id;
+    const { spaceId, spaceName, date, timeSlot } = validation.data.body; // Expecting meeting details
+
     const REWARD_COST = 5000;
-    await UserModel.findByIdAndUpdate(userId, {
-      $inc: { credits: -REWARD_COST }, // Deduct using $inc
-    });
 
-    // Fetch updated user to get accurate balance for the ledger entry
-    const updatedUser = await UserModel.findById(userId);
+    // ATOMIC CHECK-AND-DECREMENT (Prevents Double-Spend Race Condition)
+    const updatedUser = await UserModel.findOneAndUpdate(
+      { _id: userId, credits: { $gte: REWARD_COST } },
+      { $inc: { credits: -REWARD_COST } },
+      { new: true }, // Returns the document AFTER the update
+    );
 
-    // Create Booking (Free)
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-RW-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    if (!updatedUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient credits or user not found",
+      });
+    }
 
-    const booking = await BookingModel.create({
-      bookingNumber,
-      user: userId,
-      type: "meeting_room",
-      spaceId: spaceId || "REWARD_REDEMPTION", // Fallback if not provided
-      spaceSnapshot: { name: spaceName || "Free Meeting Room Reward" },
-      plan: {
-        name: "1 Hour Free Meeting Room",
-        price: 0,
-        tenure: 1,
-        tenureUnit: "hours",
-      },
-      status: "active",
-      timeline: [
-        {
-          status: "redeemed",
-          date: new Date(),
-          note: `Redeemed ${REWARD_COST} credits for free meeting room`,
-          by: "User",
+    let booking;
+    try {
+      // Create Booking (Free)
+      const bookingCount = await BookingModel.countDocuments();
+      const bookingNumber = `FS-RW-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+
+      booking = await BookingModel.create({
+        bookingNumber,
+        user: userId,
+        partner: new mongoose.Types.ObjectId(), // Required field
+        type: "MeetingRoom",
+        spaceId: spaceId
+          ? new mongoose.Types.ObjectId(spaceId)
+          : new mongoose.Types.ObjectId(), // Must be valid ObjectId
+        spaceSnapshot: { name: spaceName || "Free Meeting Room Reward" },
+        plan: {
+          name: "1 Hour Free Meeting Room",
+          price: 0,
+          tenure: 1,
+          tenureUnit: "hours",
         },
-      ],
-      startDate: new Date(date || Date.now()),
-      endDate: new Date(
-        new Date(date || Date.now()).getTime() + 60 * 60 * 1000,
-      ), // 1 Hour
-    });
+        status: "active",
+        timeline: [
+          {
+            status: "redeemed",
+            date: new Date(),
+            note: `Redeemed ${REWARD_COST} credits for free meeting room`,
+            by: "User",
+          },
+        ],
+        startDate: new Date(date || Date.now()),
+        endDate: new Date(
+          new Date(date || Date.now()).getTime() + 60 * 60 * 1000,
+        ), // 1 Hour
+      });
 
-    // Ledger Entry
-    await CreditLedgerModel.create({
-      user: userId,
-      amount: -REWARD_COST, // Deduct the reward cost
-      type: CreditType.SPENT,
-      description: `Redeemed ${REWARD_COST} credits for 1 Hour Free Meeting Room`,
-      referenceId: booking._id?.toString(),
-      bookingId: booking._id,
-      balanceAfter: updatedUser?.credits || 0,
-    });
+      // Ledger Entry
+      await CreditLedgerModel.create({
+        user: userId,
+        amount: -REWARD_COST, // Deduct the reward cost
+        type: CreditType.SPENT,
+        description: `Redeemed ${REWARD_COST} credits for 1 Hour Free Meeting Room`,
+        referenceId: booking._id?.toString(),
+        booking: booking._id, // Fixed bookingId -> booking matching reference schema
+        balanceAfter: updatedUser.credits,
+      });
 
-    res.status(200).json({
-      success: true,
-      message: "Reward redeemed successfully! Meeting room booked.",
-      data: booking,
-    });
+      res.status(200).json({
+        success: true,
+        message: "Reward redeemed successfully! Meeting room booked.",
+        data: booking,
+      });
+    } catch (bookingError) {
+      // MANUAL ROLLBACK: If booking or ledger fails, explicitly refund credits
+      await UserModel.updateOne(
+        { _id: userId },
+        { $inc: { credits: REWARD_COST } }, // Give them back
+      );
+
+      // If booking was created but ledger failed, delete the orphaned booking
+      if (booking && booking._id) {
+        await BookingModel.deleteOne({ _id: booking._id });
+      }
+
+      console.error(
+        "Critical: Failed to generate Reward Booking, rolled back wallet.",
+        bookingError,
+      );
+      return res.status(500).json({
+        success: false,
+        message:
+          "Reward redemption failed during processing, credits safely refunded",
+      });
+    }
   } catch (error) {
     console.error("Redeem reward error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to redeem reward" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to redeem reward due to server error",
+    });
   }
 };
 

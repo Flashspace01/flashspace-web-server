@@ -31,7 +31,14 @@ export const getInvoicesSchema = z.object({
           .optional(),
       ),
     page: z.string().regex(/^\d+$/).transform(Number).optional(),
-    limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
   }),
 });
 

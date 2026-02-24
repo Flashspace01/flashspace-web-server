@@ -14,13 +14,13 @@ export class InvoiceService {
 
     // Check if invoice already exists
     let invoice = await InvoiceModel.findOne({
-      bookingId: booking._id.toString(),
+      booking: booking._id,
     });
     if (invoice) return invoice;
 
     // FIXED: Fetch the true retail finalPrice from the updated Booking schema
-    const subtotal = booking.plan.finalPrice; 
-    
+    const subtotal = booking.plan.finalPrice;
+
     // Fallback safeguard in case old DB records lack finalPrice
     if (subtotal === undefined || subtotal === null) {
       throw new Error("Invalid booking plan pricing data");
@@ -38,8 +38,8 @@ export class InvoiceService {
     invoice = await InvoiceModel.create({
       invoiceNumber,
       user: booking.user,
-      partnerId: booking.partnerId,
-      bookingId: booking._id.toString(),
+      partner: booking.partner,
+      booking: booking._id,
       bookingNumber: booking.bookingNumber,
       description: `${booking.spaceSnapshot?.name || "Booking"} - ${booking.plan.name}`,
       lineItems: [
@@ -96,7 +96,7 @@ export class InvoiceService {
     // RBAC Logic (Strictly casting to ObjectId for the $match pipeline)
     if (role !== UserRole.ADMIN) {
       if (role === UserRole.PARTNER) {
-        query.partnerId = new mongoose.Types.ObjectId(userId);
+        query.partner = new mongoose.Types.ObjectId(userId);
       } else {
         query.user = new mongoose.Types.ObjectId(userId);
       }
@@ -104,7 +104,7 @@ export class InvoiceService {
 
     // Additional filters
     if (filters.status) query.status = filters.status;
-    
+
     if (filters.fromDate || filters.toDate) {
       query.createdAt = {};
       if (filters.fromDate) query.createdAt.$gte = new Date(filters.fromDate);
@@ -160,7 +160,7 @@ export class InvoiceService {
     // RBAC Logic
     if (role !== UserRole.ADMIN) {
       if (role === UserRole.PARTNER) {
-        query.partnerId = new mongoose.Types.ObjectId(userId);
+        query.partner = new mongoose.Types.ObjectId(userId);
       } else {
         query.user = new mongoose.Types.ObjectId(userId);
       }

@@ -59,8 +59,8 @@ export class VirtualOffice {
   @prop({ required: true, default: 0 })
   public totalReviews!: number;
 
-  @prop({ required: true, default: "Available Now" })
-  public availability!: string;
+  @prop({ type: () => [String], default: [] })
+  public amenities?: string[];
 
   @prop({ default: false })
   public popular!: boolean;
@@ -72,7 +72,7 @@ export class VirtualOffice {
   public isDeleted?: boolean;
 
   @prop({ default: false })
-  public isActive?: boolean;
+  public isActive!: boolean;
 
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;

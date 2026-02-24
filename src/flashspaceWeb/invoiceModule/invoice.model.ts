@@ -6,6 +6,8 @@ import {
   Severity,
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
+import { Booking } from "../bookingModule/booking.model";
+import { Payment } from "../paymentModule/payment.model";
 
 class LineItem {
   @prop({ required: true })
@@ -53,16 +55,16 @@ export class Invoice {
   user!: Ref<User>;
 
   @prop({ ref: () => User, required: true })
-  partnerId!: Ref<User>;
+  partner!: Ref<User>;
 
-  @prop()
-  bookingId?: string;
+  @prop({ ref: () => Booking })
+  booking?: Ref<Booking>;
 
   @prop()
   bookingNumber?: string;
 
-  @prop()
-  paymentId?: string;
+  @prop({ ref: () => Payment })
+  payment?: Ref<Payment>;
 
   @prop({ required: true })
   description!: string;

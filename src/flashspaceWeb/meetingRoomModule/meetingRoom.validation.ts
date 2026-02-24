@@ -12,8 +12,12 @@ const LocationSchema = z.object({
 });
 
 const OperatingHoursSchema = z.object({
-  openTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format (HH:MM)"),
-  closeTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format (HH:MM)"),
+  openTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format (HH:MM)"),
+  closeTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format (HH:MM)"),
   daysOpen: z.array(z.string()).min(1, "Must be open at least one day"),
 });
 
@@ -62,5 +66,63 @@ export const updateMeetingRoomSchema = z.object({
     popular: z.boolean().optional(),
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
+  }),
+});
+
+export const getMeetingRoomsSchema = z.object({
+  query: z.object({
+    deleted: z.enum(["true", "false"]).optional(),
+    type: meetingRoomTypeEnum.optional(),
+    minPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/)
+      .transform(Number)
+      .optional(),
+    maxPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/)
+      .transform(Number)
+      .optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
+  }),
+});
+
+export const getMeetingRoomByIdSchema = z.object({
+  params: z.object({
+    meetingRoomId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format"),
+  }),
+});
+
+export const getMeetingRoomsByCitySchema = z.object({
+  params: z.object({
+    city: z.string().min(2, "City must be at least 2 characters"),
+  }),
+  query: z.object({
+    type: meetingRoomTypeEnum.optional(),
+    minPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/)
+      .transform(Number)
+      .optional(),
+    maxPrice: z
+      .string()
+      .regex(/^\d+(\.\d+)?$/)
+      .transform(Number)
+      .optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
   }),
 });
