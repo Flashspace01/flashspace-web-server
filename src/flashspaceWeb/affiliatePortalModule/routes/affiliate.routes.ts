@@ -5,6 +5,7 @@ import * as leadController from "../controllers/affiliateLead.controller";
 import * as supportController from "../controllers/support.controller";
 import { getLeaderboard } from "../controllers/leaderboard.controller";
 import { getDashboardStats, getAIInsights } from "../controllers/affiliateDashboard.controller";
+import { getMyClients } from "../controllers/affiliateClient.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { UserRole } from "../../authModule/models/user.model";
 
@@ -44,5 +45,8 @@ router.get("/leaderboard", getLeaderboard);
 // Dashboard Routes
 router.get("/dashboard/stats", getDashboardStats);
 router.get("/dashboard/insights", getAIInsights);
+
+// Client Management Routes
+router.get("/clients", getMyClients);
 
 export { router as affiliateRoutes };

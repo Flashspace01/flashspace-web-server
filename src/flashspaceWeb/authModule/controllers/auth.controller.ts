@@ -433,6 +433,7 @@ export class AuthController {
             role: user.role,
             authProvider: user.authProvider,
             isEmailVerified: user.isEmailVerified,
+            kycVerified: user.kycVerified,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt
@@ -480,6 +481,7 @@ export class AuthController {
                 role: user.role,
                 authProvider: user.authProvider,
                 isEmailVerified: user.isEmailVerified,
+                kycVerified: user.kycVerified,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt

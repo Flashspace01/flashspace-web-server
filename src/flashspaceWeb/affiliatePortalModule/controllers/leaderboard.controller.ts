@@ -1,116 +1,114 @@
 import { Request, Response } from "express";
-import { QuotationModel, QuotationStatus } from "../models/quotation.model";
-import { AffiliateLeadModel } from "../models/affiliateLead.model";
+import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { UserModel } from "../../authModule/models/user.model";
-import { Types } from "mongoose";
+import mongoose from "mongoose";
 
-
-
-interface LeaderboardEntry {
-    affiliateId: string;
-    name: string;
-    location: string;
-    referrals: number;
-    earnings: number;
-    conversion: number;
-    initials: string;
-    isUser: boolean;
-}
+const COMMISSION_RATE = 0.15; // 15%
 
 /**
- * Get leaderboard data
+ * GET /api/affiliate/leaderboard?page=1&limit=10
+ * Returns all affiliates ranked by number of successful bookings (active/completed)
+ * made using their affiliate coupon code, with pagination.
  */
 export const getLeaderboard = async (req: Request, res: Response): Promise<void> => {
     try {
         const currentUserId = req.user?.id;
+        const page = Math.max(1, parseInt(req.query.page as string) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 10));
+        const skip = (page - 1) * limit;
 
-        // 1. Aggregate Quotations for Earnings and Accepted Counts
-        const quotationStats = await QuotationModel.aggregate([
+        // 1. Aggregate bookings by affiliateId — count & commission
+        const stats = await BookingModel.aggregate([
+            {
+                $match: {
+                    affiliateId: { $exists: true, $ne: null },
+                    isDeleted: false,
+                    // Count all paid bookings: pending_kyc = payment received (most common after simulate)
+                    status: { $in: ["pending_kyc", "pending_documents", "active", "completed"] },
+                },
+            },
             {
                 $group: {
                     _id: "$affiliateId",
-                    totalEarnings: {
+                    successfulBookings: { $sum: 1 },
+                    // Commission per booking: plan.price (paid amount) * 15%
+                    totalCommission: {
                         $sum: {
-                            $cond: [{ $eq: ["$status", QuotationStatus.ACCEPTED] }, "$price", 0]
-                        }
+                            $multiply: [
+                                { $ifNull: ["$plan.price", 0] },
+                                COMMISSION_RATE,
+                            ],
+                        },
                     },
-                    acceptedCount: {
-                        $sum: {
-                            $cond: [{ $eq: ["$status", QuotationStatus.ACCEPTED] }, 1, 0]
-                        }
-                    }
-                }
-            }
+                },
+            },
+            { $sort: { successfulBookings: -1, totalCommission: -1 } },
         ]);
 
-        // 2. Aggregate Leads for Total Referrals
-        const leadStats = await AffiliateLeadModel.aggregate([
-            {
-                $group: {
-                    _id: "$affiliateId",
-                    totalLeads: { $sum: 1 }
-                }
-            }
-        ]);
+        // 2. Total count before pagination
+        const totalEntries = stats.length;
+        const totalPages = Math.ceil(totalEntries / limit);
+        const paginated = stats.slice(skip, skip + limit);
 
-        // 3. Map stats to a dictionary for easy lookup
-        const statsMap: Record<string, { earnings: number; accepted: number; leads: number }> = {};
+        // 3. Fetch user details for paginated slice
+        const affiliateIds = paginated.map((s) => s._id);
+        const users = await UserModel.find({ _id: { $in: affiliateIds } })
+            .select("fullName")
+            .lean();
 
-        quotationStats.forEach(stat => {
-            const id = stat._id.toString();
-            if (!statsMap[id]) statsMap[id] = { earnings: 0, accepted: 0, leads: 0 };
-            statsMap[id].earnings = stat.totalEarnings;
-            statsMap[id].accepted = stat.acceptedCount;
+        const userMap: Record<string, any> = {};
+        users.forEach((u: any) => {
+            userMap[u._id.toString()] = u;
         });
 
-        leadStats.forEach(stat => {
-            const id = stat._id.toString();
-            if (!statsMap[id]) statsMap[id] = { earnings: 0, accepted: 0, leads: 0 };
-            statsMap[id].leads = stat.totalLeads;
-        });
-
-        // 4. Fetch User Details for all affiliates found
-        const affiliateIds = Object.keys(statsMap);
-        const users = await UserModel.find({ _id: { $in: affiliateIds } }).select("fullName");
-
-        // 5. Build Leaderboard
-        const leaderboard: LeaderboardEntry[] = users.map(user => {
-            const id = user._id.toString();
-            const stats = statsMap[id] || { earnings: 0, accepted: 0, leads: 0 };
-            const conversion = stats.leads > 0 ? (stats.accepted / stats.leads) * 100 : 0;
-            
-            // Generate initials
-            const names = user.fullName.split(" ");
-            const initials = names.length >= 2 
-                ? `${names[0][0]}${names[1][0]}`.toUpperCase() 
-                : user.fullName.substring(0, 2).toUpperCase();
-
-            // Commission logic: Assuming 10% commission on earnings
-            const commission = stats.earnings * 0.10;
+        // 4. Build leaderboard entries (global rank = skip + index + 1)
+        const leaderboard = paginated.map((stat, index) => {
+            const userId = stat._id.toString();
+            const user = userMap[userId] || {};
+            const name = user.fullName || "Affiliate";
+            const names = name.split(" ");
+            const initials =
+                names.length >= 2
+                    ? `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
+                    : name.substring(0, 2).toUpperCase();
 
             return {
-                affiliateId: id,
-                name: user.fullName,
-                location: "Global", // Placeholder
-                referrals: stats.leads,
-                earnings: commission, // Sent as number, formatted on frontend
-                conversion: Math.round(conversion),
+                rank: skip + index + 1,
+                affiliateId: userId,
+                name,
                 initials,
-                isUser: id === currentUserId,
+                successfulBookings: stat.successfulBookings,
+                totalCommission: parseFloat(stat.totalCommission.toFixed(2)),
+                isUser: userId === currentUserId,
             };
         });
 
-        // 6. Sort by earnings (descending)
-        leaderboard.sort((a, b) => b.earnings - a.earnings);
-
-        // 7. Limit to top 10 (or more if needed)
-        const topLeaderboard = leaderboard.slice(0, 10);
+        // 5. Find current user's rank across all entries (not just current page)
+        const currentUserStatIndex = stats.findIndex((s) => s._id.toString() === currentUserId);
+        const currentUserRank = currentUserStatIndex >= 0 ? currentUserStatIndex + 1 : null;
+        const currentUserStat = currentUserStatIndex >= 0 ? stats[currentUserStatIndex] : null;
 
         res.status(200).json({
             success: true,
-            data: topLeaderboard,
+            data: {
+                leaderboard,
+                pagination: {
+                    page,
+                    limit,
+                    totalEntries,
+                    totalPages,
+                    hasNext: page < totalPages,
+                    hasPrev: page > 1,
+                },
+                currentUser: currentUserStat
+                    ? {
+                        rank: currentUserRank,
+                        successfulBookings: currentUserStat.successfulBookings,
+                        totalCommission: parseFloat(currentUserStat.totalCommission.toFixed(2)),
+                    }
+                    : null,
+            },
         });
-
     } catch (error: any) {
         console.error("Leaderboard Error:", error);
         res.status(500).json({
