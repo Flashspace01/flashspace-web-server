@@ -22,7 +22,9 @@ import {
   replyToTicket,
   getCredits,
   redeemReward,
+  getPartnerDashboardOverview,
   getPartnerSpaceBookings,
+  getAllPartnerSpaces,
   getUserMails,
   getUserVisits,
 } from "../controllers/userDashboard.controller";
@@ -41,6 +43,8 @@ router.get("/visit", getUserVisits);
 router.get("/dashboard", getDashboardOverview);
 
 // ============ PARTNER BOOKINGS ============
+router.get("/partner/dashboard", getPartnerDashboardOverview);
+router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
 
 // ============ BOOKINGS ============

@@ -4,7 +4,7 @@ export interface SignupRequest {
   confirmPassword: string;
   fullName: string;
   phoneNumber?: string;
-  role?: 'user' | 'partner';
+  role?: 'user' | 'partner' | 'affiliate';
 }
 
 export interface LoginRequest {
@@ -42,6 +42,7 @@ export interface GoogleProfile {
   emails: Array<{ value: string; verified?: boolean }>;
   photos: Array<{ value: string }>;
   provider: string;
+  role?: string;
   _json?: {
     sub?: string;
     email?: string;
