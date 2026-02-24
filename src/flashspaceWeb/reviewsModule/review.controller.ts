@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ReviewService } from "./review.service";
 import { createReviewSchema, getReviewsSchema } from "./review.validation";
+import { ReviewModel } from "./review.model";
 
 const sendError = (
   res: Response,
