@@ -33,6 +33,7 @@ export enum TicketCategory {
   MAIL_SERVICES = "mail_services",
   BOOKINGS = "bookings",
   COMPLIANCE = "compliance",
+  LEADS = "leads",
   OTHER = "other",
 }
 

@@ -19,7 +19,7 @@ export const createTicket = async (
   res: Response,
 ) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -72,7 +72,7 @@ export const getUserTickets = async (
   res: Response,
 ) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
@@ -106,7 +106,7 @@ export const getTicketById = async (
   res: Response,
 ) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const userRole = req.user?.role;
     const ticketId = req.params.ticketId as string;
 
@@ -153,7 +153,7 @@ export const replyToTicket = async (
   res: Response,
 ) => {
   try {
-    const userId = req.user?._id;
+    const userId = req.user?._id || req.user?.id;
     const userRole = req.user?.role;
     const ticketId = req.params.ticketId as string;
     const { message, attachments } = req.body;
