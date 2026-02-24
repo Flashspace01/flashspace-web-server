@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Dependencies install karo
+# Use npm install instead of npm ci to avoid lockfile issues
 RUN npm install
 
 # Copy source code
