@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { ReviewService } from "./review.service";
-import { createReviewSchema } from "./review.validation";
+import { createReviewSchema, getReviewsSchema } from "./review.validation";
 
 const sendError = (
   res: Response,
@@ -62,5 +62,34 @@ export const postReview = async (req: Request, res: Response) => {
       return sendError(res, 400, "You have already reviewed this space");
     }
     sendError(res, 500, "Review failed", err);
+  }
+};
+
+export const getSpaceReviews = async (req: Request, res: Response) => {
+  try {
+    const validation = getReviewsSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { spaceId } = validation.data.params;
+    const { limit, page } = validation.data.query;
+
+    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _page = page ? Math.max(page, 1) : 1;
+
+    const reviewData = await ReviewService.getReviewsBySpace(
+      spaceId,
+      _limit,
+      _page,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Reviews retrieved successfully",
+      data: reviewData,
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to retrieve reviews", err);
   }
 };

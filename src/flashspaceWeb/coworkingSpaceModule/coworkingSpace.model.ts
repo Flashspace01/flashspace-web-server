@@ -9,6 +9,7 @@ import {
 import { User } from "../authModule/models/user.model";
 import { Property } from "../propertyModule/property.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { OperatingHours } from "../shared/schemas/operatingHours.schema";
 
 export class Seat {
   @prop({ required: true })
@@ -37,25 +38,12 @@ export class Floor {
   public tables!: Table[];
 }
 
-class OperatingHours {
-  @prop({ required: true, trim: true })
-  public openTime!: string; // e.g., "09:00"
-
-  @prop({ required: true, trim: true })
-  public closeTime!: string; // e.g., "18:00"
-
-  @prop({ type: () => [String], required: true })
-  public daysOpen!: string[]; // e.g., ["Monday", "Tuesday", "Wednesday"]
-}
-
 @modelOptions({
   schemaOptions: { timestamps: true },
   options: { allowMixed: Severity.ALLOW },
 })
-@index({ city: 1, area: 1 })
 @index({ popular: 1 })
 @index({ avgRating: -1 })
-@index({ location: "2dsphere" })
 export class CoworkingSpace {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
@@ -77,7 +65,7 @@ export class CoworkingSpace {
   public approvalStatus!: SpaceApprovalStatus;
 
   // --- Long-Term Pricing (Monthly Desk) ---
-  @prop({ required: false, default: 0 })
+  @prop({ required: true })
   public partnerPricePerMonth!: number;
 
   @prop({ required: false, default: 0 })
@@ -89,7 +77,7 @@ export class CoworkingSpace {
   @prop({ type: () => [Floor] })
   public floors!: Floor[];
 
-  @prop({ type: () => OperatingHours, _id: false })
+  @prop({ type: () => OperatingHours, _id: false, required: true })
   public operatingHours!: OperatingHours;
 
   @prop({ default: 0 })
@@ -97,6 +85,9 @@ export class CoworkingSpace {
 
   @prop({ default: 0 })
   public totalReviews!: number;
+
+  @prop({ type: () => [String], default: [] })
+  public amenities?: string[];
 
   @prop({ default: false })
   public isActive!: boolean;

@@ -41,7 +41,7 @@ const runSeed = async () => {
     await dbConnection();
 
     console.log("💥 Dropping existing database...");
-    await mongoose.connection.db.dropDatabase();
+    await mongoose.connection.db!.dropDatabase();
     console.log("✅ Database dropped.");
 
     console.log("🔨 Seeding Users...");

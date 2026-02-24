@@ -248,10 +248,22 @@ export class BookingService {
     return booking;
   }
 
-  static async getUserBookings(userId: string) {
-    return await SeatBookingModel.find({ user: userId })
+  static async getUserBookings(userId: string, limit: number, page: number) {
+    const bookings = await SeatBookingModel.find({ user: userId })
       .populate("space")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await SeatBookingModel.countDocuments({ user: userId });
+
+    return {
+      bookings,
+      total,
+      limit,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   static async getBookingById(bookingId: string) {

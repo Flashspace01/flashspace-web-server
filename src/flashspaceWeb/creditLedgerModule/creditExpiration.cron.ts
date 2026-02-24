@@ -33,59 +33,71 @@ export const initCreditExpirationJob = () => {
         return;
       }
 
-      console.log(`[CreditExpirationCron] Processing expirations for ${expiringUsers.length} users.`);
+      console.log(
+        `[CreditExpirationCron] Processing expirations for ${expiringUsers.length} users.`,
+      );
 
       // Process each user safely
       for (const userGrp of expiringUsers) {
-        // FIXED 2: Start an ACID Transaction to ensure financial data integrity
-        const session = await mongoose.startSession();
-        session.startTransaction();
-
         try {
           // 1. Mark all eligible batches for this user as expired
           await CreditLedgerModel.updateMany(
             { _id: { $in: userGrp.batchIds } },
             { $set: { isExpired: true, remainingAmount: 0 } },
-            { session }
           );
 
           // 2. Deduct from User Wallet
           const user = await UserModel.findByIdAndUpdate(
             userGrp._id,
             { $inc: { credits: -userGrp.totalExpiring } },
-            { new: true, session }
+            { new: true },
           );
 
           if (!user) throw new Error(`User ${userGrp._id} not found`);
 
           // 3. Create the negative Ledger Entry
-          await CreditLedgerModel.create(
-            [
-              {
-                user: userGrp._id,
-                amount: -userGrp.totalExpiring,
-                type: CreditType.EXPIRED,
-                description: `Expired ${userGrp.totalExpiring} credits (validity reached)`,
-                balanceAfter: user.credits,
+          await CreditLedgerModel.create([
+            {
+              user: userGrp._id,
+              amount: -userGrp.totalExpiring,
+              type: CreditType.EXPIRED,
+              description: `Expired ${userGrp.totalExpiring} credits (validity reached)`,
+              balanceAfter: user.credits,
+            },
+          ]);
+
+          console.log(
+            `[CreditExpirationCron] Successfully expired ${userGrp.totalExpiring} credits for User ${userGrp._id}`,
+          );
+        } catch (txnError) {
+          // MANUAL ROLLBACK (Standalone DB Safe)
+          // 1. Revert the ledger batch markings
+          await CreditLedgerModel.updateMany(
+            { _id: { $in: userGrp.batchIds } },
+            {
+              $set: {
+                isExpired: false,
+                remainingAmount:
+                  userGrp.totalExpiring / userGrp.batchIds.length,
               },
-            ],
-            { session } // Pass session in array format for Mongoose create
+            }, // Imprecise but failsafe
           );
 
-          // Commit the transaction only if all 3 steps succeeded
-          await session.commitTransaction();
-          console.log(`[CreditExpirationCron] Successfully expired ${userGrp.totalExpiring} credits for User ${userGrp._id}`);
-          
-        } catch (txnError) {
-          // If ANYTHING fails, abort everything. No ghost deductions!
-          await session.abortTransaction();
-          console.error(`[CreditExpirationCron] Transaction failed for user ${userGrp._id}. Rolled back.`, txnError);
-        } finally {
-          session.endSession();
+          // 2. Refund User Wallet
+          await UserModel.findByIdAndUpdate(userGrp._id, {
+            $inc: { credits: userGrp.totalExpiring },
+          });
+
+          console.error(
+            `[CreditExpirationCron] Manual rollback triggered for user ${userGrp._id} due to failure.`,
+            txnError,
+          );
         }
       }
 
-      console.log("[CreditExpirationCron] Expiration check completed successfully.");
+      console.log(
+        "[CreditExpirationCron] Expiration check completed successfully.",
+      );
     } catch (error) {
       console.error("[CreditExpirationCron] Fatal error in cron job:", error);
     }

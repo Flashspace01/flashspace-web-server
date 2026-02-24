@@ -143,7 +143,14 @@ export class BookingService {
     });
     if (!booking) throw new Error("Booking not found");
 
-    booking.kycProfileId = profileId;
+    // Preserve previous state for potential rollback
+    const prevKycProfile = booking.kycProfile;
+    const prevKycStatus = booking.kycStatus;
+    const prevStatus = booking.status;
+    const prevStartDate = booking.startDate;
+    const prevEndDate = booking.endDate;
+
+    booking.kycProfile = new mongoose.Types.ObjectId(profileId) as any;
     booking.kycStatus = "approved";
     booking.status = "active";
 
@@ -156,13 +163,23 @@ export class BookingService {
 
     await booking.save();
 
-    if (!profile.linkedBookings?.includes(bookingId)) {
-      profile.linkedBookings = profile.linkedBookings || [];
-      profile.linkedBookings.push(bookingId);
-      await profile.save();
+    try {
+      if (!profile.linkedBookings?.includes(bookingId)) {
+        profile.linkedBookings = profile.linkedBookings || [];
+        profile.linkedBookings.push(bookingId);
+        await profile.save();
+      }
+      return booking;
+    } catch (error) {
+      // Manual Rollback if profile save fails (Standalone DB safe)
+      booking.kycProfile = prevKycProfile;
+      booking.kycStatus = prevKycStatus as any;
+      booking.status = prevStatus as any;
+      booking.startDate = prevStartDate;
+      booking.endDate = prevEndDate;
+      await booking.save();
+      throw new Error("Failed to link profile, changes rolled back.");
     }
-
-    return booking;
   }
 
   static async getPartnerSpaceBookings(
@@ -173,7 +190,7 @@ export class BookingService {
   ) {
     const filter: any = {
       spaceId,
-      partnerId,
+      partner: partnerId,
       isDeleted: false,
     };
 
@@ -203,7 +220,7 @@ export class BookingService {
 
   static async getPartnerDashboardOverview(partnerId: string) {
     const partnerBookings = await BookingModel.find({
-      partnerId,
+      partner: partnerId,
       isDeleted: false,
     }).populate("user", "fullName email phone company");
 

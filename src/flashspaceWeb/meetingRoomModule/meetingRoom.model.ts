@@ -9,18 +9,7 @@ import {
 import { User } from "../authModule/models/user.model";
 import { Property } from "../propertyModule/property.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
-
-// --- ADDED: Consistent Operating Hours ---
-class OperatingHours {
-  @prop({ required: true, trim: true })
-  public openTime!: string;
-
-  @prop({ required: true, trim: true })
-  public closeTime!: string;
-
-  @prop({ type: () => [String], required: true })
-  public daysOpen!: string[];
-}
+import { OperatingHours } from "../shared/schemas/operatingHours.schema";
 
 export enum MeetingRoomType {
   MEETING_ROOM = "meeting_room",
@@ -33,11 +22,9 @@ export enum MeetingRoomType {
   schemaOptions: { timestamps: true },
   options: { allowMixed: Severity.ALLOW },
 })
-@index({ city: 1, area: 1 })
 @index({ type: 1 })
 @index({ avgRating: -1 })
 @index({ popular: 1 })
-@index({ location: "2dsphere" })
 export class MeetingRoom {
   @prop({ ref: () => Property, required: true })
   public property!: Ref<Property>;
@@ -53,10 +40,10 @@ export class MeetingRoom {
   @prop({ required: true })
   public partnerPricePerHour!: number;
 
-  @prop({ required: true })
+  @prop({ required: false })
   public adminMarkupPerHour!: number;
 
-  @prop({ required: true })
+  @prop({ required: false })
   public finalPricePerHour!: number;
 
   // --- Split Pricing (Per Day) ---
@@ -70,8 +57,8 @@ export class MeetingRoom {
   public finalPricePerDay?: number;
 
   // --- ADDED: Timing & Booking Rules ---
-  @prop({ type: () => OperatingHours, _id: false })
-  public operatingHours?: OperatingHours;
+  @prop({ type: () => OperatingHours, _id: false, required: true })
+  public operatingHours!: OperatingHours;
 
   @prop({ required: false, default: 1 })
   public minBookingHours?: number;
@@ -94,6 +81,9 @@ export class MeetingRoom {
 
   @prop({ default: false })
   public popular!: boolean;
+
+  @prop({ type: () => [String], default: [] })
+  public amenities?: string[];
 
   @prop({ default: false })
   public isActive!: boolean;

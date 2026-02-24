@@ -65,7 +65,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         city,
         area,
         capacity,
-        pricePerMonth,
+        partnerPricePerMonth: pricePerMonth,
         pricePerDay,
         floors,
         operatingHours,
@@ -106,9 +106,15 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
 
+    const updateData: any = { ...validation.data.body };
+    if (updateData.pricePerMonth !== undefined) {
+      updateData.partnerPricePerMonth = updateData.pricePerMonth;
+      delete updateData.pricePerMonth;
+    }
+
     const updatedSpace = await CoworkingSpaceService.updateSpace(
       coworkingSpaceId,
-      validation.data.body,
+      updateData,
       userId,
       userRole,
     );

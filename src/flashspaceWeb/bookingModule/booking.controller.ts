@@ -4,6 +4,8 @@ import {
   toggleAutoRenewSchema,
   linkProfileSchema,
   getPartnerBookingsSchema,
+  getBookingByIdSchema,
+  getBookingsByPropertySchema,
 } from "./booking.validation";
 import { getAllBookingsSchema } from "./booking.validation";
 
@@ -24,7 +26,6 @@ const sendError = (
 
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
-  
     const validation = getAllBookingsSchema.safeParse(req);
     if (!validation.success) {
       return sendError(res, 400, "Validation Error", validation.error);
@@ -49,8 +50,13 @@ export const getAllBookings = async (req: Request, res: Response) => {
 
 export const getBookingById = async (req: Request, res: Response) => {
   try {
+    const validation = getBookingByIdSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error);
+    }
+
     const userId = req.user?.id;
-    const { bookingId } = req.params;
+    const { bookingId } = validation.data.params;
 
     const booking = await BookingService.getBookingById(
       userId as string,
@@ -66,9 +72,14 @@ export const getBookingById = async (req: Request, res: Response) => {
 
 export const getBookingsByProperty = async (req: Request, res: Response) => {
   try {
+    const validation = getBookingsByPropertySchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error);
+    }
+
     const userId = req.user?.id;
-    const { spaceId } = req.params;
-    const { year, month } = req.query;
+    const { spaceId } = validation.data.params;
+    const { year, month } = validation.data.query;
 
     const bookings = await BookingService.getBookingsByProperty(
       userId as string,

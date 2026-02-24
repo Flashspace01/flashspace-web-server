@@ -1,5 +1,13 @@
 import { Request, Response } from "express";
 import { BookingService } from "./seating.service";
+import {
+  getAvailabilitySchema,
+  createHoldSchema,
+  confirmBookingSchema,
+  cancelBookingSchema,
+  getUserBookingsSchema,
+  getBookingByIdSchema,
+} from "./seating.validation";
 
 const sendError = (
   res: Response,
@@ -18,18 +26,19 @@ const sendError = (
 
 export const getAvailability = async (req: Request, res: Response) => {
   try {
-    const { spaceId } = req.params;
-    const { start, end } = req.query;
-
-    if (!start || !end) {
-      return sendError(res, 400, "start and end times are required");
+    const validation = getAvailabilitySchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const startTime = new Date(start as string);
-    const endTime = new Date(end as string);
+    const { spaceId } = validation.data.params;
+    const { start, end } = validation.data.query;
+
+    const startTime = new Date(start);
+    const endTime = new Date(end);
 
     const availability = await BookingService.getAvailability(
-      spaceId as string,
+      spaceId,
       startTime,
       endTime,
     );
@@ -52,20 +61,15 @@ export const getAvailability = async (req: Request, res: Response) => {
 
 export const createHold = async (req: Request, res: Response) => {
   try {
-    const { spaceId, seatIds, startTime, endTime } = req.body;
     const userId = (req as any).user?.id;
-
     if (!userId) return sendError(res, 401, "Unauthorized");
 
-    if (
-      !spaceId ||
-      !seatIds ||
-      !Array.isArray(seatIds) ||
-      !startTime ||
-      !endTime
-    ) {
-      return sendError(res, 400, "Missing required fields");
+    const validation = createHoldSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
     }
+
+    const { spaceId, seatIds, startTime, endTime } = validation.data.body;
 
     const newHold = await BookingService.createHold(
       userId,
@@ -93,14 +97,19 @@ export const createHold = async (req: Request, res: Response) => {
 
 export const confirmBooking = async (req: Request, res: Response) => {
   try {
-    const { paymentId } = req.body;
-    const { bookingId } = req.params;
     const userId = (req as any).user?.id;
-
     if (!userId) return sendError(res, 401, "Unauthorized");
 
+    const validation = confirmBookingSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { paymentId } = validation.data.body;
+    const { bookingId } = validation.data.params;
+
     const confirmedBooking = await BookingService.confirmBooking(
-      bookingId as string,
+      bookingId,
       userId,
       paymentId,
     );
@@ -117,14 +126,19 @@ export const confirmBooking = async (req: Request, res: Response) => {
 
 export const cancelBooking = async (req: Request, res: Response) => {
   try {
-    const { bookingId } = req.params;
     const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
-
     if (!userId) return sendError(res, 401, "Unauthorized");
 
+    const validation = cancelBookingSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { bookingId } = validation.data.params;
+
     const cancelledBooking = await BookingService.cancelBooking(
-      bookingId as string,
+      bookingId,
       userId,
       userRole,
     );
@@ -144,7 +158,20 @@ export const getUserBookings = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     if (!userId) return sendError(res, 401, "Unauthorized");
 
-    const bookings = await BookingService.getUserBookings(userId);
+    const validation = getUserBookingsSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { limit, page } = validation.data.query;
+    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _page = page ? Math.max(page, 1) : 1;
+
+    const bookings = await BookingService.getUserBookings(
+      userId,
+      _limit,
+      _page,
+    );
 
     res.status(200).json({
       success: true,
@@ -158,8 +185,13 @@ export const getUserBookings = async (req: Request, res: Response) => {
 
 export const getBookingById = async (req: Request, res: Response) => {
   try {
-    const { bookingId } = req.params;
-    const booking = await BookingService.getBookingById(bookingId as string);
+    const validation = getBookingByIdSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { bookingId } = validation.data.params;
+    const booking = await BookingService.getBookingById(bookingId);
 
     if (!booking) return sendError(res, 404, "Booking not found");
 

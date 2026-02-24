@@ -6,6 +6,7 @@ import {
   index,
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
+import { Booking } from "../bookingModule/booking.model";
 import mongoose from "mongoose";
 
 export enum CreditType {
@@ -39,9 +40,9 @@ export class CreditLedger {
   @prop()
   public description?: string;
 
-  // FIXED: Converted to ObjectId for relational integrity
-  @prop({ type: () => mongoose.Types.ObjectId })
-  public bookingId?: mongoose.Types.ObjectId;
+  // FIXED: Converted to Ref<Booking> to match normalization standards
+  @prop({ ref: () => Booking })
+  public booking?: Ref<Booking>;
 
   @prop()
   public serviceName?: string;

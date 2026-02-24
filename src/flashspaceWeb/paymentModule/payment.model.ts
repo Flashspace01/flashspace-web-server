@@ -6,6 +6,8 @@ import {
   Ref,
 } from "@typegoose/typegoose";
 import { Types } from "mongoose";
+import { User } from "../authModule/models/user.model";
+import { SeatBooking } from "../seatingModule/seating.model";
 
 export enum PaymentStatus {
   PENDING = "pending",
@@ -32,8 +34,8 @@ export enum PaymentType {
 @index({ status: 1 })
 @index({ createdAt: -1 })
 export class Payment {
-  @prop({ required: true })
-  public userId!: Types.ObjectId;
+  @prop({ ref: () => User, required: true })
+  public user!: Ref<User>;
 
   @prop({ required: true })
   public userEmail!: string;
@@ -74,7 +76,13 @@ export class Payment {
   public paymentType!: PaymentType;
 
   @prop({ required: true })
-  public spaceId!: Types.ObjectId;
+  public spaceModel!: string;
+
+  @prop({
+    required: true,
+    refPath: "spaceModel",
+  })
+  public space!: Types.ObjectId;
 
   @prop({ required: true })
   public spaceName!: string;
@@ -108,8 +116,8 @@ export class Payment {
   @prop()
   public notes?: string;
 
-  @prop()
-  public holdId?: string;
+  @prop({ ref: () => SeatBooking })
+  public seatBooking?: Ref<SeatBooking>;
 
   @prop({ default: 0 })
   public creditsUsed?: number;

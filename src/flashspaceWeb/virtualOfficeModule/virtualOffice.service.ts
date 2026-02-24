@@ -56,7 +56,11 @@ export class VirtualOfficeService {
     return office;
   }
 
-  static async getOffices(filter: any = {}) {
+  static async getOffices(
+    filter: any = {},
+    limit: number = 100,
+    page: number = 1,
+  ) {
     if (filter.isDeleted === undefined) {
       filter.isDeleted = false;
     }
@@ -79,9 +83,21 @@ export class VirtualOfficeService {
       filter.property = { $in: propertyIds };
     }
 
-    return await VirtualOfficeModel.find(filter)
+    const offices = await VirtualOfficeModel.find(filter)
       .populate("property")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await VirtualOfficeModel.countDocuments(filter);
+
+    return {
+      offices,
+      total,
+      limit,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   static async getOfficeById(officeId: string) {

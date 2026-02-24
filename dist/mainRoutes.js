@@ -22,7 +22,7 @@ const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
 const meetingRoom_routes_1 = require("./flashspaceWeb/meetingRoomModule/meetingRoom.routes");
 // Importing seat booking routes
-const booking_routes_1 = require("./flashspaceWeb/bookingModule/booking.routes");
+const seating_routes_1 = require("./flashspaceWeb/seatingModule/seating.routes");
 const review_routes_1 = require("./flashspaceWeb/reviewsModule/review.routes");
 const mail_routes_1 = __importDefault(require("./flashspaceWeb/mailModule/routes/mail.routes"));
 exports.mainRoutes = (0, express_1.Router)();
@@ -79,7 +79,7 @@ exports.mainRoutes.use("/mail", mail_routes_1.default);
 // /api/meetingRoom
 exports.mainRoutes.use("/meetingRoom", meetingRoom_routes_1.meetingRoomRoutes);
 // /api/seat-bookings
-exports.mainRoutes.use("/seat-bookings", booking_routes_1.SeatBookingRoutes);
+exports.mainRoutes.use("/seat-bookings", seating_routes_1.SeatBookingRoutes);
 exports.mainRoutes.use("/reviews", review_routes_1.reviewRoutes);
 exports.mainRoutes.use("/tickets", ticket_routes_1.ticketRoutes);
 // /api/notifications
