@@ -396,7 +396,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
       data: inquiry,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Partner inquiry error:", err);
     res.status(500).json({
       success: false,
@@ -426,7 +426,7 @@ export const getAllPartnerInquiries = async (req: Request, res: Response) => {
       data: inquiries,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Failed to retrieve inquiries",
@@ -474,7 +474,7 @@ export const updatePartnerInquiryStatus = async (
       data: updatedInquiry,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Failed to update inquiry",
