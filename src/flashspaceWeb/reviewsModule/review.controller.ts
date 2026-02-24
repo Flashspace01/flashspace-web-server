@@ -35,7 +35,7 @@ export const postReview = async (req: Request, res: Response) => {
       );
     }
 
-    const { spaceId, spaceModel, rating, comment, reviewImages } =
+    const { spaceId, spaceModel, rating, comment, reviewImages, npsScore } =
       validation.data.body;
     const userId = (req as any).user?.id;
     console.log(
@@ -50,6 +50,7 @@ export const postReview = async (req: Request, res: Response) => {
         rating,
         comment,
         reviewImages,
+        npsScore,
       },
       userId,
     );
@@ -91,5 +92,102 @@ export const getSpaceReviews = async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve reviews", err);
+  }
+};
+
+export const getAllReviews = async (req: Request, res: Response) => {
+  try {
+    const reviews = await ReviewModel.find()
+      .populate("user", "fullName email profilePicture")
+      .populate({
+        path: "space",
+        populate: { path: "property", select: "name area city" },
+      })
+      .sort({ createdAt: -1 });
+
+    const transformedReviews = reviews.map((r: any) => ({
+      _id: r._id,
+      company: r.user?.fullName || "Anonymous",
+      rating: r.rating,
+      npsScore: r.npsScore,
+      location: r.space?.property?.area || r.space?.property?.city || "Unknown",
+      review: r.comment,
+      createdAt: r.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Reviews fetched successfully",
+      data: transformedReviews,
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to fetch reviews", err);
+  }
+};
+
+export const getNpsStats = async (_req: Request, res: Response) => {
+  try {
+    const reviews = await ReviewModel.find({ npsScore: { $exists: true } });
+
+    const total = reviews.length;
+    const promoters = reviews.filter((r) => (r.npsScore || 0) >= 9).length;
+    const detractors = reviews.filter((r) => (r.npsScore || 0) <= 6).length;
+    const passives = total - promoters - detractors;
+
+    const nps =
+      total > 0
+        ? Math.round((promoters / total) * 100 - (detractors / total) * 100)
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      message: "NPS calculated successfully",
+      data: {
+        nps,
+        totalResponses: total,
+        promoters,
+        passives,
+        detractors,
+      },
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to calculate NPS", err);
+  }
+};
+
+export const getAiInsight = async (_req: Request, res: Response) => {
+  try {
+    const reviews = await ReviewModel.find().sort({ createdAt: -1 });
+
+    if (reviews.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          insight: "Not enough review data yet to generate AI insights.",
+        },
+      });
+    }
+
+    const avgRating =
+      reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length;
+
+    let insight = "";
+    if (avgRating >= 4.5) {
+      insight =
+        "Your space is performing exceptionally well! Customers love the experience. Consider highlighting these positive reviews in your marketing.";
+    } else if (avgRating >= 3.5) {
+      insight =
+        "Good performance overall. Focus on addressing minor complaints in the comments to reach a 4.5+ rating.";
+    } else {
+      insight =
+        "Performance needs improvement. Analyze low-rated reviews to identify recurring issues with facilities or service.";
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { insight },
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to generate AI insight", err);
   }
 };

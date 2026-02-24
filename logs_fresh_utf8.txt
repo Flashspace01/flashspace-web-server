@@ -1,0 +1,96 @@
+﻿[dotenv@17.3.1] injecting env (21) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+node.exe : Setting "Mixed" 
+for property 
+"SpaceSnapshot.coordinates"
+At C:\Program 
+Files\nodejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo         
+     : NotSpecifi    ed: 
+(Setting "Mixe    
+d"...ot.coordinate    
+s":String) [], Rem    
+oteException
+    + FullyQualifiedEr    
+rorId : NativeComm    
+andError
+ 
+Look here for how to 
+disable this message: https
+://typegoose.github.io/type
+goose/docs/api/decorators/m
+odel-options/#allowmixed
+Setting "Mixed" for 
+property 
+"SpaceSnapshot.coordinates"
+Look here for how to 
+disable this message: https
+://typegoose.github.io/type
+goose/docs/api/decorators/m
+odel-options/#allowmixed
+DEBUG: userDashboard.controller.ts loaded
+Setting "Mixed" for 
+property "Ticket.messages"
+Look here for how to 
+disable this message: https
+://typegoose.github.io/type
+goose/docs/api/decorators/m
+odel-options/#allowmixed
+Setting "Mixed" for 
+property "Ticket.messages"
+Look here for how to 
+disable this message: https
+://typegoose.github.io/type
+goose/docs/api/decorators/m
+odel-options/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.attachments"
+Look here for how to 
+disable this message: https
+://typegoose.github.io/type
+goose/docs/api/decorators/m
+odel-options/#allowmixed
+Admin Routes Loaded
+TEST: app.ts is loaded and running latest code
+≡ƒôº Email service disabled - emails will be logged only
+Γ£à Google OAuth client initialized successfully
+CORS enabled for origin: http://localhost:5173 with credentials support
+Attempting to connect to MongoDB at: mongodb://localhost:27017/myapp
+(node:12000) [MONGOOSE] 
+Warning: Duplicate schema 
+index on 
+{"ticketNumber":1} found. 
+This is often due to 
+declaring an index using 
+both "index: true" and 
+"schema.index()". Please 
+remove the duplicate index 
+definition.
+(Use `node 
+--trace-warnings ...` to 
+show where the warning was 
+created)
+(node:12000) [MONGOOSE] 
+Warning: Duplicate schema 
+index on {"code":1} found. 
+This is often due to 
+declaring an index using 
+both "index: true" and 
+"schema.index()". Please 
+remove the duplicate index 
+definition.
+Connected to Database!
+Database connection established successfully.
+API server started at http://localhost:5000
+Socket.io Adapter connected to Redis at localhost:6379
+New client connected 7a4pRSAzuSTT1YpEAAAD
+New client connected tmsTCXSyXjahXfc5AAAE
+New client connected hutcV4zjAaVinAKiAAAF
+New client connected z9araHmAPVHwDV99AAAI
+New client connected 6py-UOJ5t0zT0vDsAAAJ
+New client connected q94BTIce9iDzq9bQAAAL

@@ -18,7 +18,7 @@ export const createOrderSchema = z.object({
     spaceName: z.string().min(1, "Space Name is required"),
     planName: z.string().min(1, "Plan Name is required"),
     planKey: z.string().min(1, "Plan Key is required"),
-    tenure: z.number().int().positive(),
+    tenure: z.number().int().min(0, "Tenure must be at least 0"),
     yearlyPrice: z.number().nonnegative(),
     totalAmount: z.number().positive(),
     discountPercent: z.number().min(0).max(100).optional(),

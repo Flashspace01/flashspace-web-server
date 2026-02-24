@@ -45,7 +45,7 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized: No partner found");
 
     const createdOffice = await VirtualOfficeService.createOffice(
-      validation.data.body,
+      { ...validation.data.body, propertyId: (req.body as any).propertyId },
       partnerId,
     );
 
@@ -107,11 +107,15 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const { deleted, limit, page } = validation.data.query;
+    const { deleted, limit, page, property } = validation.data.query;
     const _limit = limit ? Math.min(limit, 100) : 10;
     const _page = page ? Math.max(page, 1) : 1;
 
     const query: any = deleted === "true" ? { isDeleted: true } : {};
+
+    if (property) {
+      query.property = property;
+    }
 
     const result = await VirtualOfficeService.getOffices(query, _limit, _page);
 
@@ -121,10 +125,7 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
         result.offices.length === 0
           ? "No virtual offices found"
           : "Virtual offices retrieved successfully",
-      data: {
-        ...result,
-        offices: result.offices.map(flattenProperty),
-      },
+      data: result.offices.map(flattenProperty),
     });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve virtual offices", err);

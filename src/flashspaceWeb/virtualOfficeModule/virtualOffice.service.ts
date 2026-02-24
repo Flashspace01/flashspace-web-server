@@ -6,7 +6,13 @@ import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class VirtualOfficeService {
   static async createOffice(data: any, partnerId: string) {
-    const property = await PropertyService.createProperty(data, partnerId);
+    let property;
+    if (data.propertyId) {
+      property = await PropertyModel.findById(data.propertyId);
+      if (!property) throw new Error("Property not found");
+    } else {
+      property = await PropertyService.createProperty(data, partnerId);
+    }
 
     const office = new VirtualOfficeModel({
       ...data,

@@ -12,13 +12,13 @@ import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes"
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
-import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
 import { meetingRoomRoutes } from "./flashspaceWeb/meetingRoomModule/meetingRoom.routes";
 // Importing seat booking routes
 import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes";
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
+import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
 export const mainRoutes = Router();
 
 import mongoose from "mongoose";
@@ -48,10 +48,8 @@ mainRoutes.use("/auth", authRoutes);
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/affiliate (Affiliate Portal APIs)
 mainRoutes.use("/affiliate", affiliateRoutes);
-// /api/feeback
-mainRoutes.use("/feedback", feedbackRoutes);
-// /api/spaceProvider
-// mainRoutes.use("/spaceProvider", spaceProviderRoutes);
+mainRoutes.use("/reviews", reviewRoutes);
+
 // /api/virtualOffice
 mainRoutes.use("/virtualOffice", virtualOfficeRoutes);
 // /api/coworkingSpace
@@ -69,7 +67,6 @@ mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
-// /api/coupon
 mainRoutes.use("/coupon", couponRoutes);
 // /api/mail
 mainRoutes.use("/mail", mailRoutes);
@@ -78,9 +75,10 @@ mainRoutes.use("/meetingRoom", meetingRoomRoutes);
 // /api/seat-bookings
 mainRoutes.use("/seat-bookings", SeatBookingRoutes);
 
-mainRoutes.use("/reviews", reviewRoutes);
-
 mainRoutes.use("/tickets", ticketRoutes);
+
+// /api/property
+mainRoutes.use("/property", propertyRoutes);
 
 // /api/notifications
 import { notificationRoutes } from "./flashspaceWeb/notificationModule/routes/notification.routes";

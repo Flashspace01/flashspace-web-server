@@ -7,14 +7,14 @@ const SeatSchema = z.object({
 
 const TableInputSchema = z.object({
   tableNumber: z.string(),
-  numberOfSeats: z.number().int().positive().optional(),
+  numberOfSeats: z.number().int().positive("Seating capacity is required"),
   seats: z.array(SeatSchema).optional(),
 });
 
 const FloorInputSchema = z.object({
   floorNumber: z.number().int(),
   name: z.string().optional(),
-  tables: z.array(TableInputSchema),
+  tables: z.array(TableInputSchema).min(1, "At least one table is required"),
 });
 
 const OperatingHoursSchema = z.object({
@@ -37,15 +37,19 @@ const LocationSchema = z.object({
 
 export const createCoworkingSpaceSchema = z.object({
   body: z.object({
-    name: z.string().min(3, "Name must be at least 3 characters"),
-    address: z.string().min(5, "Address is required"),
-    city: z.string().min(2, "City is required"),
-    area: z.string().min(2, "Area is required"),
-    pricePerMonth: z.number().nonnegative().optional(),
+    name: z.string().min(3, "Name must be at least 3 characters").optional(),
+    address: z.string().min(5, "Address is required").optional(),
+    city: z.string().min(2, "City is required").optional(),
+    area: z.string().min(2, "Area is required").optional(),
+    propertyId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
+    partnerPricePerMonth: z.number().nonnegative().optional(),
     pricePerDay: z.number().nonnegative().optional(),
-    floors: z.array(FloorInputSchema).optional(),
+    floors: z.array(FloorInputSchema).min(1, "At least one floor is required"),
     operatingHours: OperatingHoursSchema.optional(),
-    amenities: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
     capacity: z.number().int().positive("Capacity must be a positive integer"),
     sponsored: z.boolean().optional(),
     popular: z.boolean().optional(),
@@ -65,6 +69,7 @@ export const updateCoworkingSpaceSchema = z.object({
     address: z.string().min(5).optional(),
     city: z.string().min(2).optional(),
     area: z.string().min(2).optional(),
+    partnerPricePerMonth: z.number().nonnegative().optional(),
     pricePerMonth: z.number().nonnegative().optional(),
     pricePerDay: z.number().nonnegative().optional(),
     floors: z.array(FloorInputSchema).optional(),
@@ -75,5 +80,15 @@ export const updateCoworkingSpaceSchema = z.object({
     location: LocationSchema.optional(),
     images: z.array(z.string()).min(1).optional(),
     isActive: z.boolean().optional(),
+  }),
+});
+
+export const getCoworkingSpacesSchema = z.object({
+  query: z.object({
+    deleted: z.enum(["true", "false"]).optional(),
+    property: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
   }),
 });

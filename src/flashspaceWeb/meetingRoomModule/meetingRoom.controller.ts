@@ -40,12 +40,12 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
       );
     }
 
-    const MEETING_ROOM_DATA: any = validation.data.body;
+    const MEETING_ROOM_DATA: any = {
+      ...validation.data.body,
+      propertyId: (req.body as any).propertyId,
+    };
 
-    if (MEETING_ROOM_DATA.pricePerHour)
-      MEETING_ROOM_DATA.partnerPricePerHour = MEETING_ROOM_DATA.pricePerHour;
-    if (MEETING_ROOM_DATA.pricePerDay)
-      MEETING_ROOM_DATA.partnerPricePerDay = MEETING_ROOM_DATA.pricePerDay;
+    // Data already contains partnerPricePerHour/partnerPricePerDay from validation schema
 
     const partnerId = (req as any).user?.id;
 
@@ -120,8 +120,13 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error);
     }
 
-    const { deleted, type, minPrice, maxPrice, limit } = validation.data.query;
+    const { deleted, type, minPrice, maxPrice, limit, property } =
+      validation.data.query;
     const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+
+    if (property) {
+      query.property = property;
+    }
 
     if (type) query.type = type;
 

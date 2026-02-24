@@ -23,18 +23,37 @@ const OperatingHoursSchema = z.object({
 
 export const createMeetingRoomSchema = z.object({
   body: z.object({
-    name: z.string().min(3, "Name must be at least 3 characters long"),
-    address: z.string().min(5, "Address must be at least 5 characters long"),
-    city: z.string().min(2, "City must be at least 2 characters long"),
-    area: z.string().min(2, "Area must be at least 2 characters long"),
+    name: z
+      .string()
+      .min(3, "Name must be at least 3 characters long")
+      .optional(),
+    address: z
+      .string()
+      .min(5, "Address must be at least 5 characters long")
+      .optional(),
+    city: z
+      .string()
+      .min(2, "City must be at least 2 characters long")
+      .optional(),
+    area: z
+      .string()
+      .min(2, "Area must be at least 2 characters long")
+      .optional(),
+    propertyId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
     location: LocationSchema.optional(), // FIXED
-    pricePerHour: z.number().int().positive("Price must be a positive integer"),
-    pricePerDay: z.number().positive().optional(), // ADDED
-    operatingHours: OperatingHoursSchema.optional(), // ADDED
-    minBookingHours: z.number().int().positive().optional(), // ADDED
+    partnerPricePerHour: z
+      .number()
+      .int()
+      .positive("Price must be a positive integer"),
+    partnerPricePerDay: z.number().positive(),
+    operatingHours: OperatingHoursSchema,
+    minBookingHours: z.number().int().positive().optional(),
     capacity: z.number().int().positive("Capacity must be a positive integer"),
-    type: meetingRoomTypeEnum, // FIXED
-    amenities: z.array(z.string()).optional(),
+    type: meetingRoomTypeEnum,
+    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
     images: z
       .array(z.string())
       .min(1, "At least one image is required")
@@ -54,6 +73,8 @@ export const updateMeetingRoomSchema = z.object({
     city: z.string().min(2).optional(),
     area: z.string().min(2).optional(),
     location: LocationSchema.optional(), // FIXED
+    partnerPricePerHour: z.number().int().positive().optional(),
+    partnerPricePerDay: z.number().positive().optional(),
     pricePerHour: z.number().int().positive().optional(),
     pricePerDay: z.number().positive().optional(), // ADDED
     operatingHours: OperatingHoursSchema.optional(), // ADDED
@@ -90,6 +111,10 @@ export const getMeetingRoomsSchema = z.object({
       .refine((val) => !val || val <= 100, {
         message: "Limit cannot exceed 100",
       })
+      .optional(),
+    property: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
       .optional(),
   }),
 });

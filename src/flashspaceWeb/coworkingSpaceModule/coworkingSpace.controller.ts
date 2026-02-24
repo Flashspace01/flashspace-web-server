@@ -4,6 +4,7 @@ import { flattenProperty } from "../propertyModule/property.service";
 import {
   createCoworkingSpaceSchema,
   updateCoworkingSpaceSchema,
+  getCoworkingSpacesSchema,
 } from "./coworkingSpace.validation";
 import { CoworkingSpaceModel } from "./coworkingSpace.model";
 import { PropertyModel } from "../propertyModule/property.model";
@@ -44,7 +45,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       city,
       area,
       capacity,
-      pricePerMonth,
+      partnerPricePerMonth,
       pricePerDay,
       floors,
       operatingHours,
@@ -52,6 +53,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       location,
       images,
       popular,
+      propertyId,
     } = validation.data.body;
 
     const partnerId = (req as any).user?.id;
@@ -65,7 +67,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         city,
         area,
         capacity,
-        partnerPricePerMonth: pricePerMonth,
+        partnerPricePerMonth,
         pricePerDay,
         floors,
         operatingHours,
@@ -73,6 +75,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         location,
         images,
         popular,
+        propertyId,
       },
       partnerId,
     );
@@ -135,8 +138,18 @@ export const updateCoworkingSpace = async (req: Request, res: Response) => {
 
 export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
   try {
-    const { deleted } = req.query;
+    const validation = getCoworkingSpacesSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { deleted, property } = validation.data.query;
     const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+
+    if (property) {
+      query.property = property;
+    }
+
     const spaces = await CoworkingSpaceService.getSpaces(query);
 
     if (spaces.length === 0) {

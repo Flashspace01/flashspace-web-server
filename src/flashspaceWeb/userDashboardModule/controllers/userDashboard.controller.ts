@@ -21,6 +21,11 @@ import {
   getCreditsSchema,
   redeemRewardSchema,
 } from "../userDashboard.validation";
+import { PropertyModel } from "../../propertyModule/property.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { SeatBookingModel } from "../../seatingModule/seating.model";
 
 // ============ DASHBOARD ============
 
@@ -28,12 +33,20 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
-    // Get active bookings count
-    const activeBookings = await BookingModel.countDocuments({
-      user: userId,
-      status: "active",
-      isDeleted: false,
-    });
+    // Get active bookings count from both models
+    const [activeBookingsMain, activeSeatBookings] = await Promise.all([
+      BookingModel.countDocuments({
+        user: userId,
+        status: "active",
+        isDeleted: false,
+      }),
+      SeatBookingModel.countDocuments({
+        user: userId,
+        status: "confirmed",
+      }),
+    ]);
+
+    const activeBookings = activeBookingsMain + activeSeatBookings;
 
     // Get pending invoices total
     const pendingInvoices = await InvoiceModel.aggregate([
@@ -41,67 +54,140 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       { $group: { _id: null, total: { $sum: "$total" } } },
     ]);
 
-    // Get next booking (upcoming expiry)
-    const nextBooking = await BookingModel.findOne({
-      user: userId,
-      status: "active",
-      isDeleted: false,
-    })
-      .sort({ endDate: 1 })
-      .select("endDate");
+    // Get next booking (upcoming expiry) from both models
+    const [nextBookingMain, nextSeatBooking] = await Promise.all([
+      BookingModel.findOne({
+        user: userId,
+        status: "active",
+        isDeleted: false,
+      })
+        .sort({ endDate: 1 })
+        .select("endDate"),
+      SeatBookingModel.findOne({
+        user: userId,
+        status: "confirmed",
+      })
+        .sort({ endTime: 1 })
+        .select("endTime"),
+    ]);
+
+    let nextBookingDate = nextBookingMain?.endDate || null;
+    if (nextSeatBooking?.endTime) {
+      if (
+        !nextBookingDate ||
+        nextSeatBooking.endTime.getTime() < nextBookingDate.getTime()
+      ) {
+        nextBookingDate = nextSeatBooking.endTime;
+      }
+    }
 
     // Get KYC status
     const kyc = await KYCDocumentModel.findOne({ user: userId });
 
-    // Get recent activity (last 5 bookings/invoices)
-    const recentBookings = await BookingModel.find({
-      user: userId,
-      isDeleted: false,
-    })
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .select("bookingNumber status createdAt spaceSnapshot.name");
+    // Get recent activity (last 5 bookings/invoices) from both models
+    const [recentBookingsMain, recentSeatBookings] = await Promise.all([
+      BookingModel.find({
+        user: userId,
+        isDeleted: false,
+      })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .select("bookingNumber status createdAt spaceSnapshot.name"),
+      SeatBookingModel.find({
+        user: userId,
+      })
+        .populate("space")
+        .sort({ createdAt: -1 })
+        .limit(3),
+    ]);
 
-    const recentActivity = recentBookings.map((b) => ({
+    const recentActivityMain = recentBookingsMain.map((b) => ({
       type: "booking",
       message: `${b.spaceSnapshot?.name || "Booking"} - ${b.status}`,
       date: b.createdAt,
     }));
 
+    const recentActivitySeats = recentSeatBookings.map((s: any) => {
+      const seat = s.toObject() as any;
+      return {
+        type: "booking",
+        message: `${seat.space?.name || "Seat Booking"} - ${seat.status === "confirmed" ? "active" : seat.status}`,
+        date: seat.createdAt,
+      };
+    });
+
+    const recentActivity = [...recentActivityMain, ...recentActivitySeats]
+      .sort((a: any, b: any) => b.date.getTime() - a.date.getTime())
+      .slice(0, 5);
+
     // Usage breakdown
-    const usageBreakdown = await BookingModel.aggregate([
+    const usageBreakdownMain = await BookingModel.aggregate([
       { $match: { user: userId, isDeleted: false } },
       { $group: { _id: "$type", count: { $sum: 1 } } },
     ]);
 
-    const totalBookings = usageBreakdown.reduce((sum, u) => sum + u.count, 0);
+    const usageBreakdownSeats = await SeatBookingModel.countDocuments({
+      user: userId,
+    });
+
+    const totalBookingsMain = usageBreakdownMain.reduce(
+      (sum, u) => sum + u.count,
+      0,
+    );
+    const totalBookings = totalBookingsMain + usageBreakdownSeats;
+
     const virtualOfficeCount =
-      usageBreakdown.find((u) => u._id === "VirtualOffice")?.count || 0;
+      usageBreakdownMain.find((u) => u._id === "VirtualOffice")?.count || 0;
     const coworkingCount =
-      usageBreakdown.find((u) => u._id === "CoworkingSpace")?.count || 0;
+      (usageBreakdownMain.find((u) => u._id === "CoworkingSpace")?.count || 0) +
+      usageBreakdownSeats;
     const meetingRoomCount =
-      usageBreakdown.find((u) => u._id === "MeetingRoom")?.count || 0;
+      usageBreakdownMain.find((u) => u._id === "MeetingRoom")?.count || 0;
 
     // Monthly bookings (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const monthlyBookings = await BookingModel.aggregate([
-      {
-        $match: {
-          user: userId,
-          createdAt: { $gte: sixMonthsAgo },
-          isDeleted: false,
+    const [monthlyBookingsMain, monthlyBookingsSeats] = await Promise.all([
+      BookingModel.aggregate([
+        {
+          $match: {
+            user: userId,
+            createdAt: { $gte: sixMonthsAgo },
+            isDeleted: false,
+          },
         },
-      },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          count: { $sum: 1 },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 },
+          },
         },
-      },
-      { $sort: { _id: 1 } },
+      ]),
+      SeatBookingModel.aggregate([
+        {
+          $match: {
+            user: userId,
+            createdAt: { $gte: sixMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
+
+    const combinedMonthly = new Map();
+    [...monthlyBookingsMain, ...monthlyBookingsSeats].forEach((m) => {
+      combinedMonthly.set(m._id, (combinedMonthly.get(m._id) || 0) + m.count);
+    });
+
+    const monthlyData = Array.from(combinedMonthly.entries())
+      .map(([_id, count]) => ({ _id, count }))
+      .sort((a, b) => a._id - b._id);
 
     const months = [
       "Jan",
@@ -117,7 +203,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       "Nov",
       "Dec",
     ];
-    const formattedMonthly = monthlyBookings.map((m) => ({
+    const formattedMonthly = monthlyData.map((m) => ({
       month: months[m._id - 1],
       count: m.count,
     }));
@@ -127,7 +213,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       data: {
         activeServices: activeBookings,
         pendingInvoices: pendingInvoices[0]?.total || 0,
-        nextBookingDate: nextBooking?.endDate || null,
+        nextBookingDate: nextBookingDate,
         kycStatus: kyc?.overallStatus || "not_started",
         recentActivity,
         usageBreakdown: {
@@ -158,9 +244,6 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 // ============ PARTNER BOOKINGS ============
 
 import { PartnerKYCModel } from "../models/partnerKYC.model";
-import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
-import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
-import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 
 export const getAllPartnerSpaces = async (req: Request, res: Response) => {
   try {
@@ -169,74 +252,58 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    // Fetch spaces across all 4 models
-    const filter = { partner: userId, isDeleted: false };
+    console.log(`[DEBUG] getAllPartnerSpaces called for userId: ${userId}`);
 
-    const [coworkingSpaces, meetingRooms, virtualOffices] = await Promise.all([
-      CoworkingSpaceModel.find(filter).populate("property"),
-      MeetingRoomModel.find(filter).populate("property"),
-      VirtualOfficeModel.find(filter).populate("property"),
-    ]);
+    // Fetch properties where partner matches userId
+    // Explicitly cast to ObjectId just in case
+    const partnerId = new mongoose.Types.ObjectId(userId);
+    console.log(`[DEBUG] Searching for properties with partner: ${partnerId}`);
 
-    const spaces: any[] = [];
-
-    // Map Coworking Spaces
-    coworkingSpaces.forEach((s: any) => {
-      spaces.push({
-        id: s._id.toString(),
-        name: (s.property as any)?.name || "N/A",
-        city: (s.property as any)?.city || "N/A",
-        location: (s.property as any)?.area || "N/A",
-        availableSeats: s.capacity || 0, // Placeholder calculation
-        totalSeats: s.capacity || 0,
-        meetingRooms: 0, // In a real scenario, count nested or linked meeting rooms
-        cabins:
-          s.inventory
-            ?.filter((i: any) => i.type === "PRIVATE_CABIN")
-            .reduce((sum: number, i: any) => sum + (i.totalUnits || 0), 0) || 0,
-        status: s.isActive ? "ACTIVE" : "INACTIVE",
-        type: "Coworking Space",
-      });
+    const properties = await PropertyModel.find({
+      partner: partnerId,
+      isDeleted: false,
     });
 
-    // Map Meeting Rooms
-    meetingRooms.forEach((s: any) => {
-      spaces.push({
-        id: s._id.toString(),
-        name: (s.property as any)?.name || "N/A",
-        city: (s.property as any)?.city || "N/A",
-        location: (s.property as any)?.area || "N/A",
-        availableSeats: s.capacity || 0,
-        totalSeats: s.capacity || 0,
-        meetingRooms: 1,
-        cabins: 0,
-        status: s.isActive ? "ACTIVE" : "INACTIVE",
-        type: "Meeting Room",
-      });
-    });
+    console.log(
+      `[DEBUG] Found ${properties.length} properties for partner: ${userId}`,
+    );
 
-    // Map Virtual Offices
-    virtualOffices.forEach((s: any) => {
-      spaces.push({
-        id: s._id.toString(),
-        name: (s.property as any)?.name || "N/A",
-        city: (s.property as any)?.city || "N/A",
-        location: (s.property as any)?.area || "N/A",
-        availableSeats: "N/A",
-        totalSeats: "N/A",
-        meetingRooms: 0,
-        cabins: 0,
-        status: s.isActive ? "ACTIVE" : "INACTIVE",
-        type: "Virtual Office",
-      });
-    });
+    const spaces = properties
+      .map((p: any) => {
+        try {
+          const pObj = typeof p.toObject === "function" ? p.toObject() : p;
+          // Stringify _id and id explicitly
+          const _id = String(pObj._id || pObj.id || "");
+          return {
+            _id,
+            id: _id,
+            name: pObj.name || "N/A",
+            city: pObj.city || "N/A",
+            area: pObj.area || "N/A",
+            location: pObj.area || "N/A",
+            status: pObj.isActive ? "ACTIVE" : "INACTIVE",
+            type: "Property",
+            kycStatus: pObj.kycStatus || "not_started",
+            propertyStatus: pObj.status || "draft",
+          };
+        } catch (err) {
+          console.error("Mapping error for property:", p._id, err);
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    console.log(`Successfully mapped ${spaces.length} spaces for response`);
+    if (spaces.length > 0) {
+      console.log("First space example:", JSON.stringify(spaces[0], null, 2));
+    }
 
     return res.status(200).json({
       success: true,
       data: spaces,
     });
   } catch (error) {
-    console.error("Failed to fetch all partner spaces:", error);
+    console.error("Failed to fetch all partner properties:", error);
     res.status(500).json({ success: false, message: "Failed to fetch spaces" });
   }
 };
@@ -380,9 +447,10 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     const userId = req.user?.id; // This is the partner requesting the data
 
     // SECURED: We now explicitly mandate that the booking's partner matches the logged-in user!
+    // HARDENED: Using explicit ObjectId casting to ensure reliable matching
     const filter: any = {
-      spaceId,
-      partner: userId, // <-- THIS PLUGS THE DATA LEAK
+      spaceId: new mongoose.Types.ObjectId(spaceId as string),
+      partner: new mongoose.Types.ObjectId(userId), // <-- THIS PLUGS THE DATA LEAK
       isDeleted: false,
     };
 
@@ -416,6 +484,67 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch bookings" });
+  }
+};
+
+export const getPartnerPropertyBookings = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { propertyId } = req.params;
+    const userId = req.user?.id;
+
+    if (!propertyId || !mongoose.Types.ObjectId.isValid(propertyId as string)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid property ID" });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // 1. Find all spaces belonging to this property
+    const [coworking, virtual, meeting] = await Promise.all([
+      CoworkingSpaceModel.find({
+        property: new mongoose.Types.ObjectId(propertyId as string),
+        isDeleted: false,
+      }).select("_id"),
+      VirtualOfficeModel.find({
+        property: new mongoose.Types.ObjectId(propertyId as string),
+        isDeleted: false,
+      }).select("_id"),
+      MeetingRoomModel.find({
+        property: new mongoose.Types.ObjectId(propertyId as string),
+        isDeleted: false,
+      }).select("_id"),
+    ]);
+
+    const spaceIds = [
+      ...coworking.map((s) => s._id),
+      ...virtual.map((s) => s._id),
+      ...meeting.map((s) => s._id),
+    ];
+
+    if (spaceIds.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // 2. Fetch all bookings for these spaces associated with this partner
+    const bookings = await BookingModel.find({
+      isDeleted: false,
+      spaceId: { $in: spaceIds },
+    })
+      .populate("user", "fullName email phone")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: bookings });
+  } catch (error) {
+    console.error("Get property bookings error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch property bookings" });
   }
 };
 
@@ -660,29 +789,111 @@ export const getAllBookings = async (req: Request, res: Response) => {
     const userId = req.user?.id;
     const { type, status, page = 1, limit = 10 } = req.query;
 
+    let normalizedType = type as string;
+    if (type === "virtual_office") normalizedType = "VirtualOffice";
+    else if (type === "coworking_space") normalizedType = "CoworkingSpace";
+    else if (type === "meeting_room") normalizedType = "MeetingRoom";
+
     const filter: any = { user: userId, isDeleted: false };
-    if (type) filter.type = type;
+    if (normalizedType) filter.type = normalizedType;
     if (status) filter.status = status;
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [bookings, total] = await Promise.all([
+    // Prepare seat filter if applicable
+    let seatFilter: any = null;
+    if (!normalizedType || normalizedType === "CoworkingSpace") {
+      seatFilter = { user: userId };
+      if (status) {
+        if (status === "active") seatFilter.status = "confirmed";
+        else if (status === "pending_payment") seatFilter.status = "pending";
+        else seatFilter.status = status;
+      }
+    }
+
+    // 1. Fetch data and counts
+    const [
+      bookingsRaw,
+      totalBookingsMain,
+      seatBookingsRaw,
+      totalSeatBookingsCount,
+    ] = await Promise.all([
       BookingModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
       BookingModel.countDocuments(filter),
+      seatFilter
+        ? SeatBookingModel.find(seatFilter)
+            .populate("space")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(Number(limit))
+        : Promise.resolve([]),
+      seatFilter
+        ? SeatBookingModel.countDocuments(seatFilter)
+        : Promise.resolve(0),
     ]);
 
+    // 2. Normalize seat bookings
+    const normalizedSeatBookings = (seatBookingsRaw as any[]).map((s) => {
+      const seatBooking = s.toObject() as any;
+      const space = seatBooking.space || {};
+
+      return {
+        _id: seatBooking._id,
+        bookingNumber: seatBooking.paymentId
+          ? `SB-${seatBooking.paymentId.slice(-6).toUpperCase()}`
+          : `SB-${seatBooking._id.toString().slice(-6).toUpperCase()}`,
+        type: "CoworkingSpace",
+        spaceId: space._id || seatBooking.space,
+        user: seatBooking.user,
+        spaceSnapshot: {
+          _id: space._id,
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          image: space.images?.[0] || "",
+        },
+        plan: {
+          name: "Seat Booking",
+          price: seatBooking.totalAmount,
+          tenure: 1,
+          tenureUnit: "booking",
+        },
+        status:
+          seatBooking.status === "confirmed"
+            ? "active"
+            : seatBooking.status === "pending"
+              ? "pending_payment"
+              : seatBooking.status,
+        startDate: seatBooking.startTime,
+        endDate: seatBooking.endTime,
+        createdAt: seatBooking.createdAt,
+        updatedAt: seatBooking.updatedAt,
+      };
+    });
+
+    // 4. Combine and Re-sort
+    // Note: This merging logic is simplified. For large datasets, a more robust paginated merge would be needed.
+    const allBookings = [
+      ...bookingsRaw.map((b) => b.toObject()),
+      ...normalizedSeatBookings,
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, Number(limit));
+
     // Calculate days remaining for each booking
-    const bookingsWithDays = bookings.map((b) => {
-      const booking = b.toObject();
+    const bookingsWithDays = allBookings.map((booking: any) => {
       if (booking.endDate) {
         const now = new Date();
         const end = new Date(booking.endDate);
         const diffTime = end.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        (booking as any).daysRemaining = diffDays > 0 ? diffDays : 0;
+        booking.daysRemaining = diffDays > 0 ? diffDays : 0;
       }
       return booking;
     });
@@ -691,9 +902,11 @@ export const getAllBookings = async (req: Request, res: Response) => {
       success: true,
       data: bookingsWithDays,
       pagination: {
-        total,
+        total: totalBookingsMain + totalSeatBookingsCount,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(
+          (totalBookingsMain + totalSeatBookingsCount) / Number(limit),
+        ),
       },
     });
   } catch (error) {
@@ -709,31 +922,84 @@ export const getBookingById = async (req: Request, res: Response) => {
     const userId = req.user?.id;
     const { bookingId } = req.params;
 
-    const booking = await BookingModel.findOne({
+    // 1. Try finding in main BookingModel
+    let booking = await BookingModel.findOne({
       _id: bookingId,
       user: userId,
       isDeleted: false,
     });
 
-    if (!booking) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Booking not found" });
+    if (booking) {
+      const bookingObj = booking.toObject() as any;
+      if (bookingObj.endDate) {
+        const now = new Date();
+        const end = new Date(bookingObj.endDate);
+        const diffTime = end.getTime() - now.getTime();
+        bookingObj.daysRemaining = Math.max(
+          0,
+          Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
+        );
+      }
+      return res.status(200).json({ success: true, data: bookingObj });
     }
 
-    // Calculate days remaining
-    const bookingObj = booking.toObject() as any;
-    if (bookingObj.endDate) {
-      const now = new Date();
-      const end = new Date(bookingObj.endDate);
-      const diffTime = end.getTime() - now.getTime();
-      bookingObj.daysRemaining = Math.max(
-        0,
-        Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
-      );
+    // 2. Try finding in SeatBookingModel
+    const seatBooking = await SeatBookingModel.findOne({
+      _id: bookingId,
+      user: userId,
+    }).populate("space");
+
+    if (seatBooking) {
+      const s = seatBooking.toObject() as any;
+      const space = s.space || {};
+      const normalized = {
+        _id: s._id,
+        bookingNumber: s.paymentId
+          ? `SB-${s.paymentId.slice(-6).toUpperCase()}`
+          : `SB-${s._id.toString().slice(-6).toUpperCase()}`,
+        type: "CoworkingSpace",
+        spaceId: space._id || s.space,
+        user: s.user,
+        spaceSnapshot: {
+          _id: space._id,
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          image: space.images?.[0] || "",
+        },
+        plan: {
+          name: "Seat Booking",
+          price: s.totalAmount,
+          tenure: 1,
+          tenureUnit: "booking",
+        },
+        status:
+          s.status === "confirmed"
+            ? "active"
+            : s.status === "pending"
+              ? "pending_payment"
+              : s.status,
+        startDate: s.startTime,
+        endDate: s.endTime,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      };
+
+      if ((normalized as any).endDate) {
+        const now = new Date();
+        const end = new Date((normalized as any).endDate);
+        const diffTime = end.getTime() - now.getTime();
+        (normalized as any).daysRemaining = Math.max(
+          0,
+          Math.ceil(diffTime / (1000 * 60 * 60 * 24)),
+        );
+      }
+      return res.status(200).json({ success: true, data: normalized });
     }
 
-    res.status(200).json({ success: true, data: bookingObj });
+    return res
+      .status(404)
+      .json({ success: false, message: "Booking not found" });
   } catch (error) {
     console.error("Get booking error:", error);
     res
