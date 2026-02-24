@@ -407,7 +407,7 @@ export class AdminService {
       // We need to fetch all relevant bookings to aggregate correctly
       // In a very large scale app, this should be an aggregation pipeline.
       const allBookings = await BookingModel.find(query)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber company")
         .populate("spaceSnapshot", "name city")
         .sort({ createdAt: -1 });
 
@@ -420,6 +420,18 @@ export class AdminService {
         const amount = Number(booking.amount || booking.plan?.price || 0);
         const date = new Date(booking.createdAt);
 
+        // Date fallbacks
+        let startDate = booking.startDate ? new Date(booking.startDate) : date;
+        let endDate = booking.endDate ? new Date(booking.endDate) : null;
+
+        if (!endDate && booking.plan?.tenure) {
+          endDate = new Date(startDate);
+          const tenure = Number(booking.plan.tenure) || 12;
+          const unit = booking.plan.tenureUnit || "months";
+          if (unit === "year" || unit === "years") endDate.setFullYear(endDate.getFullYear() + tenure);
+          else endDate.setMonth(endDate.getMonth() + tenure);
+        }
+
         if (existing) {
           existing.revenue += amount;
           existing.bookingCount += 1;
@@ -428,12 +440,18 @@ export class AdminService {
             existing.plan = booking.plan?.name || booking.type;
             existing.spaceName = booking.spaceSnapshot?.name || booking.location || existing.spaceName;
           }
+          if (startDate < existing.startDate) {
+            existing.startDate = startDate;
+          }
+          if (endDate && (!existing.endDate || endDate > existing.endDate)) {
+            existing.endDate = endDate;
+          }
         } else {
           clientMap.set(userId, {
             id: userId,
-            clientId: `CL-${userId.substring(userId.length - 4).toUpperCase()}`, // Stable ID based on user ID
+            clientId: `CL-${userId.substring(userId.length - 4).toUpperCase()}`,
             name: booking.user.email || "Unknown Email",
-            companyName: booking.user.fullName || "Individual",
+            companyName: booking.user.company || booking.user.fullName || "Individual",
             email: booking.user.email,
             phone: booking.user.phoneNumber || "+91 98765 43210",
             plan: booking.plan?.name || booking.type || "Standard Access",
@@ -441,6 +459,8 @@ export class AdminService {
             revenue: amount,
             bookingCount: 1,
             lastActivityDate: date,
+            startDate: startDate,
+            endDate: endDate,
             initials: (booking.user.fullName || "CL").substring(0, 2).toUpperCase(),
           });
         }
