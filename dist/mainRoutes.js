@@ -18,13 +18,13 @@ const ticket_routes_1 = require("./flashspaceWeb/ticketModule/routes/ticket.rout
 const meetingScheduler_routes_1 = require("./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes");
 const affiliate_routes_1 = require("./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes");
 const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
-const feedback_routes_1 = require("./flashspaceWeb/feebackModule/feedback.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
 const meetingRoom_routes_1 = require("./flashspaceWeb/meetingRoomModule/meetingRoom.routes");
 // Importing seat booking routes
 const seating_routes_1 = require("./flashspaceWeb/seatingModule/seating.routes");
 const review_routes_1 = require("./flashspaceWeb/reviewsModule/review.routes");
 const mail_routes_1 = __importDefault(require("./flashspaceWeb/mailModule/routes/mail.routes"));
+const property_routes_1 = require("./flashspaceWeb/propertyModule/property.routes");
 exports.mainRoutes = (0, express_1.Router)();
 const mongoose_1 = __importDefault(require("mongoose"));
 // /api/health - Check server and DB status
@@ -51,10 +51,7 @@ exports.mainRoutes.use("/auth", auth_routes_1.authRoutes);
 exports.mainRoutes.use("/contactForm", contactForm_routes_1.contactFormRoutes);
 // /api/affiliate (Affiliate Portal APIs)
 exports.mainRoutes.use("/affiliate", affiliate_routes_1.affiliateRoutes);
-// /api/feeback
-exports.mainRoutes.use("/feedback", feedback_routes_1.feedbackRoutes);
-// /api/spaceProvider
-// mainRoutes.use("/spaceProvider", spaceProviderRoutes);
+exports.mainRoutes.use("/reviews", review_routes_1.reviewRoutes);
 // /api/virtualOffice
 exports.mainRoutes.use("/virtualOffice", virtualOffice_routes_1.virtualOfficeRoutes);
 // /api/coworkingSpace
@@ -72,7 +69,6 @@ exports.mainRoutes.use("/spacePartner", spacePartner_routes_1.spacePartnerRoutes
 // /api/meetings (Meeting Scheduler APIs)
 exports.mainRoutes.use("/meetings", meetingScheduler_routes_1.meetingSchedulerRoutes);
 // /api/coupon
-// /api/coupon
 exports.mainRoutes.use("/coupon", coupon_routes_1.couponRoutes);
 // /api/mail
 exports.mainRoutes.use("/mail", mail_routes_1.default);
@@ -80,8 +76,9 @@ exports.mainRoutes.use("/mail", mail_routes_1.default);
 exports.mainRoutes.use("/meetingRoom", meetingRoom_routes_1.meetingRoomRoutes);
 // /api/seat-bookings
 exports.mainRoutes.use("/seat-bookings", seating_routes_1.SeatBookingRoutes);
-exports.mainRoutes.use("/reviews", review_routes_1.reviewRoutes);
 exports.mainRoutes.use("/tickets", ticket_routes_1.ticketRoutes);
+// /api/property
+exports.mainRoutes.use("/property", property_routes_1.propertyRoutes);
 // /api/notifications
 const notification_routes_1 = require("./flashspaceWeb/notificationModule/routes/notification.routes");
 exports.mainRoutes.use("/notifications", notification_routes_1.notificationRoutes);
