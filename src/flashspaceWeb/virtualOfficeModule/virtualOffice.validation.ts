@@ -11,18 +11,34 @@ const LocationSchema = z.object({
 
 export const createVirtualOfficeSchema = z.object({
   body: z.object({
-    name: z.string().min(3, "Name must be at least 3 characters long"),
-    address: z.string().min(5, "Address must be at least 5 characters long"),
-    city: z.string().min(2, "City must be at least 2 characters long"),
-    area: z.string().min(2, "Area must be at least 2 characters long"),
+    name: z
+      .string()
+      .min(3, "Name must be at least 3 characters long")
+      .optional(),
+    address: z
+      .string()
+      .min(5, "Address must be at least 5 characters long")
+      .optional(),
+    city: z
+      .string()
+      .min(2, "City must be at least 2 characters long")
+      .optional(),
+    area: z
+      .string()
+      .min(2, "Area must be at least 2 characters long")
+      .optional(),
+    propertyId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
 
     // FIXED: Updated to Numbers and matching the Model property names
-    gstPlanPricePerYear: z.number().nonnegative().optional(),
-    mailingPlanPricePerYear: z.number().nonnegative().optional(),
-    brPlanPricePerYear: z.number().nonnegative().optional(),
+    finalGstPricePerYear: z.number().nonnegative(),
+    finalMailingPricePerYear: z.number().nonnegative(),
+    finalBrPricePerYear: z.number().nonnegative(),
 
     features: z.array(z.string()).min(1, "At least one feature is required"),
-    amenities: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
     popular: z.boolean().optional(),
     sponsored: z.boolean().optional(),
     location: LocationSchema.optional(), // FIXED: Replaced coordinates
@@ -73,6 +89,10 @@ export const getVirtualOfficesSchema = z.object({
       .refine((val) => !val || val <= 100, {
         message: "Limit cannot exceed 100",
       })
+      .optional(),
+    property: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
       .optional(),
   }),
 });

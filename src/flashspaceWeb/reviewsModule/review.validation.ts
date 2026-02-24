@@ -15,6 +15,7 @@ export const createReviewSchema = z.object({
       .min(2, "Comment must be at least 2 characters")
       .max(500),
     reviewImages: z.array(z.string()).optional(),
+    npsScore: z.number().min(0).max(10).optional(),
   }),
 });
 

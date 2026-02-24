@@ -84,6 +84,9 @@ export class Review {
   @prop({ type: () => [String], default: [] })
   public reviewImages?: string[];
 
+  @prop({ min: 0, max: 10 })
+  public npsScore?: number;
+
   // Fixed: Accepts spaceModelName to avoid querying all collections
   public static async calcAverageRatings(
     spaceId: string,

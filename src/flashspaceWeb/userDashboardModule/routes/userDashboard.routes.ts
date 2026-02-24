@@ -25,6 +25,7 @@ import {
   getPartnerDashboardOverview,
   getPartnerActiveRequests,
   getPartnerSpaceBookings,
+  getPartnerPropertyBookings,
   getPartnerClients,
   getPartnerClientDetails,
   getAllPartnerSpaces,
@@ -33,6 +34,7 @@ import {
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
+
 // All routes require authentication
 router.use(AuthMiddleware.authenticate);
 
@@ -46,6 +48,10 @@ router.get("/visit", getUserVisits);
 router.get("/dashboard", getDashboardOverview);
 
 // ============ PARTNER BOOKINGS ============
+router.get(
+  "/partner/property/:propertyId/bookings",
+  getPartnerPropertyBookings,
+);
 router.get("/partner/dashboard", getPartnerDashboardOverview);
 router.get("/partner/active-requests", getPartnerActiveRequests);
 router.get("/partner/spaces", getAllPartnerSpaces);
