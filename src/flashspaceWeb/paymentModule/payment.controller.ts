@@ -448,7 +448,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
           }
         );
         // -------------------------------------
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to create booking:", err);
       }
 
@@ -551,7 +551,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       bookingData = await createBookingAndInvoice(payment);
 
       // -------------------------------------
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create booking:", err);
     }
 

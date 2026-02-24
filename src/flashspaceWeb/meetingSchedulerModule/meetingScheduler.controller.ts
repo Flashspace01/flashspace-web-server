@@ -39,7 +39,7 @@ export const initiateGoogleAuth = async (_req: Request, res: Response) => {
       data: { authUrl },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error initiating Google auth:", err);
     res.status(500).json({
       success: false,
@@ -67,7 +67,7 @@ export const handleGoogleCallback = async (req: Request, res: Response) => {
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     res.redirect(`${frontendUrl}/admin/calendar?auth=success`);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error handling Google callback:", err);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     res.redirect(`${frontendUrl}/admin/calendar?auth=error`);
@@ -88,7 +88,7 @@ export const getAuthStatus = async (_req: Request, res: Response) => {
       },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting auth status:", err);
     res.status(500).json({
       success: false,
@@ -118,7 +118,7 @@ export const revokeGoogleAuth = async (_req: Request, res: Response) => {
         error: "Revocation failed",
       });
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error revoking Google auth:", err);
     res.status(500).json({
       success: false,
@@ -148,7 +148,7 @@ export const getAvailability = async (req: Request, res: Response) => {
       },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting availability:", err);
     res.status(500).json({
       success: false,
@@ -190,7 +190,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
 
 
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error booking meeting:", err);
     res.status(500).json({
       success: false,
@@ -231,7 +231,7 @@ export const getMeetingDetails = async (req: Request, res: Response) => {
       data: meeting,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting meeting details:", err);
     res.status(500).json({
       success: false,
@@ -261,7 +261,7 @@ export const getScheduledCalls = async (req: Request, res: Response) => {
       data: meetings,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting scheduled calls:", err);
     res.status(500).json({
       success: false,

@@ -1180,7 +1180,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
       }
