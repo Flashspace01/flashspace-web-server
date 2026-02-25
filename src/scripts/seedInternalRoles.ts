@@ -14,7 +14,7 @@ const internalUsers = [
     },
     {
         email: 'admin@flashspace.co',
-        fullName: 'System Admin',
+        fullName: 'Admin',
         role: UserRole.ADMIN,
         password: 'Password@123',
     },

@@ -197,7 +197,11 @@ export class AdminService {
       const query: any = { isDeleted: deleted ? true : { $ne: true } };
 
       if (role && role !== "all") {
-        query.role = role;
+        if (role === 'team') {
+          query.role = { $in: STAFF_ROLES };
+        } else {
+          query.role = role;
+        }
       }
 
       if (search) {
@@ -215,16 +219,18 @@ export class AdminService {
 
       const total = await UserModel.countDocuments(query);
 
-      // Global stats for dashboard cards (independent of current filter/page)
+      // Global stats for dashboard cards (scoped to current filter)
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
+      const statsQuery = { ...query };
+
       const stats = {
-        total: await UserModel.countDocuments({ isDeleted: { $ne: true } }),
-        verified: await UserModel.countDocuments({ isDeleted: { $ne: true }, isEmailVerified: true }),
+        total: await UserModel.countDocuments(statsQuery),
+        verified: await UserModel.countDocuments({ ...statsQuery, isEmailVerified: true }),
         newThisMonth: await UserModel.countDocuments({
-          isDeleted: { $ne: true },
+          ...statsQuery,
           createdAt: { $gte: startOfMonth }
         }),
       };
