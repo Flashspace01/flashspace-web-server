@@ -23,6 +23,7 @@ spacePartnerRoutes.put("/space-details/:id/reject", rejectSpaceDetails);
 spacePartnerRoutes.post("/space-details", setSpaceDetails);
 spacePartnerRoutes.get("/space-details", getAllSpaceDetails);
 
+
 // Space management routes
 spacePartnerRoutes.post("/spaces", spaceController.createSpace);
 spacePartnerRoutes.get("/spaces", spaceController.getSpaces);
@@ -42,4 +43,14 @@ spacePartnerRoutes.post(
 	uploadKYCFile.single("file"),
 	spaceKycController.uploadSpaceUserKycFile,
 );
+
+
+// Partner invoice-payment routes
+import * as partnerFinancialsController from "../controllers/partnerFinancials.controller";
+
+spacePartnerRoutes.post("/invoices", partnerFinancialsController.createInvoice);
+spacePartnerRoutes.get("/invoices", partnerFinancialsController.getInvoices);
+
+spacePartnerRoutes.post("/payments", partnerFinancialsController.createPayment);
+spacePartnerRoutes.get("/payments", partnerFinancialsController.getPayments);
 

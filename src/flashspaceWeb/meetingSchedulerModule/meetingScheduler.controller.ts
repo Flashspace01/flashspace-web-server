@@ -10,15 +10,24 @@ import { NotificationType } from "../notificationModule/models/Notification";
 export const initiateGoogleAuth = async (_req: Request, res: Response) => {
   try {
     console.log("DEBUG: initiateGoogleAuth called");
-    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_ID status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_ID ? "Present" : "Missing");
-    console.log("DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET status:", process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET ? "Present" : "Missing");
+    console.log(
+      "DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_ID status:",
+      process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_ID ? "Present" : "Missing",
+    );
+    console.log(
+      "DEBUG: MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET status:",
+      process.env.MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET
+        ? "Present"
+        : "Missing",
+    );
 
     if (!GoogleCalendarService.isConfigured()) {
       return res.status(500).json({
         success: false,
         message: "Google OAuth not configured",
         data: {},
-        error: "Missing MEETING_SCHEDULER_GOOGLE_CLIENT_ID or MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET",
+        error:
+          "Missing MEETING_SCHEDULER_GOOGLE_CLIENT_ID or MEETING_SCHEDULER_GOOGLE_CLIENT_SECRET",
       });
     }
 
@@ -30,7 +39,7 @@ export const initiateGoogleAuth = async (_req: Request, res: Response) => {
       data: { authUrl },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error initiating Google auth:", err);
     res.status(500).json({
       success: false,
@@ -58,7 +67,7 @@ export const handleGoogleCallback = async (req: Request, res: Response) => {
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     res.redirect(`${frontendUrl}/admin/calendar?auth=success`);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error handling Google callback:", err);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     res.redirect(`${frontendUrl}/admin/calendar?auth=error`);
@@ -79,7 +88,7 @@ export const getAuthStatus = async (_req: Request, res: Response) => {
       },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting auth status:", err);
     res.status(500).json({
       success: false,
@@ -109,7 +118,7 @@ export const revokeGoogleAuth = async (_req: Request, res: Response) => {
         error: "Revocation failed",
       });
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error revoking Google auth:", err);
     res.status(500).json({
       success: false,
@@ -139,7 +148,7 @@ export const getAvailability = async (req: Request, res: Response) => {
       },
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting availability:", err);
     res.status(500).json({
       success: false,
@@ -181,7 +190,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
 
 
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error booking meeting:", err);
     res.status(500).json({
       success: false,
@@ -194,7 +203,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
 
 export const getMeetingDetails = async (req: Request, res: Response) => {
   try {
-    const { meetingId } = req.params;
+    const meetingId = req.params.meetingId as string;
 
     if (!Types.ObjectId.isValid(meetingId)) {
       return res.status(400).json({
@@ -222,7 +231,7 @@ export const getMeetingDetails = async (req: Request, res: Response) => {
       data: meeting,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting meeting details:", err);
     res.status(500).json({
       success: false,
@@ -252,7 +261,7 @@ export const getScheduledCalls = async (req: Request, res: Response) => {
       data: meetings,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Error getting scheduled calls:", err);
     res.status(500).json({
       success: false,

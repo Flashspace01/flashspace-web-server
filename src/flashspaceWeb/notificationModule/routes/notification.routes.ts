@@ -1,14 +1,27 @@
 
 import { Router } from "express";
-import { getAdminNotifications, deleteNotification, markAsRead } from "../controllers/notification.controller";
+import { getAdminNotifications, getUserNotifications, deleteNotification, markAsRead, deleteAllForAdmin, markAllAsRead, deleteAllForUser } from "../controllers/notification.controller";
+import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 
 export const notificationRoutes = Router();
 
 // GET /api/notifications/admin
 notificationRoutes.get("/admin", getAdminNotifications);
 
+// GET /api/notifications (current user)
+notificationRoutes.get("/", AuthMiddleware.authenticate, getUserNotifications);
+
+// DELETE /api/notifications/all
+notificationRoutes.delete("/all", AuthMiddleware.authenticate, deleteAllForUser);
+
 // DELETE /api/notifications/:id
 notificationRoutes.delete("/:id", deleteNotification);
 
+// DELETE /api/notifications/admin/all
+notificationRoutes.delete("/admin/all", deleteAllForAdmin);
+
 // PATCH /api/notifications/:id/read
 notificationRoutes.patch("/:id/read", markAsRead);
+
+// PATCH /api/notifications/read-all
+notificationRoutes.patch("/read-all", AuthMiddleware.authenticate, markAllAsRead);

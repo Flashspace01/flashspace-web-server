@@ -7,8 +7,15 @@ import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
-import { UserModel } from "../authModule/models/user.model";
-import { CreditLedgerModel, CreditSource } from "../userDashboardModule/models/creditLedger.model";
+import { UserModel, UserRole } from "../authModule/models/user.model";
+import {
+  CreditLedgerModel,
+  CreditSource,
+} from "../userDashboardModule/models/creditLedger.model";
+import { NotificationType } from "../notificationModule/models/Notification";
+import { NotificationService } from "../notificationModule/services/notification.service";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -20,8 +27,19 @@ const razorpay = new Razorpay({
 async function createBookingAndInvoice(payment: any) {
   try {
     // Generate booking number
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    // Generate a collision-safe booking number by finding the current max sequence
+    // (countDocuments fails when bookings are deleted — the sequence desync causes duplicates)
+    const lastBooking = await BookingModel.findOne({}, { bookingNumber: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
+    const year = new Date().getFullYear();
+    let nextSeq = 1;
+    if (lastBooking?.bookingNumber) {
+      const parts = lastBooking.bookingNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    }
+    const bookingNumber = `FS-${year}-${String(nextSeq).padStart(5, "0")}`;
 
     // Get space details for snapshot
     let spaceSnapshot: any = {
@@ -38,8 +56,8 @@ async function createBookingAndInvoice(payment: any) {
           address: space.address,
           city: space.city,
           area: space.area,
-          image: space.image,
-          coordinates: space.coordinates,
+          image: space.images?.[0] || "",
+          coordinates: space.location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
@@ -51,24 +69,69 @@ async function createBookingAndInvoice(payment: any) {
           address: space.address,
           city: space.city,
           area: space.area,
-          image: space.image,
-          coordinates: space.coordinates,
+          image: space.images?.[0] || "",
+          coordinates: space.location?.coordinates || [],
+        };
+      }
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.spaceId);
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: space.name,
+          address: space.address,
+          city: space.city,
+          area: space.area,
+          image: space.images?.[0] || "",
+          coordinates: space.location?.coordinates || [],
         };
       }
     }
-    // For MEETING_ROOM, we rely on the initial spaceSnapshot (name and ID from payment)
-    // or we could add specific MeetingRoomModel lookup later.
+
+    // Get partner ID from the space model directly (used for security & fast queries)
+    let partnerId;
+    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+      const space = await VirtualOfficeModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
+      const space = await CoworkingSpaceModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.spaceId);
+      partnerId = space?.partner;
+    }
+
+    // Fallback: If no partner is assigned to the space, find the first admin to assign as partner
+    // This prevents booking failure when space data is incomplete.
+    if (!partnerId) {
+      console.warn(`Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`);
+      const adminUser = await UserModel.findOne({ role: UserRole.ADMIN, isDeleted: { $ne: true } });
+      if (adminUser) {
+        partnerId = adminUser._id;
+      } else {
+        // Last resort: Use the user themselves or keep undefined if we really have no admins (unlikely)
+        console.error("No admin found for fallback. Booking might still fail validation.");
+      }
+    }
 
     // Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + (payment.tenure * 12)); // tenure in years
+    const startDate = payment.startDate
+      ? new Date(payment.startDate)
+      : new Date();
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
 
     // Create booking
     const booking = await BookingModel.create({
       bookingNumber,
       user: payment.userId,
-      type: payment.paymentType === PaymentType.VIRTUAL_OFFICE ? "virtual_office" : payment.paymentType === PaymentType.MEETING_ROOM ? "meeting_room" : "coworking_space",
+      partnerId: partnerId, // Added partnerId which is required by the model
+      type:
+        payment.paymentType === PaymentType.VIRTUAL_OFFICE
+          ? "virtual_office"
+          : payment.paymentType === PaymentType.MEETING_ROOM
+            ? "meeting_room"
+            : "coworking_space",
       spaceId: payment.spaceId,
       spaceSnapshot,
       plan: {
@@ -96,12 +159,28 @@ async function createBookingAndInvoice(payment: any) {
       startDate,
       endDate,
       autoRenew: false,
-      features: ["Business Address", "Mail Handling", "GST Registration Support"],
+      features: [
+        "Business Address",
+        "Mail Handling",
+        "GST Registration Support",
+      ],
+      couponCode: payment.couponCode || undefined,
+      affiliateId: payment.affiliateId ? payment.affiliateId : undefined,
     });
 
     // Generate invoice number
-    const invoiceCount = await InvoiceModel.countDocuments();
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+    // Collision-safe invoice number (same approach as booking number)
+    const lastInvoice = await InvoiceModel.findOne({}, { invoiceNumber: 1 })
+      .sort({ createdAt: -1 })
+      .lean();
+    const invYear = new Date().getFullYear();
+    let nextInvSeq = 1;
+    if (lastInvoice?.invoiceNumber) {
+      const parts = lastInvoice.invoiceNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) nextInvSeq = lastSeq + 1;
+    }
+    const invoiceNumber = `INV-${invYear}-${String(nextInvSeq).padStart(5, "0")}`;
 
     // Calculate tax (18% GST)
     const subtotal = payment.totalAmount;
@@ -166,7 +245,7 @@ async function createBookingAndInvoice(payment: any) {
       if (creditsEarned > 0) {
         // Update User
         await UserModel.findByIdAndUpdate(payment.userId, {
-          $inc: { credits: creditsEarned }
+          $inc: { credits: creditsEarned },
         });
 
         // Get updated user to get new balance
@@ -179,7 +258,7 @@ async function createBookingAndInvoice(payment: any) {
           source: CreditSource.BOOKING,
           description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
           referenceId: booking._id?.toString(),
-          balanceAfter: user?.credits || 0
+          balanceAfter: user?.credits || 0,
         });
       }
     }
@@ -212,14 +291,25 @@ export const createOrder = async (req: Request, res: Response) => {
       discountPercent,
       discountAmount,
       paymentType = PaymentType.VIRTUAL_OFFICE,
+      startDate,
+      couponCode,
+      affiliateId,
     } = req.body;
 
     // Validation
-    if (!userId || !userEmail || !spaceId || !planName || !tenure || !totalAmount) {
+    if (
+      !userId ||
+      !userEmail ||
+      !spaceId ||
+      !planName ||
+      !tenure ||
+      !totalAmount
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
-        error: "userId, userEmail, spaceId, planName, tenure, and totalAmount are required",
+        error:
+          "userId, userEmail, spaceId, planName, tenure, and totalAmount are required",
       });
     }
 
@@ -227,11 +317,13 @@ export const createOrder = async (req: Request, res: Response) => {
     let razorpayOrder;
 
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.warn("Razorpay keys missing - Switching to DEV MODE (Mock Order)");
+      console.warn(
+        "Razorpay keys missing - Switching to DEV MODE (Mock Order)",
+      );
       razorpayOrder = {
         id: `order_mock_${Date.now()}`,
         amount: Math.round(totalAmount * 100),
-        currency: "INR"
+        currency: "INR",
       };
     } else {
       // Create Razorpay order (receipt max 40 chars)
@@ -279,6 +371,9 @@ export const createOrder = async (req: Request, res: Response) => {
       totalAmount,
       discountPercent: discountPercent || 0,
       discountAmount: discountAmount || 0,
+      startDate: startDate ? new Date(startDate) : undefined,
+      couponCode: couponCode || undefined,
+      affiliateId: affiliateId || undefined,
     });
 
     res.status(201).json({
@@ -325,7 +420,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
           razorpaySignature: razorpay_signature || "dev_signature",
           status: PaymentStatus.COMPLETED,
         },
-        { new: true }
+        { new: true },
       );
 
       if (!payment) {
@@ -339,9 +434,60 @@ export const verifyPayment = async (req: Request, res: Response) => {
       let bookingData = null;
       try {
         bookingData = await createBookingAndInvoice(payment);
-      } catch (err) {
+
+        // --- NOTIFICATION LOGIC (DEV MODE) ---
+        await NotificationService.notifyUser(
+          payment.userId.toString(),
+          "Booking Confirmed! 🎉",
+          `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          NotificationType.SUCCESS,
+          {
+            bookingId: bookingData?.booking?._id,
+            paymentId: payment._id,
+            type: "booking_confirmation",
+          }
+        );
+
+        if (bookingData?.invoiceNumber) {
+          await NotificationService.notifyUser(
+            payment.userId.toString(),
+            "Invoice Generated 📄",
+            `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+            NotificationType.INFO,
+            {
+              invoiceNumber: bookingData.invoiceNumber,
+              type: "invoice_generated",
+              actionUrl: "/dashboard/documents"
+            }
+          );
+        }
+        // -------------------------------------
+      } catch (err: any) {
         console.error("Failed to create booking:", err);
       }
+
+      // --- MARK COUPON AS USED (DEV MODE) ---
+      if (payment.couponCode) {
+        try {
+          const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+          if (coupon) {
+            if (coupon.isAffiliateCoupon) {
+              await CouponModel.updateOne(
+                { _id: coupon._id },
+                { $addToSet: { usedBy: payment.userId.toString() } }
+              );
+            } else {
+              coupon.status = CouponStatus.USED;
+              coupon.usedAt = new Date();
+              coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+              await coupon.save();
+            }
+          }
+        } catch (couponErr) {
+          console.error("Failed to mark coupon as used in DEV MODE:", couponErr);
+        }
+      }
+      // -------------------------------------
 
       return res.status(200).json({
         success: true,
@@ -385,8 +531,8 @@ export const verifyPayment = async (req: Request, res: Response) => {
         { razorpayOrderId: razorpay_order_id },
         {
           status: PaymentStatus.FAILED,
-          errorMessage: "Signature verification failed"
-        }
+          errorMessage: "Signature verification failed",
+        },
       );
 
       return res.status(400).json({
@@ -403,7 +549,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         razorpaySignature: razorpay_signature,
         status: PaymentStatus.COMPLETED,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!payment) {
@@ -417,9 +563,62 @@ export const verifyPayment = async (req: Request, res: Response) => {
     let bookingData = null;
     try {
       bookingData = await createBookingAndInvoice(payment);
-    } catch (err) {
+
+      // -------------------------------------
+    } catch (err: any) {
       console.error("Failed to create booking:", err);
     }
+
+    // --- MARK COUPON AS USED (PROD MODE) ---
+    if (payment.couponCode) {
+      try {
+        const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+        if (coupon) {
+          if (coupon.isAffiliateCoupon) {
+            await CouponModel.updateOne(
+              { _id: coupon._id },
+              { $addToSet: { usedBy: payment.userId.toString() } }
+            );
+          } else {
+            coupon.status = CouponStatus.USED;
+            coupon.usedAt = new Date();
+            coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+            await coupon.save();
+          }
+        }
+      } catch (couponErr) {
+        console.error("Failed to mark coupon as used in PROD MODE:", couponErr);
+      }
+    }
+    // ---------------------------------------
+
+    // --- NOTIFICATION LOGIC (PROD MODE) ---
+    await NotificationService.notifyUser(
+      payment.userId.toString(),
+      "Booking Confirmed! 🎉",
+      `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+      NotificationType.SUCCESS,
+      {
+        bookingId: bookingData?.booking?._id,
+        paymentId: payment._id,
+        type: "booking_confirmation",
+      }
+    );
+
+    if (bookingData?.invoiceNumber) {
+      await NotificationService.notifyUser(
+        payment.userId.toString(),
+        "Invoice Generated 📄",
+        `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+        NotificationType.INFO,
+        {
+          invoiceNumber: bookingData.invoiceNumber,
+          type: "invoice_generated",
+          actionUrl: "/dashboard/documents"
+        }
+      );
+    }
+    // -------------------------------------
 
     res.status(200).json({
       success: true,
@@ -580,7 +779,7 @@ export const handlePaymentFailure = async (req: Request, res: Response) => {
         status: PaymentStatus.FAILED,
         errorMessage: `${error_code}: ${error_description}`,
       },
-      { new: true }
+      { new: true },
     );
 
     res.status(200).json({

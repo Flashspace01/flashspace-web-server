@@ -1,96 +1,119 @@
-import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  modelOptions,
+  index,
+  Ref,
+  Severity,
+} from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
+import { GeoLocation } from "../shared/geolocation.schema";
 
+export enum InventoryType {
+  PRIVATE_CABIN = "PRIVATE_CABIN",
+  OPEN_DESK = "OPEN_DESK",
+  OTHER = "OTHER",
+}
 
-enum DeskType {
-    HotDesk = "Hot Desk",
-    DedicatedDesk = "Dedicated Desk",
-    PrivateOffice = "Private Office",
-    SharedDesk = "Shared Desk"
+class InventoryItem {
+  @prop({ required: true, enum: InventoryType })
+  public type!: InventoryType;
+
+  // Required only if type is "OTHER"
+  @prop({ required: false, trim: true })
+  public customName?: string;
+
+  @prop({ required: true, default: 0 })
+  public totalUnits!: number;
+
+  // --- Long-Term Pricing ---
+  @prop({ required: false, default: 0 })
+  public pricePerMonth?: number;
+
+  @prop({ required: false, default: 0 })
+  public pricePerYear?: number;
+
+  // --- Short-Term "Day Pass" Pricing ---
+  @prop({ required: false })
+  public pricePerDay?: number;
+
+  @prop({ required: false })
+  public pricePerHour?: number;
+}
+
+class OperatingHours {
+  @prop({ required: true, trim: true })
+  public openTime!: string; // e.g., "09:00"
+
+  @prop({ required: true, trim: true })
+  public closeTime!: string; // e.g., "18:00"
+
+  @prop({ type: () => [String], required: true })
+  public daysOpen!: string[]; // e.g., ["Monday", "Tuesday", "Wednesday"]
 }
 
 @modelOptions({
-    schemaOptions: {
-        timestamps: true
-    }
+  schemaOptions: { timestamps: true },
+  options: { allowMixed: Severity.ALLOW },
 })
-@index({ city: 1, area: 1 }) // Location-based searches
-@index({ isDeleted: 1, isActive: 1 }) // Filter active spaces
-@index({ type: 1, city: 1 }) // Desk type + location queries
-@index({ popular: 1, rating: -1 }) // Featured/popular spaces
-@index({ "coordinates.lat": 1, "coordinates.lng": 1 }) // Geospatial queries
-@index({ price: 1 }) // Price-based filtering
+@index({ city: 1, area: 1 })
+@index({ "inventory.type": 1 })
+@index({ popular: 1 })
+@index({ avgRating: -1 })
+@index({ location: "2dsphere" })
 export class CoworkingSpace {
-    @prop({ required: true, trim: true })
-    public name!: string;
+  @prop({ required: true, trim: true })
+  public name!: string;
 
-    @prop({ required: true })
-    public address!: string;
+  @prop({ required: true })
+  public address!: string;
 
-    @prop({ required: true, trim: true })
-    public city!: string;
+  @prop({ required: true, index: true })
+  public city!: string;
 
-    @prop({ required: true, trim: true })
-    public area!: string;
+  @prop({ required: true, index: true })
+  public area!: string;
 
-    @prop({ required: true })
-    public price!: string;
+  @prop({ type: () => GeoLocation, _id: false })
+  public location?: GeoLocation;
 
-    @prop({ required: false })
-    public priceYearly?: string;
+  @prop({ required: true })
+  public capacity!: number;
 
+  @prop({ default: false })
+  public sponsored!: boolean;
 
-    @prop({ required: true })
-    public originalPrice!: string;
+  @prop({ default: false })
+  public popular!: boolean;
 
-    @prop({ required: false })
-    public gstPlanPrice!: string;
+  // The restructured inventory
+  @prop({ type: () => [InventoryItem], _id: false })
+  public inventory!: InventoryItem[];
 
-    @prop({ required: false })
-    public mailingPlanPrice!: string;
+  // Added Operating Hours for Day Pass logic
+  @prop({ type: () => OperatingHours, _id: false })
+  public operatingHours?: OperatingHours;
 
-    @prop({ required: false })
-    public brPlanPrice!: string;
+  @prop({ type: () => [String] })
+  public amenities!: string[];
 
-    @prop({ required: true, default: 4.0 })
-    public rating!: number;
+  @prop({ default: 0 })
+  public avgRating!: number;
 
-    @prop({ required: true, default: 0 })
-    public reviews!: number;
+  @prop({ default: 0 })
+  public totalReviews!: number;
 
-    @prop({ required: true, enum: DeskType })
-    public type!: DeskType;
+  @prop({ type: () => [String], required: true })
+  public images!: string[];
 
-    @prop({ required: true, type: () => [String] })
-    public features!: string[];
+  @prop({ default: true })
+  public isActive!: boolean;
 
-    @prop({ required: true, default: "Available Now" })
-    public availability!: string;
+  @prop({ default: false })
+  public isDeleted!: boolean;
 
-    @prop({ default: false })
-    public popular!: boolean;
-
-    @prop({ type: () => Object })
-    public coordinates?: {
-        lat: number;
-        lng: number;
-    };
-
-    @prop({ type: () => String })
-    public image?: string;
-
-    @prop({ default: false })
-    public isDeleted?: boolean;
-
-    @prop({ default: true })
-    public isActive?: boolean;
-
-    @prop({ ref: () => User })
-    public partner?: Ref<User>;
-
-    @prop({ ref: () => User, default: [] })
-    public managers?: Ref<User>[];
+  @prop({ ref: () => User, required: true })
+  public partner!: Ref<User>;
 }
 
 export const CoworkingSpaceModel = getModelForClass(CoworkingSpace);
-// Schema Updated

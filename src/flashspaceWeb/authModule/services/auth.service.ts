@@ -29,6 +29,7 @@ export class AuthService {
   async signup(signupData: SignupRequest): Promise<AuthResponse> {
     try {
       const { email, password, confirmPassword, fullName, phoneNumber, role } = signupData;
+      console.log('Backend signup - Processing role:', role);
 
       // Validate passwords match
       if (password !== confirmPassword) {
@@ -48,8 +49,10 @@ export class AuthService {
       }
 
       // Validate role (only allow 'user' or 'partner', default to 'user')
-      const allowedRoles: string[] = [UserRole.USER, UserRole.PARTNER];
+      const allowedRoles: string[] = [UserRole.USER, UserRole.PARTNER, UserRole.AFFILIATE];
+      console.log('Allowed Roles:', allowedRoles);
       const selectedRole: UserRole = (role && allowedRoles.includes(role) ? role : UserRole.USER) as UserRole;
+      console.log('Selected Role:', selectedRole);
 
       // Check if user already exists
       const existingUser = await this.userRepository.findByEmail(email);
@@ -89,6 +92,8 @@ export class AuthService {
       try {
         await EmailUtil.sendEmailVerificationOTP(email, otpData.otp, fullName);
         console.log('✅ Verification OTP sent to:', email);
+        console.log('Signup Request Body:', JSON.stringify(signupData, null, 2));
+        console.log('Received Role:', signupData.role);
         console.log('📌 OTP Code (for testing):', otpData.otp);
       } catch (emailError) {
         console.error('Error sending verification OTP:', emailError);
@@ -103,7 +108,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         }
       };
     } catch (error) {
@@ -186,7 +192,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         },
         tokens
       };
@@ -199,7 +206,7 @@ export class AuthService {
     }
   }
 
-  async googleAuthWithToken(idToken: string): Promise<AuthResponse> {
+  async googleAuthWithToken(idToken: string, role?: string): Promise<AuthResponse> {
     try {
       // Import GoogleUtil
       const { GoogleUtil } = await import('../utils/google.util');
@@ -212,6 +219,10 @@ export class AuthService {
           success: false,
           message: 'Invalid Google token'
         };
+      }
+
+      if (role) {
+        profile.role = role;
       }
 
       // Continue with existing Google auth logic
@@ -258,7 +269,7 @@ export class AuthService {
           fullName: profile.displayName,
           googleId: profile.id,
           authProvider: AuthProvider.GOOGLE,
-          role: UserRole.USER,
+          role: (profile.role as UserRole) || UserRole.USER, // Use provided role or default to USER
           isEmailVerified: true, // Google emails are pre-verified
           refreshTokens: []
         };
@@ -293,7 +304,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         },
         tokens
       };
@@ -332,7 +344,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         }
       };
     } catch (error) {
@@ -704,7 +717,8 @@ export class AuthService {
           email: verifiedUser.email,
           fullName: verifiedUser.fullName,
           role: verifiedUser.role,
-          isEmailVerified: verifiedUser.isEmailVerified
+          isEmailVerified: verifiedUser.isEmailVerified,
+          kycVerified: verifiedUser.kycVerified
         },
         tokens
       };

@@ -3,12 +3,17 @@ import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
 import { BookingModel } from "../models/booking.model";
-import { KYCDocumentModel } from "../models/kyc.model";
+import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
+import Mail from "../../mailModule/models/mail.model";
+import Visit from "../../visitModule/models/visit.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
+import { BusinessInfoModel } from "../models/businessInfo.model";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
 
 // ============ DASHBOARD ============
 
@@ -139,48 +144,195 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
 // ============ PARTNER BOOKINGS ============
 
+import { PartnerKYCModel } from "../models/partnerKYC.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+
+export const getAllPartnerSpaces = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // Fetch spaces across all 4 models
+    const filter = { partner: userId, isDeleted: false };
+
+    const [coworkingSpaces, meetingRooms, eventSpaces, virtualOffices] =
+      await Promise.all([
+        CoworkingSpaceModel.find(filter),
+        MeetingRoomModel.find(filter),
+        EventSpaceModel.find(filter),
+        VirtualOfficeModel.find(filter),
+      ]);
+
+    const spaces: any[] = [];
+
+    // Map Coworking Spaces
+    coworkingSpaces.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0, // Placeholder calculation
+        totalSeats: s.capacity || 0,
+        meetingRooms: 0, // In a real scenario, count nested or linked meeting rooms
+        cabins:
+          s.inventory
+            ?.filter((i: any) => i.type === "PRIVATE_CABIN")
+            .reduce((sum: number, i: any) => sum + (i.totalUnits || 0), 0) || 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Coworking Space",
+      });
+    });
+
+    // Map Meeting Rooms
+    meetingRooms.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0,
+        totalSeats: s.capacity || 0,
+        meetingRooms: 1,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Meeting Room",
+      });
+    });
+
+    // Map Event Spaces
+    eventSpaces.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: s.capacity || 0,
+        totalSeats: s.capacity || 0,
+        meetingRooms: 0,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Event Space",
+      });
+    });
+
+    // Map Virtual Offices
+    virtualOffices.forEach((s: any) => {
+      spaces.push({
+        id: s._id.toString(),
+        name: s.name,
+        city: s.city,
+        location: s.area || "N/A",
+        availableSeats: "N/A",
+        totalSeats: "N/A",
+        meetingRooms: 0,
+        cabins: 0,
+        status: s.isActive ? "ACTIVE" : "INACTIVE",
+        type: "Virtual Office",
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: spaces,
+    });
+  } catch (error) {
+    console.error("Failed to fetch all partner spaces:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch spaces" });
+  }
+};
+
+export const getPartnerDashboardOverview = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+
+    // Get all bookings where the partner is the logged-in user
+    const partnerBookings = await BookingModel.find({
+      partnerId: userId,
+      isDeleted: false,
+    }).populate("user", "fullName email phone company");
+
+    // Map bookings to the frontend Client structure
+    const clients = partnerBookings.map((b: any) => {
+      // Determine Status
+      let status = "INACTIVE";
+      if (b.status === "active") {
+        if (b.endDate) {
+          const now = new Date();
+          const end = new Date(b.endDate);
+          const diffDays = Math.ceil(
+            (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          status = diffDays <= 7 ? "EXPIRING_SOON" : "ACTIVE"; // Mark as expiring if <= 7 days left
+        } else {
+          status = "ACTIVE";
+        }
+      }
+
+      // Determine Plan name
+      let planName = b.plan?.name || "Standard";
+      if (b.type === "virtual_office") planName = "Virtual Office " + planName;
+      if (b.type === "coworking_space") planName = "Coworking " + planName;
+
+      return {
+        id: b.bookingNumber || b._id.toString(),
+        companyName: b.user?.company || b.user?.fullName || "N/A",
+        contactName: b.user?.fullName || "N/A",
+        plan: planName,
+        space: b.spaceSnapshot?.name || "Unknown Space",
+        startDate: b.startDate
+          ? new Date(b.startDate).toISOString().split("T")[0]
+          : "N/A",
+        endDate: b.endDate
+          ? new Date(b.endDate).toISOString().split("T")[0]
+          : "N/A",
+        status: status,
+        kycStatus: b.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        clients,
+      },
+    });
+  } catch (error) {
+    console.error("Partner Dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch partner dashboard data",
+    });
+  }
+};
+
 export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
   try {
     const { spaceId } = req.params;
     const { month, year } = req.query;
-    console.log("spaceId", spaceId);
-    if (!spaceId || !mongoose.Types.ObjectId.isValid(spaceId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid space ID",
-      });
+
+    if (!spaceId || !mongoose.Types.ObjectId.isValid(spaceId as string)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid space ID" });
     }
 
-    // Verify if the user has access to this space (Partner or Manager)
-    // We still need to check this for security, even if we don't filter bookings by user
-    const userId = req.user?.id;
-    // You might need to import CoworkingSpaceModel if not already imported,
-    // or use a different way to check ownership if models are isolated.
-    // Assuming CoworkingSpaceModel is needed here.
-    // Since it wasn't imported in the original file, I'll add the import or use a dynamic import/service.
-    // However, for now, let's assume I can import it.
-    // Wait, the user said "no need to match the user id".
-    // Maybe they meant "don't check ownership"?
-    // But then anyone can see anyone's bookings. That's bad.
-    // I will assume they meant "don't filter bookings by booking.user = userId".
+    const userId = req.user?.id; // This is the partner requesting the data
 
-    // Let's implement the ownership check.
-    // I need to import CoworkingSpaceModel.
-    // It's in ../../coworkingSpaceModule/coworkingSpace.model
-
-    // For now, I will implement the functionality. I'll add the import in a separate step if needed,
-    // or assuming it's available.
-    // Actually, looking at the imports, CoworkingSpaceModel is NOT imported.
-    // I will add the import first in a separate tool call to be safe, or just append it to the top.
-
-    // Re-reading: "no need to macth the user id just filter property by spaceid and fetch data based on the filter provided"
-    // This could arguably mean "Skip the partner check entirely".
-    // "just filter property by spaceid".
-    // If I skip the partner check, it's insecure.
-    // BUT the user is determining the requirements.
-    // I will keep the partner check because it's "Partner Portal".
-
-    const filter: any = { spaceId, isDeleted: false };
+    // SECURED: We now explicitly mandate that the booking's partnerId matches the logged-in user!
+    const filter: any = {
+      spaceId,
+      partnerId: userId, // <-- THIS PLUGS THE DATA LEAK
+      isDeleted: false,
+    };
 
     // Date Filtering
     let startDate: Date, endDate: Date;
@@ -192,12 +344,10 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
       startDate = new Date(currentYear, monthIndex, 1);
       endDate = new Date(currentYear, monthIndex + 1, 0, 23, 59, 59);
     } else {
-      // Full Year
       startDate = new Date(currentYear, 0, 1);
       endDate = new Date(currentYear, 11, 31, 23, 59, 59);
     }
 
-    // Filter bookings that overlap with the date range
     filter.$or = [
       { startDate: { $gte: startDate, $lte: endDate } },
       { endDate: { $gte: startDate, $lte: endDate } },
@@ -207,11 +357,8 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     const bookings = await BookingModel.find(filter)
       .populate("user", "fullName email phone")
       .sort({ startDate: -1 });
-    console.log("bookings", bookings);
-    res.status(200).json({
-      success: true,
-      data: bookings,
-    });
+
+    res.status(200).json({ success: true, data: bookings });
   } catch (error) {
     console.error("Get partner bookings error:", error);
     res
@@ -225,19 +372,20 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { type, status, page = 1, limit = 10 } = req.query;
+    const { type, status, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (type) filter.type = type;
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [bookings, total] = await Promise.all([
       BookingModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limitNum),
       BookingModel.countDocuments(filter),
     ]);
 
@@ -260,7 +408,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -401,7 +549,7 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
 export const linkBookingToProfile = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId as string;
     const { profileId } = req.body;
 
     if (!profileId) {
@@ -484,11 +632,93 @@ export const getKYCStatus = async (req: Request, res: Response) => {
     console.log(`[getKYCStatus] User: ${userId}, ProfileId: ${profileId}`);
 
     if (profileId) {
-      // Get specific profile
-      const kyc = await KYCDocumentModel.findOne({
+      if (profileId === "new") {
+        return res.status(200).json({ success: true, data: null });
+      }
+
+      // 1. Try finding in KYCDocument (Individual)
+      let kyc: any = await KYCDocumentModel.findOne({
         _id: profileId,
         user: userId,
       });
+
+      // 2. If not found, try BusinessInfoModel
+      if (!kyc) {
+        const businessInfo = await BusinessInfoModel.findOne({
+          _id: profileId,
+          user: userId,
+        });
+
+        if (businessInfo) {
+          // Fetch Main Individual Profile for Personal Info
+          const mainProfile = await KYCDocumentModel.findOne({
+            user: userId,
+            kycType: "individual",
+          });
+
+          // Map BusinessInfo to KYCData structure
+          kyc = {
+            _id: businessInfo._id,
+            user: businessInfo.user,
+            profileName: businessInfo.profileName || businessInfo.companyName,
+            kycType: "business",
+            isPartner: false,
+            personalInfo: mainProfile?.personalInfo || {},
+            businessInfo: {
+              companyName: businessInfo.companyName,
+              companyType: businessInfo.companyType,
+              gstNumber: businessInfo.gstNumber,
+              panNumber: businessInfo.panNumber,
+              cinNumber: businessInfo.cinNumber,
+              registeredAddress: businessInfo.registeredAddress,
+              industry: businessInfo.industry,
+              partners: [],
+              verified: businessInfo.status === "approved",
+            },
+            documents: businessInfo.documents || [],
+            overallStatus: businessInfo.status || "pending",
+            progress: 0,
+            createdAt: businessInfo.createdAt,
+            updatedAt: businessInfo.updatedAt,
+          };
+        }
+      }
+
+      if (!kyc) {
+        // 3. Try PartnerKYCModel for single fetch if needed
+        const partner = await PartnerKYCModel.findOne({
+          _id: profileId,
+          user: userId,
+        });
+        if (partner) {
+          // Map partner to KYCData structure
+          kyc = {
+            _id: partner._id,
+            user: partner.user,
+            profileName: partner.fullName, // Use partner's fullName as profileName
+            kycType: "individual",
+            isPartner: true,
+            personalInfo: {
+              fullName: partner.fullName,
+              email: partner.email,
+              phone: partner.phone,
+              panNumber: partner.panNumber,
+              aadhaarNumber: partner.aadhaarNumber,
+              dateOfBirth: partner.dob,
+            },
+            businessInfo: {
+              companyName: "N/A",
+              partners: [],
+            },
+            documents: partner.documents || [],
+            overallStatus: partner.status || "pending",
+            progress: 0,
+            createdAt: partner.createdAt,
+            updatedAt: partner.updatedAt,
+          };
+        }
+      }
+
       if (!kyc) {
         console.log("[getKYCStatus] Profile not found for ID:", profileId);
         return res
@@ -498,17 +728,105 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       return res.status(200).json({ success: true, data: kyc });
     }
 
-    // Get all user's KYC profiles
-    const profiles = await KYCDocumentModel.find({
+    // Get all user's profiles (Combined)
+
+    // 1. Individual Profile
+    const individualProfiles = await KYCDocumentModel.find({
       user: userId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
+      kycType: "individual",
     });
-    res.status(200).json({ success: true, data: profiles });
+
+    // 2. Business Profiles (from BusinessInfoModel)
+    const businessProfiles = await BusinessInfoModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
+    });
+
+    // 3. Partner Profiles
+    const partnerProfiles = await PartnerKYCModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
+    });
+
+    // Find main profile for personal info
+    const mainProfile = individualProfiles.find(
+      (p) => p.kycType === "individual",
+    );
+
+    // Map Business Profiles to KYCData
+    const mappedBusinessProfiles = businessProfiles.map((b) => ({
+      _id: b._id,
+      user: b.user,
+      profileName: b.profileName || b.companyName,
+      kycType: "business",
+      isPartner: false,
+      personalInfo: mainProfile?.personalInfo || {},
+      businessInfo: {
+        companyName: b.companyName,
+        companyType: b.companyType,
+        gstNumber: b.gstNumber,
+        panNumber: b.panNumber,
+        cinNumber: b.cinNumber,
+        registeredAddress: b.registeredAddress,
+        industry: b.industry,
+        verified: b.status === "approved",
+      },
+      documents: b.documents || [],
+      overallStatus: b.status || "pending",
+      progress: 0,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+    }));
+
+    // Map Partner Profiles to KYCData
+    const mappedPartnerProfiles = partnerProfiles.map((p) => ({
+      _id: p._id,
+      user: p.user,
+      profileName: p.fullName,
+      kycType: "individual",
+      isPartner: true,
+      personalInfo: {
+        fullName: p.fullName,
+        email: p.email,
+        phone: p.phone,
+        panNumber: p.panNumber,
+        aadhaarNumber: p.aadhaarNumber,
+        dateOfBirth: p.dob,
+      },
+      businessInfo: {
+        companyName: "N/A",
+        partners: [],
+      },
+      documents: p.documents || [],
+      overallStatus: p.status || "pending",
+      progress: 0,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
+    // Combine
+    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles, ...mappedPartnerProfiles];
+
+    res.status(200).json({ success: true, data: allProfiles });
   } catch (error) {
     console.error("Get KYC error:", error);
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch KYC status" });
+  }
+};
+
+export const getBusinessInfo = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const businessInfo = await BusinessInfoModel.findOne({ user: userId });
+    res.status(200).json({ success: true, data: businessInfo });
+  } catch (error) {
+    console.error("Get Business Info error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch business info" });
   }
 };
 
@@ -522,24 +840,153 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       panNumber,
       cinNumber,
       registeredAddress,
+      industry,
       profileId,
       profileName,
       kycType,
       partners,
-      // Personal Info Fields
       personalPhone,
       personalDob,
       personalAadhaar,
       personalPan,
       personalFullName,
+      personalEmail,
     } = req.body;
     console.log(
       `[updateBusinessInfo] User: ${userId}, ProfileId: ${profileId}, Type: ${kycType}`,
     );
 
+    // ============================================
+    // CASE 1: BUSINESS PROFILE (Using BusinessInfoModel)
+    // ============================================
+    if (kycType === "business" || (profileId && profileId !== "new")) {
+      let businessInfo = null;
+      // Check if profileId is valid business info
+      if (profileId && profileId !== "new") {
+        businessInfo = await BusinessInfoModel.findOne({
+          _id: profileId,
+          user: userId,
+        });
+      }
+
+      if (businessInfo || kycType === "business") {
+        console.log("[updateBusinessInfo] Processing as Business Profile");
+
+        if (!businessInfo) {
+          const mainProfile = await KYCDocumentModel.findOne({
+            user: userId,
+            kycType: "individual",
+          });
+
+          // Fallback for company name to avoid validation error
+          const safeCompanyName =
+            companyName || profileName || "Draft Business Profile";
+
+          businessInfo = new BusinessInfoModel({
+            user: userId,
+            kycProfile: mainProfile?._id,
+            profileName: profileName || safeCompanyName,
+            status: "in_progress",
+            companyName: safeCompanyName,
+          });
+        }
+
+        if (companyName) businessInfo.companyName = companyName;
+        if (companyType) businessInfo.companyType = companyType;
+        if (gstNumber) businessInfo.gstNumber = gstNumber;
+        if (panNumber) businessInfo.panNumber = panNumber;
+        if (cinNumber) businessInfo.cinNumber = cinNumber;
+        if (registeredAddress)
+          businessInfo.registeredAddress = registeredAddress;
+        if (industry) businessInfo.industry = industry;
+        if (profileName) businessInfo.profileName = profileName;
+
+        if (profileName) businessInfo.profileName = profileName;
+
+        // Ensure status is in_progress if it was not started, but don't revert pending/approved
+        if (!businessInfo.status || businessInfo.status === "not_started") {
+          businessInfo.status = "in_progress";
+        }
+
+        // Remove rejection reason if being updated (optional, but good for drafts)
+        if (businessInfo.status === "in_progress") {
+          businessInfo.rejectionReason = undefined;
+        }
+
+        businessInfo.updatedAt = new Date();
+
+        try {
+          await businessInfo.save();
+
+          // Recalculate and update businessInfoCount in main KYC Profile
+          // Use ObjectId for query to ensure match
+          const userObjectId = new mongoose.Types.ObjectId(userId);
+          let pendingBusinessCount = await BusinessInfoModel.countDocuments({
+            user: userObjectId,
+            status: "pending",
+          });
+
+          console.log(
+            `[updateBusinessInfo] Recalculated Pending Count: ${pendingBusinessCount} for user ${userId}`,
+          );
+
+          // Fallback: If we just saved a pending doc, count should be at least 1
+          if (pendingBusinessCount === 0 && businessInfo.status === "pending") {
+            console.log(
+              "[updateBusinessInfo] Count is 0 but doc is pending. Forcing count update.",
+            );
+            // Try to find the main KYC profile and increment manually if recalculation failed
+            const kycProfile = await KYCDocumentModel.findOne({ user: userId });
+            if (kycProfile) {
+              pendingBusinessCount = (kycProfile.businessInfoCount || 0) + 1;
+            } else {
+              pendingBusinessCount = 1;
+            }
+          }
+
+          await KYCDocumentModel.findOneAndUpdate(
+            { user: userId },
+            { businessInfoCount: pendingBusinessCount },
+          );
+        } catch (saveError) {
+          console.error("[updateBusinessInfo] Save Error:", saveError);
+          return res.status(400).json({
+            success: false,
+            message: "Validation Failed: " + (saveError as Error).message,
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Business Profile updated",
+          data: {
+            _id: businessInfo._id,
+            kycType: "business",
+            profileName: businessInfo.profileName,
+            businessInfo: {
+              companyName: businessInfo.companyName,
+              companyType: businessInfo.companyType,
+              gstNumber: businessInfo.gstNumber,
+              panNumber: businessInfo.panNumber,
+              cinNumber: businessInfo.cinNumber,
+              registeredAddress: businessInfo.registeredAddress,
+              industry: businessInfo.industry,
+            },
+            overallStatus: businessInfo.status,
+          },
+        });
+      }
+    }
+
+    // ============================================
+    // CASE 2: INDIVIDUAL PROFILE (Legacy / Main Profile)
+    // ============================================
+    console.log(
+      "[updateBusinessInfo] Processing as Individual/Main Profile (Legacy)",
+    );
+
     let kyc;
     if (profileId && profileId !== "new") {
-      // Update existing profile
       kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
       if (!kyc) {
         console.log(
@@ -551,26 +998,28 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
           .json({ success: false, message: "Profile not found" });
       }
     } else {
-      // Create new profile
       console.log("[updateBusinessInfo] Creating NEW profile");
       const user = await UserModel.findById(userId);
-      const isPartnerProfile = kycType === "individual" && personalFullName && personalFullName !== user?.fullName;
+      const isPartnerProfile =
+        kycType === "individual" &&
+        !!personalFullName &&
+        personalFullName !== user?.fullName;
       kyc = new KYCDocumentModel({
         user: userId,
         profileName:
           profileName ||
           (kycType === "business" ? companyName : "Personal Profile"),
         kycType: kycType || "individual",
-        isPartner: isPartnerProfile,
+        isPartner: Boolean(isPartnerProfile),
         personalInfo: {
-          fullName: personalFullName || user?.fullName, // Allow custom name or default to user
-          email: user?.email,
+          fullName: personalFullName || user?.fullName,
+          email: isPartnerProfile ? personalEmail : user?.email,
           phone: user?.phoneNumber,
         },
       });
     }
 
-    // Update business info if provided
+    // Update business info if provided (Legacy support)
     if (companyName || gstNumber || partners) {
       kyc.businessInfo = {
         companyName: companyName || kyc.businessInfo?.companyName,
@@ -580,21 +1029,22 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
         cinNumber: cinNumber || kyc.businessInfo?.cinNumber,
         registeredAddress:
           registeredAddress || kyc.businessInfo?.registeredAddress,
+        industry: industry || kyc.businessInfo?.industry,
         partners: partners || kyc.businessInfo?.partners || [],
         verified: false,
       };
     }
 
-    // Update personal info if provided
+    // Update personal info logic (Legacy support)
     if (
       personalPhone ||
       personalDob ||
       personalAadhaar ||
       personalPan ||
-      personalFullName
+      personalFullName ||
+      personalEmail
     ) {
       if (!kyc.personalInfo) {
-        // Initialize if empty, preserving existing user data if any
         const user = await UserModel.findById(userId);
         kyc.personalInfo = {
           fullName: user?.fullName,
@@ -604,13 +1054,14 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       }
 
       if (personalPhone) kyc.personalInfo.phone = personalPhone;
+      if (personalEmail) kyc.personalInfo.email = personalEmail;
       if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
       if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
       if (personalPan) kyc.personalInfo.panNumber = personalPan;
       if (personalFullName) {
         kyc.personalInfo.fullName = personalFullName;
         // Update isPartner flag if changing fullName on existing individual profile
-        if (kyc.kycType === 'individual') {
+        if (kyc.kycType === "individual") {
           const user = await UserModel.findById(userId);
           kyc.isPartner = personalFullName !== user?.fullName;
         }
@@ -625,18 +1076,17 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       kyc.profileName = profileName;
     }
 
-    // Update progress
     kyc.progress = calculateKYCProgress(kyc);
     kyc.updatedAt = new Date();
 
-    // Only set to pending if status was not_started and user is making progress
-    // Don't auto-set to pending - let user explicitly submit
     if (kyc.overallStatus === "not_started" && kyc.progress > 0) {
       kyc.overallStatus = "in_progress";
     }
 
     await kyc.save();
     console.log("[updateBusinessInfo] Saved profile:", kyc._id);
+
+    // Sync legacy BusinessInfoModel logic removed as we use direct logic now.
 
     res
       .status(200)
@@ -691,7 +1141,20 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     }
 
     console.log("[STEP 3] Finding KYC profile in database...");
-    let kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+    let kyc: any = await KYCDocumentModel.findOne({
+      _id: profileId,
+      user: userId,
+    });
+
+    if (!kyc) {
+      // Check if it is a partner profile
+      kyc = await PartnerKYCModel.findOne({ _id: profileId, user: userId });
+    }
+
+    if (!kyc) {
+      // Check if it is a business profile
+      kyc = await BusinessInfoModel.findOne({ _id: profileId, user: userId });
+    }
 
     if (!kyc) {
       console.log("[STEP 3a] FAIL: Profile not found for:", profileId);
@@ -706,7 +1169,9 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
 
     // Check if document type already exists
     const existingIndex =
-      kyc.documents?.findIndex((d) => d.type === documentType) ?? -1;
+      kyc.documents?.findIndex(
+        (d: KYCDocumentItem) => d.type === documentType,
+      ) ?? -1;
     console.log("[STEP 4a] Existing doc index:", existingIndex);
 
     const docEntry = {
@@ -747,7 +1212,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
       }
@@ -790,7 +1255,13 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
 export const deleteKYCDocument = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { profileId, documentType } = req.body;
+    const bodyProfileId = req.body?.profileId;
+    const bodyDocType = req.body?.documentType;
+    const queryProfileId = req.query?.profileId;
+    const queryDocType = req.query?.documentType;
+
+    const profileId = (bodyProfileId || queryProfileId) as string;
+    const documentType = (bodyDocType || queryDocType) as string;
 
     console.log(
       `[deleteKYCDocument] User: ${userId}, ProfileId: ${profileId}, DocType: ${documentType}`,
@@ -803,10 +1274,47 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
       });
     }
 
-    const kyc = await KYCDocumentModel.findOne({
+    let kyc: any = await KYCDocumentModel.findOne({
       _id: profileId,
       user: userId,
     });
+
+    if (!kyc) {
+      // Check if it is a partner profile
+      const partner = await PartnerKYCModel.findOne({
+        _id: profileId,
+        user: userId,
+      });
+      if (partner) {
+        kyc = {
+          _id: partner._id,
+          user: partner.user,
+          kycType: "individual", // Partners are individuals
+          isPartner: true,
+          personalInfo: {
+            fullName: partner.fullName,
+            email: partner.email,
+            phone: partner.phone,
+            panNumber: partner.panNumber,
+            aadhaarNumber: partner.aadhaarNumber,
+            dateOfBirth: partner.dob,
+          },
+          businessInfo: {
+            companyName: "N/A",
+            partners: [],
+          },
+          documents: partner.documents || [],
+          overallStatus: partner.status,
+          createdAt: partner.createdAt,
+          updatedAt: partner.updatedAt,
+        };
+      }
+    }
+
+    if (!kyc) {
+      // Check if it is a business profile
+      kyc = await BusinessInfoModel.findOne({ _id: profileId, user: userId });
+    }
 
     if (!kyc) {
       return res
@@ -816,7 +1324,9 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
 
     // Check if document exists
     const docIndex =
-      kyc.documents?.findIndex((d) => d.type === documentType) ?? -1;
+      kyc.documents?.findIndex(
+        (d: KYCDocumentItem) => d.type === documentType,
+      ) ?? -1;
     if (docIndex === -1) {
       return res
         .status(404)
@@ -852,6 +1362,8 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
     // If was approved/pending and user deletes doc, revert to in_progress
     if (kyc.overallStatus === "approved" || kyc.overallStatus === "pending") {
       kyc.overallStatus = "in_progress";
+      // Sync User verification status
+      await UserModel.findByIdAndUpdate(userId, { kycVerified: false });
     }
     kyc.updatedAt = new Date();
 
@@ -872,119 +1384,304 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const { profileId } = req.body;
+    console.log(`[submitKYCForReview] User: ${userId}, Body:`, req.body);
 
     if (!profileId) {
-      return res.status(400).json({ success: false, message: "Profile ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Profile ID is required" });
     }
 
-    const kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
+    let kyc: any = await KYCDocumentModel.findOne({
+      _id: profileId,
+      user: userId,
+    });
+
+    let isBusinessInfoDoc = false;
+    let isPartner = false;
 
     if (!kyc) {
-      return res.status(404).json({ success: false, message: "KYC profile not found" });
+      console.log(
+        `[submitKYCForReview] Not found in KYCDocument, checking PartnerKYC...`,
+      );
+      kyc = await PartnerKYCModel.findOne({ _id: profileId, user: userId });
+      if (kyc) {
+        console.log(`[submitKYCForReview] Found in PartnerKYC`);
+        isPartner = true;
+      }
+    } else {
+      console.log(`[submitKYCForReview] Found in KYCDocument`);
     }
 
-    // Check if already submitted or approved
-    if (kyc.overallStatus === "pending" || kyc.overallStatus === "approved") {
-      return res.status(400).json({ 
-        success: false, 
-        message: kyc.overallStatus === "approved" 
-          ? "KYC is already approved" 
-          : "KYC is already under review" 
+    if (!kyc) {
+      // Check BusinessInfoModel as fallback
+      console.log(
+        `[submitKYCForReview] Not found in PartnerKYC, checking BusinessInfoModel...`,
+      );
+      kyc = await BusinessInfoModel.findOne({ _id: profileId, user: userId });
+      if (kyc) {
+        console.log(`[submitKYCForReview] Found in BusinessInfoModel`);
+        isBusinessInfoDoc = true;
+      }
+    }
+
+    if (!kyc) {
+      return res
+        .status(404)
+        .json({ success: false, message: "KYC profile not found" });
+    }
+
+    // Check status based on model type
+    const status =
+      isPartner || isBusinessInfoDoc ? kyc.status : kyc.overallStatus;
+    if (status === "pending" || status === "approved") {
+      return res.status(400).json({
+        success: false,
+        message:
+          status === "approved"
+            ? "KYC is already approved"
+            : "KYC is already under review",
       });
     }
 
-    // Validate all requirements are met
-    const isBusiness = kyc.kycType === "business";
-    const isPartner = kyc.isPartner === true;
-
-    // Check personal info
-    if (!kyc.personalInfo?.fullName || !kyc.personalInfo?.aadhaarNumber || !kyc.personalInfo?.panNumber) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please complete all personal information before submitting" 
-      });
-    }
-
-    // Check business info for business type
-    if (isBusiness && (!kyc.businessInfo?.companyName || !kyc.businessInfo?.gstNumber)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Please complete all business information before submitting" 
-      });
-    }
-
-    // Check required documents
-    const uploadedDocs = kyc.documents?.map(d => d.type) || [];
+    // Validate requirements
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
     let requiredDocs: string[];
 
-    if (isBusiness) {
-      requiredDocs = ["pan_card", "gst_certificate", "address_proof", "video_kyc"];
-    } else if (isPartner) {
-      requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
+    if (isPartner) {
+      // Partner Validation
+      if (!kyc.fullName || !kyc.panNumber || !kyc.aadhaarNumber) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please complete partner details (PAN, Aadhaar) before submitting",
+        });
+      }
+      requiredDocs = ["pan_card", "aadhaar"];
+    } else if (isBusinessInfoDoc) {
+      // Business Info Validation
+      if (!kyc.companyName || !kyc.gstNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "Please complete all business information before submitting",
+        });
+      }
+      // Business Profile Docs
+      requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
     } else {
-      requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
+      // KYCDocument Validation
+      const isBusiness = kyc.kycType === "business";
+      // ... previous validation logic for KYCDocument ...
+      if (
+        !kyc.personalInfo?.fullName ||
+        !kyc.personalInfo?.aadhaarNumber ||
+        !kyc.personalInfo?.panNumber
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Please complete all personal information before submitting",
+        });
+      }
+
+      if (
+        isBusiness &&
+        (!kyc.businessInfo?.companyName || !kyc.businessInfo?.gstNumber)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Please complete all business information before submitting",
+        });
+      }
+
+      const isPartnerProfile = kyc.isPartner === true;
+      if (isBusiness) {
+        requiredDocs = [
+          "pan_card",
+          "gst_certificate",
+          "address_proof",
+          "video_kyc",
+        ];
+      } else if (isPartnerProfile) {
+        requiredDocs = ["pan_card", "aadhaar"];
+      } else {
+        requiredDocs = ["pan_card", "aadhaar", "video_kyc"];
+      }
     }
 
-    const missingDocs = requiredDocs.filter(doc => !uploadedDocs.includes(doc));
+    const missingDocs = requiredDocs.filter(
+      (doc) => !uploadedDocs.includes(doc),
+    );
     if (missingDocs.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Please upload all required documents: ${missingDocs.join(", ")}` 
+      return res.status(400).json({
+        success: false,
+        message: `Please upload all required documents: ${missingDocs.join(", ")}`,
       });
     }
 
-    // All validations passed - submit for review
-    kyc.overallStatus = "pending";
-    kyc.progress = calculateKYCProgress(kyc);
+    // Submit for review
+    if (isPartner || isBusinessInfoDoc) {
+      kyc.status = "pending";
+    } else {
+      kyc.overallStatus = "pending";
+      kyc.progress = calculateKYCProgress(kyc);
+    }
     kyc.updatedAt = new Date();
 
     await kyc.save();
 
-    res.status(200).json({ 
-      success: true, 
-      message: "KYC submitted for review successfully. Our team will review it shortly.",
-      data: kyc 
+    // Recalculate businessInfoCount if it's a Business Info doc
+    if (isBusinessInfoDoc) {
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+      const pendingBusinessCount = await BusinessInfoModel.countDocuments({
+        user: userObjectId,
+        status: "pending",
+      });
+
+      await KYCDocumentModel.findOneAndUpdate(
+        { user: userId },
+        { businessInfoCount: pendingBusinessCount },
+      );
+    }
+
+    // Recalculate partnerCount if it's a Partner KYC doc
+    if (isPartner) {
+      const pendingPartnerCount = await PartnerKYCModel.countDocuments({
+        user: userId,
+        status: "pending",
+        isDeleted: { $ne: true },
+      });
+
+      await KYCDocumentModel.findOneAndUpdate(
+        { user: userId },
+        { partnerCount: pendingPartnerCount },
+      );
+    }
+
+    // Notify Admin
+    try {
+      const user = await UserModel.findById(userId);
+      const userName = user?.fullName || "User";
+
+      let title = "New KYC Request";
+      let message = `${userName} has submitted a KYC request for review.`;
+
+      if (isPartner) {
+        title = "New Partner KYC Request";
+        message = `${userName} has submitted a Partner KYC request.`;
+      } else if (isBusinessInfoDoc) {
+        title = "New Business Profile Request";
+        message = `${userName} has submitted a Business Profile for review.`;
+      }
+
+      await NotificationService.notifyAdmin(
+        title,
+        message,
+        NotificationType.INFO,
+        {
+          userId,
+          kycId: profileId,
+          type: isPartner
+            ? "partner"
+            : isBusinessInfoDoc
+              ? "business"
+              : "individual",
+        },
+      );
+    } catch (notifError) {
+      console.error(
+        "[submitKYCForReview] Failed to send notification:",
+        notifError,
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        "KYC submitted for review successfully. Our team will review it shortly.",
+      data: kyc,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Submit KYC error:", error);
-    res.status(500).json({ success: false, message: "Failed to submit KYC for review" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit KYC for review",
+      error: error.message,
+      stack: error.stack, // Dev only debugging
+    });
   }
 };
 
 function calculateKYCProgress(kyc: any): number {
   let progress = 0;
-  const isBusiness = kyc.kycType === "business";
-  const isPartner = kyc.isPartner === true;
+  // Check if it's a BusinessInfo document (has companyName at root, no kycType field usually)
+  const isBusinessDoc = !!kyc.companyName && !kyc.personalInfo;
+
+  const isBusiness = kyc.kycType === "business" || isBusinessDoc;
+  const isPartner =
+    kyc.isPartner === true ||
+    (!!kyc.fullName && !kyc.personalInfo && !kyc.companyName); // PartnerKYC has fullName at root
 
   // Weights based on type
   // Individual: Personal(30), Docs(50), Status(20)
   // Partner: Personal(50), Docs(50) - no video KYC
   // Business: Personal(25), Business(25), Docs(40), Status(10)
 
-  if (isBusiness) {
-    if (kyc.personalInfo?.fullName) progress += 25;
-    if (kyc.businessInfo?.companyName) progress += 25;
+  // Explicit handling for BusinessInfoModel
+  if (isBusinessDoc) {
+    // For BusinessInfoModel, we assume personal info is handled via main profile
+    progress += 25; // Auto-credit for personal info
+    if (kyc.companyName) progress += 25;
 
-    const requiredDocs = [
-      "pan_card",
-      "gst_certificate",
-      "address_proof",
-      "video_kyc",
-    ];
+    // Check documents for Business Info
+    const requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
     const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
     const hasRequiredCount = requiredDocs.filter((d) =>
       uploadedDocs.includes(d),
     ).length;
     progress += Math.round((hasRequiredCount / requiredDocs.length) * 40);
 
-    if (kyc.overallStatus === "approved") progress += 10;
+    if (kyc.status === "approved" || kyc.status === "pending") progress += 10;
+
+    return Math.min(progress, 100);
+  }
+
+  if (isBusiness) {
+    if (kyc.personalInfo?.fullName) progress += 25; // Might be missing for BusinessInfoModel, that's okay
+    if (kyc.businessInfo?.companyName || kyc.companyName) progress += 25;
+
+    const requiredDocs = [
+      "pan_card",
+      "gst_certificate",
+      "address_proof",
+      // "video_kyc", // Video KYC might not be required for pure business profile if personal is separate?
+      // But let's keep it consistent with previous logic or adjust.
+      // If it's BusinessInfoModel, we might strictly check docs.
+    ];
+    // Adjust required docs based on whether it's linked or standalone?
+    // For now, keep as is but check root documents
+
+    const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
+    const hasRequiredCount = requiredDocs.filter((d) =>
+      uploadedDocs.includes(d),
+    ).length;
+    progress += Math.round((hasRequiredCount / requiredDocs.length) * 40);
+
+    if (kyc.overallStatus === "approved" || kyc.status === "approved")
+      progress += 10;
   } else if (isPartner) {
     // Partner profile - no video KYC required
-    if (kyc.personalInfo?.fullName && kyc.personalInfo?.aadhaarNumber && kyc.personalInfo?.panNumber) progress += 50;
+    if (
+      kyc.personalInfo?.fullName &&
+      kyc.personalInfo?.aadhaarNumber &&
+      kyc.personalInfo?.panNumber
+    )
+      progress += 50;
 
     const requiredDocs = ["pan_card", "aadhaar"]; // No video_kyc for partners
     const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
-    const hasRequiredCount = requiredDocs.filter(d => uploadedDocs.includes(d)).length;
+    const hasRequiredCount = requiredDocs.filter((d) =>
+      uploadedDocs.includes(d),
+    ).length;
     progress += Math.round((hasRequiredCount / requiredDocs.length) * 50);
   } else {
     // Individual
@@ -1013,7 +1710,7 @@ function calculateKYCProgress(kyc: any): number {
 export const getAllInvoices = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { status, fromDate, toDate, page = 1, limit = 10 } = req.query;
+    const { status, fromDate, toDate, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (status) filter.status = status;
@@ -1023,13 +1720,14 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       if (toDate) filter.createdAt.$lte = new Date(toDate as string);
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [invoices, total, summary] = await Promise.all([
       InvoiceModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limitNum),
       InvoiceModel.countDocuments(filter),
       InvoiceModel.aggregate([
         { $match: { user: userId, isDeleted: false } },
@@ -1060,7 +1758,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -1102,18 +1800,19 @@ export const getInvoiceById = async (req: Request, res: Response) => {
 export const getAllTickets = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [tickets, total] = await Promise.all([
       SupportTicketModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limitNum)
         .select("-messages"),
       SupportTicketModel.countDocuments(filter),
     ]);
@@ -1124,7 +1823,7 @@ export const getAllTickets = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -1365,5 +2064,56 @@ export const redeemReward = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to redeem reward" });
+  }
+};
+
+// ============ MAIL ============
+
+export const getUserMails = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const userEmail = user.email.trim();
+
+    // Case-insensitive exact match
+    const mails = await Mail.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: mails });
+  } catch (error) {
+    console.error("Get user mails error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch mails" });
+  }
+};
+
+// ============ VISITS ============
+
+export const getUserVisits = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const userEmail = user.email.trim();
+
+    // Case-insensitive exact match
+    const visits = await Visit.find({
+      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: visits });
+  } catch (error) {
+    console.error("Get user visits error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };

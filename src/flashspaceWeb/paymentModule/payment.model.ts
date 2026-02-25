@@ -88,7 +88,17 @@ export class Payment {
   @prop({ default: 0 })
   public discountAmount!: number;
 
-  // Metadata
+  // Booking Start Date (user-selected)
+  @prop()
+  public startDate?: Date;
+
+  // Affiliate / Coupon Attribution
+  @prop()
+  public couponCode?: string; // Coupon code applied by the user
+
+  @prop()
+  public affiliateId?: string; // Affiliate whose coupon was used
+
   @prop()
   public notes?: string;
 

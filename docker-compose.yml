@@ -11,7 +11,7 @@ services:
       - PORT=5000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DB_URI=mongodb://mongo:27017/myapp # Connect to mongo container
+      - DB_URI=mongodb://mongo:27017/flash # Connect to mongo container
     env_file:
       - .env
     volumes:

@@ -19,7 +19,7 @@ export class TicketValidation {
       }),
       category: Joi.string().valid(
         'virtual_office', 'coworking', 'billing', 'kyc',
-        'technical', 'mail_services', 'bookings', 'compliance', 'other'
+        'technical', 'mail_services', 'bookings', 'compliance', 'leads', 'other'
       ).required().messages({
         'any.only': 'Invalid category selected',
         'any.required': 'Category is required'
@@ -79,7 +79,7 @@ export class TicketValidation {
       priority: Joi.string().valid('low', 'medium', 'high').optional(),
       category: Joi.string().valid(
         'virtual_office', 'coworking', 'billing', 'kyc',
-        'technical', 'mail_services', 'bookings', 'compliance', 'other'
+        'technical', 'mail_services', 'bookings', 'compliance', 'leads', 'other'
       ).optional(),
       deadline: Joi.date().optional()
     });
