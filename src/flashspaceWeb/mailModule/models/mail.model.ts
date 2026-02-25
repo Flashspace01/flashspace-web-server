@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IMail extends Document {
     mailId: string;
+    partnerId: mongoose.Types.ObjectId;
     client: string;
     email: string;
     sender: string;
@@ -15,6 +16,7 @@ export interface IMail extends Document {
 
 const MailSchema: Schema = new Schema({
     mailId: { type: String },
+    partnerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     client: { type: String, required: true },
     email: { type: String, required: true },
     sender: { type: String, required: true },

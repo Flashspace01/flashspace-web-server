@@ -28,7 +28,7 @@ const router = Router();
 router.post(
   '/',
   AuthMiddleware.authenticate,
-  RoleMiddleware.requireAdminOrUser,
+  RoleMiddleware.requireClientRole,
   TicketValidation.validateCreateTicket,
   createTicket
 );
@@ -37,7 +37,7 @@ router.post(
 router.get(
   '/my-tickets',
   AuthMiddleware.authenticate,
-  RoleMiddleware.requireAdminOrUser,
+  RoleMiddleware.requireClientRole,
   getUserTickets
 );
 
@@ -45,7 +45,7 @@ router.get(
 router.get(
   '/:ticketId',
   AuthMiddleware.authenticate,
-  RoleMiddleware.requireAdminOrUser,
+  RoleMiddleware.requireClientRole,
   getTicketById
 );
 
@@ -53,7 +53,7 @@ router.get(
 router.post(
   '/:ticketId/reply',
   AuthMiddleware.authenticate,
-  RoleMiddleware.requireAdminOrUser,
+  RoleMiddleware.requireClientRole,
   TicketValidation.validateReply,
   replyToTicket
 );

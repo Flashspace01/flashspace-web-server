@@ -53,6 +53,21 @@ export class RoleMiddleware {
   }
 
   /**
+   * Middleware to allow both user and affiliate
+   */
+  static requireClientRole(req: Request, res: Response, next: NextFunction) {
+    const allowedRoles = [UserRole.ADMIN, UserRole.USER, UserRole.AFFILIATE];
+    if (!req.user || !allowedRoles.includes(req.user.role as UserRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Client authentication required.',
+        error: 'Forbidden'
+      });
+    }
+    next();
+  }
+
+  /**
    * Middleware to require partner role
    */
   static requirePartner(req: Request, res: Response, next: NextFunction) {

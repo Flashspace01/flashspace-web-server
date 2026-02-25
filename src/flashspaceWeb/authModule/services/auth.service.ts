@@ -108,7 +108,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         }
       };
     } catch (error) {
@@ -194,7 +195,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         },
         tokens
       };
@@ -307,7 +309,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         },
         tokens
       };
@@ -346,7 +349,8 @@ export class AuthService {
           email: user.email,
           fullName: user.fullName,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified
         }
       };
     } catch (error) {
@@ -718,7 +722,8 @@ export class AuthService {
           email: verifiedUser.email,
           fullName: verifiedUser.fullName,
           role: verifiedUser.role,
-          isEmailVerified: verifiedUser.isEmailVerified
+          isEmailVerified: verifiedUser.isEmailVerified,
+          kycVerified: verifiedUser.kycVerified
         },
         tokens
       };

@@ -2,7 +2,6 @@ import { Server as HttpServer } from "http";
 import { Server, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { createClient } from "redis";
-import jwt from "jsonwebtoken";
 
 let io: Server;
 
@@ -26,12 +25,16 @@ export const initSocket = (httpServer: HttpServer) => {
   const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
   const subClient = pubClient.duplicate();
 
-  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
-    io.adapter(createAdapter(pubClient, subClient));
-    console.log(
-      `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
-    );
-  });
+  Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log(
+        `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
+      );
+    })
+    .catch((err) => {
+      console.error("Failed to connect Socket.io Redis adapter:", err);
+    });
 
   io = new Server(httpServer, {
     cors: {
@@ -52,30 +55,11 @@ export const initSocket = (httpServer: HttpServer) => {
 
     // Join user specific notification feed
     socket.on("join_user_feed", (userId: string) => {
-      socket.join(userId);
-      console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
+      if (userId) {
+        socket.join(userId);
+        console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
+      }
     });
-
-  io.on("connection", (socket: Socket) => {
-    console.log("New client connected", socket.id);
-
-    // Join ticket room
-    socket.on("join_ticket", (ticketId: string) => {
-      socket.join(ticketId);
-      console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
-    });
-
-        // Join user specific notification feed
-        socket.on("join_user_feed", (userId: string) => {
-            socket.join(userId);
-            console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
-        });
-
-        // Join admin feed
-        socket.on("join_admin_feed", () => {
-            socket.join("admin_feed");
-            console.log(`Socket ${socket.id} joined admin_feed`);
-        });
 
     // Join admin feed
     socket.on("join_admin_feed", () => {
@@ -83,6 +67,11 @@ export const initSocket = (httpServer: HttpServer) => {
       console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
+
+    socket.on("disconnect", () => {
+      console.log("Client disconnected", socket.id);
+    });
+
     // Handle typing events
     socket.on("typing", (data: { ticketId: string; user: string }) => {
       socket.to(data.ticketId).emit("typing", data);
@@ -92,23 +81,7 @@ export const initSocket = (httpServer: HttpServer) => {
       socket.to(data.ticketId).emit("stop_typing", data);
     });
 
-    socket.on("disconnect", () => {
-      console.log("Client disconnected", socket.id);
-    });
-  });
-
-    // Handle typing events
-    socket.on("typing", (data: { ticketId: string; user: string }) => {
-      socket.to(data.ticketId).emit("typing", data);
-    });
-
-    socket.on("stop_typing", (data: { ticketId: string }) => {
-      socket.to(data.ticketId).emit("stop_typing", data);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Client disconnected", socket.id);
-    });
+    // The disconnect handler is already present above, so no need to duplicate it
   });
 
   return io;

@@ -52,7 +52,7 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
       message: "Meeting room created successfully",
       data: createdRoom,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to create meeting room", err);
   }
 };
@@ -125,7 +125,7 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
         message: "Meeting rooms retrieved successfully",
         data: rooms,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve meeting rooms", err);
   }
 };
@@ -185,7 +185,7 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
         message: `Meeting rooms in ${city} retrieved successfully`,
         data: rooms,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve rooms by city", err);
   }
 };
@@ -214,7 +214,7 @@ export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
         message: "Partner meeting rooms retrieved successfully",
         data: rooms,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner meeting rooms", err);
   }
 };

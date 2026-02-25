@@ -77,6 +77,21 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/clients
+  static async getClients(req: Request, res: Response) {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+
+    const result = await adminService.getClients(req.user, page, limit, search, status);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
   // PUT /api/admin/kyc/:id/review
   static async reviewKYC(req: Request, res: Response) {
     const id = req.params.id as string;
