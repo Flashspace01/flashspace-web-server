@@ -15,6 +15,8 @@ export enum spaceType {
   PRIVATE_OFFICE = "Private Office",
   DEDICATED_DESK = "Dedicated Desk",
   MEETING_ROOM = "Meeting Room",
+  COWORKING = "Coworking",
+  VIRTUAL_OFFICE = "Virtual Office",
 }
 
 class ClientDetails {

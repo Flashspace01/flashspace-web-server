@@ -1,0 +1,17 @@
+﻿src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.controller.ts(31,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.controller.ts(91,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/flashspaceWeb/coworkingSpaceModule/coworkingSpace.validation.ts(13,12): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/flashspaceWeb/eventSpaceModule/eventSpace.controller.ts(31,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/eventSpaceModule/eventSpace.controller.ts(65,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/eventSpaceModule/eventSpace.validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/flashspaceWeb/eventSpaceModule/eventSpace.validation.ts(49,8): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/flashspaceWeb/eventSpaceModule/eventSpace.validation.ts(90,8): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/flashspaceWeb/meetingRoomModule/meetingRoom.controller.ts(32,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/meetingRoomModule/meetingRoom.controller.ts(68,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/meetingRoomModule/meetingRoom.validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/flashspaceWeb/reviewsModule/review.controller.ts(31,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/reviewsModule/review.validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/flashspaceWeb/virtualOfficeModule/virtualOffice.controller.ts(32,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/virtualOfficeModule/virtualOffice.controller.ts(68,38): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/flashspaceWeb/virtualOfficeModule/virtualOffice.validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.

@@ -92,7 +92,13 @@ export class Payment {
   @prop()
   public startDate?: Date;
 
-  // Metadata
+  // Affiliate / Coupon Attribution
+  @prop()
+  public couponCode?: string; // Coupon code applied by the user
+
+  @prop()
+  public affiliateId?: string; // Affiliate whose coupon was used
+
   @prop()
   public notes?: string;
 

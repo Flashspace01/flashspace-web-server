@@ -7,7 +7,7 @@ import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../models/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
-import Mail from "../../mailModule/models/mail.model"; 
+import Mail from "../../mailModule/models/mail.model";
 import Visit from "../../visitModule/models/visit.model";
 import { CreditLedgerModel, CreditSource } from "../models/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
@@ -372,19 +372,20 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
 export const getAllBookings = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { type, status, page = 1, limit = 10 } = req.query;
+    const { type, status, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (type) filter.type = type;
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [bookings, total] = await Promise.all([
       BookingModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limitNum),
       BookingModel.countDocuments(filter),
     ]);
 
@@ -407,7 +408,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -732,14 +733,20 @@ export const getKYCStatus = async (req: Request, res: Response) => {
     // 1. Individual Profile
     const individualProfiles = await KYCDocumentModel.find({
       user: userId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
       kycType: "individual",
     });
 
     // 2. Business Profiles (from BusinessInfoModel)
     const businessProfiles = await BusinessInfoModel.find({
       user: userId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
+    });
+
+    // 3. Partner Profiles
+    const partnerProfiles = await PartnerKYCModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
     });
 
     // Find main profile for personal info
@@ -772,8 +779,34 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       updatedAt: b.updatedAt,
     }));
 
+    // Map Partner Profiles to KYCData
+    const mappedPartnerProfiles = partnerProfiles.map((p) => ({
+      _id: p._id,
+      user: p.user,
+      profileName: p.fullName,
+      kycType: "individual",
+      isPartner: true,
+      personalInfo: {
+        fullName: p.fullName,
+        email: p.email,
+        phone: p.phone,
+        panNumber: p.panNumber,
+        aadhaarNumber: p.aadhaarNumber,
+        dateOfBirth: p.dob,
+      },
+      businessInfo: {
+        companyName: "N/A",
+        partners: [],
+      },
+      documents: p.documents || [],
+      overallStatus: p.status || "pending",
+      progress: 0,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
     // Combine
-    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles];
+    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles, ...mappedPartnerProfiles];
 
     res.status(200).json({ success: true, data: allProfiles });
   } catch (error) {
@@ -1179,7 +1212,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
       }
@@ -1677,7 +1710,7 @@ function calculateKYCProgress(kyc: any): number {
 export const getAllInvoices = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { status, fromDate, toDate, page = 1, limit = 10 } = req.query;
+    const { status, fromDate, toDate, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (status) filter.status = status;
@@ -1687,13 +1720,14 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       if (toDate) filter.createdAt.$lte = new Date(toDate as string);
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [invoices, total, summary] = await Promise.all([
       InvoiceModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(limitNum),
       InvoiceModel.countDocuments(filter),
       InvoiceModel.aggregate([
         { $match: { user: userId, isDeleted: false } },
@@ -1724,7 +1758,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -1766,18 +1800,19 @@ export const getInvoiceById = async (req: Request, res: Response) => {
 export const getAllTickets = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Number(limit) || 100;
+    const skip = (Number(page) - 1) * limitNum;
 
     const [tickets, total] = await Promise.all([
       SupportTicketModel.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit))
+        .limit(limitNum)
         .select("-messages"),
       SupportTicketModel.countDocuments(filter),
     ]);
@@ -1788,7 +1823,7 @@ export const getAllTickets = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {

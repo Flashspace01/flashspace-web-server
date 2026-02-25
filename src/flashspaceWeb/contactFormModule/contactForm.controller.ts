@@ -47,7 +47,7 @@ export const createContactForm = async (req: Request, res: Response) => {
       data: createdContact,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
@@ -77,7 +77,7 @@ export const getAllContactForm = async (req: Request, res: Response) => {
       data: allContacts,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
@@ -120,7 +120,7 @@ export const getContactFormById = async (req: Request, res: Response) => {
       data: contact,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
@@ -181,7 +181,7 @@ export const updateContactForm = async (req: Request, res: Response) => {
       data: updatedContact,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
@@ -228,7 +228,7 @@ export const deleteContactForm = async (req: Request, res: Response) => {
       data: deletedContact,
       error: {},
     });
-  } catch (err) {
+  } catch (err: any) {
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",

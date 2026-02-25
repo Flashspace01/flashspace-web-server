@@ -4,6 +4,7 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from "../../ticketModule/routes/ticket.routes";
+import { getAllAffiliates, getAffiliateClients } from "../controllers/affiliateAdmin.controller";
 
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
@@ -78,6 +79,17 @@ adminRoutes.get(
     Permission.VIEW_ALL_SPACES,
   ]),
   AdminController.getAllBookings,
+);
+
+// 4.1 Client Management
+adminRoutes.get(
+  "/clients",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.MANAGE_OWN_SPACES,
+    Permission.VIEW_ALL_SPACES,
+  ]),
+  AdminController.getClients,
 );
 
 // 5. KYC Management
@@ -186,6 +198,20 @@ adminRoutes.put(
 
 // 6. Ticket Management Routes (from ticket module)
 adminRoutes.use("/tickets", ticketRoutes);
+
+// 7. Affiliate Management (Admin only)
+adminRoutes.get(
+  "/affiliates",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  getAllAffiliates,
+);
+
+adminRoutes.get(
+  "/affiliates/:affiliateId/clients",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  getAffiliateClients,
+);
+
 
 // Note: The ticket routes from ticketModule already have /admin prefix
 // So they will be accessible at:

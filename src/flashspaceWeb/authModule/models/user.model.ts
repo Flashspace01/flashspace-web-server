@@ -41,8 +41,6 @@ export enum UserRole {
 @index({ role: 1 }) // Role-based access queries
 @index({ authProvider: 1 }) // Provider-specific queries
 @index({ lastLogin: -1 }) // Recent activity tracking
-@index({ emailVerificationOTPExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired OTPs
-@index({ resetPasswordExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired reset tokens
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
 

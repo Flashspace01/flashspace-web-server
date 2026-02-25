@@ -46,7 +46,7 @@ export const createEventSpaceSchema = z.object({
         .max(10, "Maximum 10 images allowed"),
     })
     .refine(
-      (data) => {
+      (data: any) => {
         if (data.type === EventSpaceType.OTHER && (!data.customType || data.customType.trim() === "")) {
           return false;
         }
@@ -87,7 +87,7 @@ export const updateEventSpaceSchema = z.object({
       // --------------------
     })
     .refine(
-      (data) => {
+      (data: any) => {
         // Only validate customType if type is explicitly being updated to OTHER
         if (data.type === EventSpaceType.OTHER && (!data.customType || data.customType.trim() === "")) {
           return false;

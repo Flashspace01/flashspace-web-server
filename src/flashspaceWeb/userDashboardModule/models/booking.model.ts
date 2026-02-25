@@ -93,7 +93,7 @@ export class Booking {
   @prop({
     required: true,
     // <-- FIXED: Added event_space
-    enum: ["virtual_office", "coworking_space", "meeting_room", "event_space"], 
+    enum: ["virtual_office", "coworking_space", "meeting_room", "event_space"],
   })
   type!: string;
 
@@ -145,6 +145,12 @@ export class Booking {
 
   @prop({ default: false })
   autoRenew?: boolean;
+
+  @prop()
+  couponCode?: string; // Coupon code applied at booking time
+
+  @prop()
+  affiliateId?: mongoose.Types.ObjectId; // Affiliate who referred this booking
 
   @prop({ type: () => [String], default: [] })
   features?: string[];
