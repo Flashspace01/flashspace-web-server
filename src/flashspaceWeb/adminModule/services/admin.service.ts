@@ -14,6 +14,7 @@ import { PasswordUtil } from "../../authModule/utils/password.util";
 import mongoose from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
+import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
 
 export class AdminService {
   /**
@@ -63,6 +64,7 @@ export class AdminService {
               totalBookings: 0,
               activeListings: 0,
               totalRevenue: 0,
+              openTickets: 0,
               recentActivity: [],
             },
           };
@@ -131,6 +133,24 @@ export class AdminService {
       const totalRevenue =
         revenueAggregation.length > 0 ? revenueAggregation[0].totalRevenue : 0;
 
+      // 4.5. Open Tickets
+      const ticketQuery: any = {
+        status: TicketStatus.OPEN,
+        isDeleted: { $ne: true }, // Tickets might not have isDeleted, but adding as precaution if it exists
+      };
+
+      if (!isAdminOrSales) {
+        // Find tickets linked to partner's bookings
+        const bookingIds = await BookingModel.find({
+          spaceId: { $in: spaceIds },
+          isDeleted: false,
+        }).distinct("_id");
+
+        ticketQuery.bookingId = { $in: bookingIds };
+      }
+
+      const openTicketsCount = await TicketModel.countDocuments(ticketQuery);
+
       // 5. Recent Activity
       let recentActivity: any[] = [];
 
@@ -172,6 +192,7 @@ export class AdminService {
           totalBookings,
           activeListings,
           totalRevenue,
+          openTickets: openTicketsCount,
           recentActivity,
         },
       };
