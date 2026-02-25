@@ -2,9 +2,12 @@ import { Router } from "express";
 import { requireSpacePartner } from "../middleware/spacePartner.middleware";
 import * as spaceController from "../controllers/space.controller";
 import * as spaceKycController from "../controllers/spacekyc.controller";
-import { setSpaceDetails, getAllSpaceDetails, acceptSpaceDetails, rejectSpaceDetails } from "../controllers/spaceDetails.controller";
-
-
+import {
+  setSpaceDetails,
+  getAllSpaceDetails,
+  acceptSpaceDetails,
+  rejectSpaceDetails,
+} from "../controllers/spaceDetails.controller";
 
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../../userDashboardModule/config/multer.config";
@@ -23,7 +26,6 @@ spacePartnerRoutes.put("/space-details/:id/reject", rejectSpaceDetails);
 spacePartnerRoutes.post("/space-details", setSpaceDetails);
 spacePartnerRoutes.get("/space-details", getAllSpaceDetails);
 
-
 // Space management routes
 spacePartnerRoutes.post("/spaces", spaceController.createSpace);
 spacePartnerRoutes.get("/spaces", spaceController.getSpaces);
@@ -31,7 +33,6 @@ spacePartnerRoutes.get("/spaces/:id", spaceController.getSpaceById);
 spacePartnerRoutes.put("/spaces/:id", spaceController.updateSpace);
 spacePartnerRoutes.delete("/spaces/:id", spaceController.deleteSpace);
 
-<<<<<<< HEAD
 // Partner invoice-payment routes
 import * as partnerFinancialsController from "../controllers/partnerFinancials.controller";
 
@@ -40,18 +41,19 @@ spacePartnerRoutes.get("/invoices", partnerFinancialsController.getInvoices);
 
 spacePartnerRoutes.post("/payments", partnerFinancialsController.createPayment);
 spacePartnerRoutes.get("/payments", partnerFinancialsController.getPayments);
-=======
 // Space user KYC routes (for partners to submit their own KYC)
 spacePartnerRoutes.get("/kyc", spaceKycController.getMySpaceUserKyc);
 
 // Business info KYC route
-spacePartnerRoutes.put("/kyc/business-info", spaceKycController.upsertSpaceUserKycBusinessInfo);
+spacePartnerRoutes.put(
+  "/kyc/business-info",
+  spaceKycController.upsertSpaceUserKycBusinessInfo,
+);
 spacePartnerRoutes.put("/kyc", spaceKycController.upsertSpaceUserKyc);
 
 spacePartnerRoutes.post(
-	"/kyc/upload",
-	uploadKYCFile.single("file"),
-	spaceKycController.uploadSpaceUserKycFile,
+  "/kyc/upload",
+  uploadKYCFile.single("file"),
+  spaceKycController.uploadSpaceUserKycFile,
 );
->>>>>>> ca529ea9a7b9d8eb9d5520c85383cd5cb2740637
-
+spacePartnerRoutes.post("/kyc/submit", spaceKycController.submitSpaceUserKyc);
