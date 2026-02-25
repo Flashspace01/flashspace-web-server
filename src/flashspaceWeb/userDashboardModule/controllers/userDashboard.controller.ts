@@ -1190,16 +1190,16 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       }
 
       // 1. Try finding in KYCDocument (Individual)
+      const userObject = new mongoose.Types.ObjectId(userId as string);
+      const profileObject = new mongoose.Types.ObjectId(profileId as string);
       let kyc: any = await KYCDocumentModel.findOne({
-        _id: profileId,
-        user: userId,
+        user: userObject,
       });
-
+      console.log("[getKYCStatus] KYC: ", kyc);
       // 2. If not found, try BusinessInfoModel
       if (!kyc) {
         const businessInfo = await BusinessInfoModel.findOne({
-          _id: profileId,
-          user: userId,
+          user: userObject,
         });
 
         if (businessInfo) {
@@ -1289,6 +1289,9 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       isDeleted: { $ne: true },
       kycType: "individual",
     });
+    console.log(
+      `[getKYCStatus] Found ${individualProfiles.length} individual profiles`,
+    );
 
     // 2. Business Profiles (from BusinessInfoModel)
     const businessProfiles = await BusinessInfoModel.find({
@@ -1301,6 +1304,23 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       user: userId,
       isDeleted: { $ne: true },
     });
+    console.log(
+      `[getKYCStatus] Found ${businessProfiles.length} business profiles`,
+    );
+
+    // debug query without filters
+    const allUserDocs = await KYCDocumentModel.find({ user: userId });
+    console.log(
+      `[getKYCStatus] Total KYCDocuments for user (no filters): ${allUserDocs.length}`,
+    );
+    if (allUserDocs.length > 0) {
+      console.log(
+        `[getKYCStatus] First doc types: ${allUserDocs.map((d) => d.kycType).join(", ")}`,
+      );
+      console.log(
+        `[getKYCStatus] First doc isDeleted: ${allUserDocs.map((d) => d.isDeleted).join(", ")}`,
+      );
+    }
 
     // Find main profile for personal info
     const mainProfile = individualProfiles.find(

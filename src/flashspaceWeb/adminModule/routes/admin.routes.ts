@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import { AdminController } from "../controllers/admin.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
@@ -16,41 +15,41 @@ export const adminRoutes = Router();
 adminRoutes.use(AuthMiddleware.authenticate);
 // Space Partner KYC Document Review (admin)
 adminRoutes.put(
-    '/spacePartner/kyc/document/review',
-    RBACMiddleware.requireAnyPermission([
-        Permission.MANAGE_ALL_USERS,
-        Permission.MANAGE_OWN_SPACES
-    ]),
-    reviewSpaceUserKycDocument
+  "/spacePartner/kyc/document/review",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  reviewSpaceUserKycDocument,
 );
 
 // Space Partner KYC Overall Review (admin)
 adminRoutes.put(
-    '/spacePartner/kyc/overall/review',
-    RBACMiddleware.requireAnyPermission([
-        Permission.MANAGE_ALL_USERS,
-        Permission.MANAGE_OWN_SPACES
-    ]),
-    reviewSpaceUserKycOverall
+  "/spacePartner/kyc/overall/review",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  reviewSpaceUserKycOverall,
 );
 
 // Authentication removed as requested
 // Space Partner KYC routes (admin, protected)
 adminRoutes.get(
-    '/spacePartner/kyc',
-    RBACMiddleware.requireAnyPermission([
-        Permission.MANAGE_ALL_USERS,
-        Permission.MANAGE_OWN_SPACES
-    ]),
-    getAllSpacePartnerKyc
+  "/spacePartner/kyc",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  getAllSpacePartnerKyc,
 );
 adminRoutes.get(
-    '/spacePartner/kyc/:id',
-    RBACMiddleware.requireAnyPermission([
-        Permission.MANAGE_ALL_USERS,
-        Permission.MANAGE_OWN_SPACES
-    ]),
-    getSpacePartnerKycById
+  "/spacePartner/kyc/:id",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  getSpacePartnerKycById,
 );
 
 // 1. Authenticate all users (removed as per request)
