@@ -447,8 +447,22 @@ export const verifyPayment = async (req: Request, res: Response) => {
             type: "booking_confirmation",
           }
         );
+
+        if (bookingData?.invoiceNumber) {
+          await NotificationService.notifyUser(
+            payment.userId.toString(),
+            "Invoice Generated 📄",
+            `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+            NotificationType.INFO,
+            {
+              invoiceNumber: bookingData.invoiceNumber,
+              type: "invoice_generated",
+              actionUrl: "/dashboard/documents"
+            }
+          );
+        }
         // -------------------------------------
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to create booking:", err);
       }
 
@@ -551,7 +565,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       bookingData = await createBookingAndInvoice(payment);
 
       // -------------------------------------
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create booking:", err);
     }
 
@@ -577,6 +591,34 @@ export const verifyPayment = async (req: Request, res: Response) => {
       }
     }
     // ---------------------------------------
+
+    // --- NOTIFICATION LOGIC (PROD MODE) ---
+    await NotificationService.notifyUser(
+      payment.userId.toString(),
+      "Booking Confirmed! 🎉",
+      `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+      NotificationType.SUCCESS,
+      {
+        bookingId: bookingData?.booking?._id,
+        paymentId: payment._id,
+        type: "booking_confirmation",
+      }
+    );
+
+    if (bookingData?.invoiceNumber) {
+      await NotificationService.notifyUser(
+        payment.userId.toString(),
+        "Invoice Generated 📄",
+        `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+        NotificationType.INFO,
+        {
+          invoiceNumber: bookingData.invoiceNumber,
+          type: "invoice_generated",
+          actionUrl: "/dashboard/documents"
+        }
+      );
+    }
+    // -------------------------------------
 
     res.status(200).json({
       success: true,

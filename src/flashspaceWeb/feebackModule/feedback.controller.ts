@@ -63,7 +63,7 @@ export const createFeedback = async (req: Request, res: Response) => {
 
     });
 
-  } catch (err) {
+  } catch (err: any) {
 
     res.status(500).json({
 
@@ -111,7 +111,7 @@ export const getAllFeedback = async (_req: Request, res: Response) => {
 
     });
 
-  } catch (err) {
+  } catch (err: any) {
 
     res.status(500).json({
 
@@ -193,7 +193,7 @@ export const getNpsStats = async (_req: Request, res: Response) => {
 
     });
 
-  } catch (err) {
+  } catch (err: any) {
 
     res.status(500).json({
 
@@ -306,7 +306,7 @@ export const getAiInsight = async (_req: Request, res: Response) => {
 
     });
 
-  } catch (err) {
+  } catch (err: any) {
 
     console.error("AI Insight Error:", err);
 

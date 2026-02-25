@@ -49,7 +49,7 @@ export const createEventSpace = async (req: Request, res: Response) => {
       message: "Event space created successfully",
       data: createdSpace,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to create event space", err);
   }
 };
@@ -122,7 +122,7 @@ export const getAllEventSpaces = async (req: Request, res: Response) => {
       message: "Event spaces retrieved successfully",
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve event spaces", err);
   }
 };
@@ -178,7 +178,7 @@ export const getEventSpacesByCity = async (req: Request, res: Response) => {
       message: `Event spaces in ${city} retrieved successfully`,
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces by city", err);
   }
 };
@@ -205,7 +205,7 @@ export const getPartnerEventSpaces = async (req: Request, res: Response) => {
       message: "Partner event spaces retrieved successfully",
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner event spaces", err);
   }
 };

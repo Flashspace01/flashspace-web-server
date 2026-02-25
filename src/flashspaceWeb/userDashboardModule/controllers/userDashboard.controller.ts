@@ -733,14 +733,20 @@ export const getKYCStatus = async (req: Request, res: Response) => {
     // 1. Individual Profile
     const individualProfiles = await KYCDocumentModel.find({
       user: userId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
       kycType: "individual",
     });
 
     // 2. Business Profiles (from BusinessInfoModel)
     const businessProfiles = await BusinessInfoModel.find({
       user: userId,
-      isDeleted: false,
+      isDeleted: { $ne: true },
+    });
+
+    // 3. Partner Profiles
+    const partnerProfiles = await PartnerKYCModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
     });
 
     // Find main profile for personal info
@@ -773,8 +779,34 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       updatedAt: b.updatedAt,
     }));
 
+    // Map Partner Profiles to KYCData
+    const mappedPartnerProfiles = partnerProfiles.map((p) => ({
+      _id: p._id,
+      user: p.user,
+      profileName: p.fullName,
+      kycType: "individual",
+      isPartner: true,
+      personalInfo: {
+        fullName: p.fullName,
+        email: p.email,
+        phone: p.phone,
+        panNumber: p.panNumber,
+        aadhaarNumber: p.aadhaarNumber,
+        dateOfBirth: p.dob,
+      },
+      businessInfo: {
+        companyName: "N/A",
+        partners: [],
+      },
+      documents: p.documents || [],
+      overallStatus: p.status || "pending",
+      progress: 0,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    }));
+
     // Combine
-    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles];
+    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles, ...mappedPartnerProfiles];
 
     res.status(200).json({ success: true, data: allProfiles });
   } catch (error) {
@@ -1180,7 +1212,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
       }

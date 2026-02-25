@@ -75,7 +75,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       message: "Coworking space created successfully",
       data: createdSpace,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to create space", err);
   }
 };
@@ -139,7 +139,7 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
       message: "Coworking spaces retrieved successfully",
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces", err);
   }
 };
@@ -183,7 +183,7 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
       message: `Coworking spaces in ${city} retrieved successfully`,
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces by city", err);
   }
 };
@@ -199,7 +199,7 @@ export const getPartnerSpaces = async (req: Request, res: Response) => {
       message: "Partner spaces retrieved successfully",
       data: spaces,
     });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner spaces", err);
   }
 };

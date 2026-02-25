@@ -52,7 +52,7 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
         message: "Virtual office created successfully",
         data: createdOffice,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to create virtual office", err);
   }
 };
@@ -119,7 +119,7 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
         message: "Virtual offices retrieved successfully",
         data: offices,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve virtual offices", err);
   }
 };
@@ -171,7 +171,7 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
         message: `Virtual offices in ${city} retrieved successfully`,
         data: offices,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to retrieve offices by city", err);
   }
 };
@@ -193,7 +193,7 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
         message: "Partner virtual offices retrieved",
         data: formattedSpaces,
       });
-  } catch (err) {
+  } catch (err: any) {
     sendError(res, 500, "Failed to fetch partner virtual offices", err);
   }
 };

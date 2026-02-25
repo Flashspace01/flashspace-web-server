@@ -1,11 +1,12 @@
 import express from "express";
 // Change import style to destructuring to catch errors at compile time
-import { create, getAll, getRecent, getStats } from "../controllers/quotation.controller";
+import { create, getAll, getRecent, getStats, getAvailableSpaces } from "../controllers/quotation.controller";
 import * as leadController from "../controllers/affiliateLead.controller";
 import * as supportController from "../controllers/support.controller";
 import { getLeaderboard } from "../controllers/leaderboard.controller";
 import { getDashboardStats, getAIInsights } from "../controllers/affiliateDashboard.controller";
 import { getMyClients } from "../controllers/affiliateClient.controller";
+import * as invoiceController from "../controllers/affiliateInvoice.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { UserRole } from "../../authModule/models/user.model";
 
@@ -26,6 +27,7 @@ router.post("/quotations", create);
 router.get("/quotations", getAll);
 router.get("/quotations/recent", getRecent);
 router.get("/quotations/stats", getStats);
+router.get("/spaces", getAvailableSpaces);
 
 // Lead Routes
 router.post("/leads", leadController.create);
@@ -48,5 +50,9 @@ router.get("/dashboard/insights", getAIInsights);
 
 // Client Management Routes
 router.get("/clients", getMyClients);
+
+// Invoice Routes
+router.get("/invoices", invoiceController.getInvoices);
+router.get("/invoices/:id", invoiceController.getInvoiceById);
 
 export { router as affiliateRoutes };

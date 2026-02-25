@@ -4,6 +4,8 @@ import {
     QuotationStatus,
 } from "../models/quotation.model";
 import { Types } from "mongoose";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 
 /**
  * Create a new quotation for an affiliate
@@ -127,4 +129,24 @@ export const getQuotationStats = async (affiliateId?: string) => {
         accepted: data.accepted,
         conversion: conversionRate,
     };
+};
+
+/**
+ * Search available spaces by city and type for quotation generation
+ */
+export const searchAvailableSpaces = async (city: string, type: string) => {
+    if (type.toLowerCase().includes("coworking")) {
+        return await CoworkingSpaceModel.find({
+            city: new RegExp(`^${city}$`, "i"),
+            isActive: true,
+            isDeleted: false,
+        }).lean();
+    } else if (type.toLowerCase().includes("virtual")) {
+        return await VirtualOfficeModel.find({
+            city: new RegExp(`^${city}$`, "i"),
+            isActive: true,
+            isDeleted: false,
+        }).lean();
+    }
+    return [];
 };
