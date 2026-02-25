@@ -139,7 +139,8 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
 // ============ PARTNER BOOKINGS ============
 
-import { PartnerKYCModel } from "../models/partnerKYC.model";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
 import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { EventSpaceModel } from "../../eventSpaceModule/eventSpace.model";
@@ -1080,40 +1081,6 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
 
     await kyc.save();
 
-<<<<<<< HEAD
-    res.status(200).json({ 
-      success: true, 
-      message: "KYC submitted for review successfully. Our team will review it shortly.",
-      data: kyc 
-=======
-    // Recalculate businessInfoCount if it's a Business Info doc
-    if (isBusinessInfoDoc) {
-      const userObjectId = new mongoose.Types.ObjectId(userId);
-      const pendingBusinessCount = await BusinessInfoModel.countDocuments({
-        user: userObjectId,
-        status: "pending",
-      });
-
-      await KYCDocumentModel.findOneAndUpdate(
-        { user: userId },
-        { businessInfoCount: pendingBusinessCount },
-      );
-    }
-
-    // Recalculate partnerCount if it's a Partner KYC doc
-    if (isPartner) {
-      const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-        user: userId,
-        status: "pending",
-        isDeleted: { $ne: true },
-      });
-
-      await KYCDocumentModel.findOneAndUpdate(
-        { user: userId },
-        { partnerCount: pendingPartnerCount },
-      );
-    }
-
     // Notify Admin
     try {
       const user = await UserModel.findById(userId);
@@ -1125,7 +1092,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       if (isPartner) {
         title = "New Partner KYC Request";
         message = `${userName} has submitted a Partner KYC request.`;
-      } else if (isBusinessInfoDoc) {
+      } else if (isBusiness) {
         title = "New Business Profile Request";
         message = `${userName} has submitted a Business Profile for review.`;
       }
@@ -1139,7 +1106,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
           kycId: profileId,
           type: isPartner
             ? "partner"
-            : isBusinessInfoDoc
+            : isBusiness
               ? "business"
               : "individual",
         },
@@ -1156,7 +1123,6 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       message:
         "KYC submitted for review successfully. Our team will review it shortly.",
       data: kyc,
->>>>>>> 3612a66 (Space-Portal-Spaces-Backend)
     });
   } catch (error) {
     console.error("Submit KYC error:", error);
