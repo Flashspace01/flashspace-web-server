@@ -138,7 +138,7 @@ export class AdminService {
         isDeleted: { $ne: true }, // Tickets might not have isDeleted, but adding as precaution if it exists
       };
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         // Find tickets linked to partner's bookings
         const bookingIds = await BookingModel.find({
           spaceId: { $in: spaceIds },

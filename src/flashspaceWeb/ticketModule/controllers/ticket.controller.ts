@@ -128,7 +128,7 @@ export const getTicketById = async (
       UserRole.SPACE_PARTNER_MANAGER
     ];
 
-    const isStaff = staffRoles.includes(userRole);
+    const isStaff = staffRoles.includes(userRole as UserRole);
 
     // If user is staff, they can access any ticket
     // If user is regular user, they can only access their own tickets

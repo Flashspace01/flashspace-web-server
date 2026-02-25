@@ -67,7 +67,8 @@ export const RolePermissions: Record<UserRole, Permission[]> = {
     ],
     [UserRole.AFFILIATE_MANAGER]: [
         Permission.VIEW_DASHBOARD,
-        Permission.MANAGE_SYSTEM // required to access settings
+        Permission.MANAGE_SYSTEM, // required to access settings
+        Permission.MANAGE_ALL_USERS // Required for /affiliates endpoint
     ],
     [UserRole.SPACE_PARTNER_MANAGER]: [
         Permission.VIEW_DASHBOARD,
