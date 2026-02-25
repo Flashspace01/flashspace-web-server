@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 export const dbConnection = async () => {
     try {
-        const dbUri = process.env.DB_URI || "mongodb://127.0.0.1:27017/myapp";
+        const dbUri = process.env.DB_URI || "mongodb://127.0.0.1:27018/myapp";
         console.log(`Attempting to connect to MongoDB at: ${dbUri}`);
 
         await mongoose.connect(dbUri, {

@@ -25,6 +25,14 @@ export const initSocket = (httpServer: HttpServer) => {
   const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
   const subClient = pubClient.duplicate();
 
+  // Handle Redis connection errors to prevent process crash
+  pubClient.on("error", (err) => {
+    console.error("Redis Pub Client Error:", err.message);
+  });
+  subClient.on("error", (err) => {
+    console.error("Redis Sub Client Error:", err.message);
+  });
+
   Promise.all([pubClient.connect(), subClient.connect()])
     .then(() => {
       io.adapter(createAdapter(pubClient, subClient));
@@ -33,7 +41,7 @@ export const initSocket = (httpServer: HttpServer) => {
       );
     })
     .catch((err) => {
-      console.error("Failed to connect Socket.io Redis adapter:", err);
+      console.error("Failed to connect Socket.io Redis adapter (falling back to memory adapter):", err.message);
     });
 
   io = new Server(httpServer, {
