@@ -48,7 +48,7 @@ router.post('/google/callback', authController.googleCallback);
 
 // Semi-protected routes (optional authentication)
 router.get('/check-auth', 
-  AuthMiddleware.optionalAuth, 
+  AuthMiddleware.optionalAuth,
   authController.checkAuth
 );
 
@@ -60,9 +60,16 @@ router.post('/logout', authController.logout);
 router.post('/logout-all', authController.logoutAll);
 
 // Profile routes (requires email verification)
-router.get('/profile', 
-  AuthMiddleware.requireVerifiedEmail, 
-  authController.getProfile
+router.get(
+  "/profile",
+  AuthMiddleware.requireVerifiedEmail,
+  authController.getProfile,
+);
+
+router.patch(
+  "/profile",
+  AuthMiddleware.requireVerifiedEmail,
+  authController.updateProfile,
 );
 
 export { router as authRoutes };
