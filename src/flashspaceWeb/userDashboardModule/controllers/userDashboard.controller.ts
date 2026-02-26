@@ -286,6 +286,7 @@ export const getPartnerDashboardOverview = async (
         id: b.bookingNumber || b._id.toString(),
         companyName: b.user?.company || b.user?.fullName || "N/A",
         contactName: b.user?.fullName || "N/A",
+        email: b.user?.email || "N/A",
         plan: planName,
         space: b.spaceSnapshot?.name || "Unknown Space",
         startDate: b.startDate
@@ -806,7 +807,11 @@ export const getKYCStatus = async (req: Request, res: Response) => {
     }));
 
     // Combine
-    const allProfiles = [...individualProfiles, ...mappedBusinessProfiles, ...mappedPartnerProfiles];
+    const allProfiles = [
+      ...individualProfiles,
+      ...mappedBusinessProfiles,
+      ...mappedPartnerProfiles,
+    ];
 
     res.status(200).json({ success: true, data: allProfiles });
   } catch (error) {
@@ -2076,17 +2081,30 @@ export const getUserMails = async (req: Request, res: Response) => {
     const user = await UserModel.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const userEmail = user.email.trim();
 
-    // Case-insensitive exact match
-    const mails = await Mail.find({
-      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
-    }).sort({ createdAt: -1 });
+    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
 
-    res.status(200).json({ success: true, data: mails });
+    const mails = await Mail.find({
+      $or: [
+        { email: { $regex: userEmailRegex } },
+        { clientEmail: { $regex: userEmailRegex } },
+      ],
+    })
+      .lean()
+      .sort({ createdAt: -1 });
+
+    const formattedMails = mails.map((m: any) => ({
+      ...m,
+      mailId: m.mailId || m._id?.toString(),
+    }));
+
+    res.status(200).json({ success: true, data: formattedMails });
   } catch (error) {
     console.error("Get user mails error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch mails" });
@@ -2101,17 +2119,30 @@ export const getUserVisits = async (req: Request, res: Response) => {
     const user = await UserModel.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const userEmail = user.email.trim();
 
-    // Case-insensitive exact match
-    const visits = await Visit.find({
-      email: { $regex: new RegExp(`^${userEmail}$`, 'i') }
-    }).sort({ createdAt: -1 });
+    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
 
-    res.status(200).json({ success: true, data: visits });
+    const visits = await Visit.find({
+      $or: [
+        { email: { $regex: userEmailRegex } },
+        { clientEmail: { $regex: userEmailRegex } },
+      ],
+    })
+      .lean()
+      .sort({ createdAt: -1 });
+
+    const formattedVisits = visits.map((v: any) => ({
+      ...v,
+      visitId: v.visitId || v._id?.toString(),
+    }));
+
+    res.status(200).json({ success: true, data: formattedVisits });
   } catch (error) {
     console.error("Get user visits error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
