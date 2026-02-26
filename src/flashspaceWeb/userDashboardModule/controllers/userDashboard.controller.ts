@@ -376,7 +376,23 @@ export const getAllBookings = async (req: Request, res: Response) => {
     const { type, status, page = 1, limit = 100 } = req.query;
 
     const filter: any = { user: userId, isDeleted: false };
-    if (type) filter.type = type;
+
+    // Support filtering by both exactly matching 'type' and 'bookingType'
+    // along with converting CamelCase tabs to snake_case if necessary
+    if (type) {
+      const snakeCaseType = (type as string)
+        .replace(/([A-Z])/g, "_$1")
+        .toLowerCase()
+        .replace(/^_/, ""); // e.g., "VirtualOffice" -> "virtual_office"
+
+      filter.$or = [
+        { type: type },
+        { bookingType: type },
+        { type: snakeCaseType },
+        { bookingType: snakeCaseType }
+      ];
+    }
+
     if (status) filter.status = status;
 
     const limitNum = Number(limit) || 100;
