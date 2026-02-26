@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Use npm install instead of npm ci to avoid lockfile issues
-RUN npm install
+RUN npm config set registry http://registry.npmjs.org/ && npm config set fetch-retries 5 && npm install
 
 # Copy source code
 COPY . .

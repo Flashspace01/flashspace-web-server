@@ -16,6 +16,7 @@ services:
       - .env
     volumes:
       - ./src/flashspaceWeb/meetingSchedulerModule/google-tokens.json:/app/dist/flashspaceWeb/meetingSchedulerModule/google-tokens.json
+      - ./uploads:/app/uploads
     depends_on:
       - redis
       - mongo

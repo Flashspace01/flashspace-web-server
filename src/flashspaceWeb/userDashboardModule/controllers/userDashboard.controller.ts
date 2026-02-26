@@ -403,9 +403,21 @@ export const getAllBookings = async (req: Request, res: Response) => {
       return booking;
     });
 
+    // Calculate stats before sending the response
+    const allBookings = await BookingModel.find({ user: userId, isDeleted: false });
+
+    const stats = {
+      total: allBookings.length,
+      active: allBookings.filter(b => b.status === "active").length,
+      virtualOffice: allBookings.filter(b => b.type === "VirtualOffice" || b.type === "virtual_office").length,
+      coworking: allBookings.filter(b => b.type === "CoworkingSpace" || b.type === "coworking_space").length,
+      meetingRoom: allBookings.filter(b => b.type === "MeetingRoom" || b.type === "meeting_room").length,
+    };
+
     res.status(200).json({
       success: true,
       data: bookingsWithDays,
+      stats,
       pagination: {
         total,
         page: Number(page),
