@@ -11,6 +11,28 @@ export const dbConnection = async () => {
             family: 4
         });
         console.log("Connected to Database!");
+
+        // Drop legacy TTL indexes that delete users silently
+        try {
+            await mongoose.connection.db?.collection('users').dropIndex('emailVerificationOTPExpiry_1');
+            console.log("Legacy emailVerificationOTPExpiry TTL index dropped successfully.");
+        } catch (e: any) {
+            // Ignore if index doesn't exist
+            if (e.codeName !== 'IndexNotFound') {
+                console.error("Error dropping emailVerificationOTPExpiry index:", e);
+            }
+        }
+
+        try {
+            await mongoose.connection.db?.collection('users').dropIndex('resetPasswordExpiry_1');
+            console.log("Legacy resetPasswordExpiry TTL index dropped successfully.");
+        } catch (e: any) {
+            // Ignore if index doesn't exist
+            if (e.codeName !== 'IndexNotFound') {
+                console.error("Error dropping resetPasswordExpiry index:", e);
+            }
+        }
+
     } catch (err: any) {
         console.error("Mongoose Connection Error:", err);
 
