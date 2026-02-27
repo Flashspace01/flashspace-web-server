@@ -1187,6 +1187,13 @@ export const getKYCStatus = async (req: Request, res: Response) => {
         return res.status(200).json({ success: true, data: null });
       }
 
+      if (!mongoose.Types.ObjectId.isValid(profileId as string)) {
+        console.log(`[getKYCStatus] Invalid profileId format: ${profileId}`);
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid Profile ID format" });
+      }
+
       // 1. Try finding in KYCDocument (Individual)
       const userObject = new mongoose.Types.ObjectId(userId as string);
       const profileObject = new mongoose.Types.ObjectId(profileId as string);
@@ -1228,6 +1235,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
             },
             documents: businessInfo.documents || [],
             overallStatus: businessInfo.status || "pending",
+            rejectionReason: businessInfo.rejectionReason,
             progress: 0,
             createdAt: businessInfo.createdAt,
             updatedAt: businessInfo.updatedAt,
@@ -1263,6 +1271,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
             },
             documents: partner.documents || [],
             overallStatus: partner.status || "pending",
+            rejectionReason: partner.rejectionReason,
             progress: 0,
             createdAt: partner.createdAt,
             updatedAt: partner.updatedAt,
@@ -1339,6 +1348,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       },
       documents: b.documents || [],
       overallStatus: b.status || "pending",
+      rejectionReason: b.rejectionReason,
       progress: 0,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
@@ -1402,6 +1412,11 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       let businessInfo = null;
       // Check if profileId is valid business info
       if (profileId && profileId !== "new") {
+        if (!mongoose.Types.ObjectId.isValid(profileId as string)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid Profile ID format" });
+        }
         businessInfo = await BusinessInfoModel.findOne({
           _id: profileId,
           user: userId,
@@ -1927,6 +1942,12 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       return res
         .status(400)
         .json({ success: false, message: "Profile ID is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(profileId as string)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Profile ID format" });
     }
 
     let kyc: any = await KYCDocumentModel.findOne({

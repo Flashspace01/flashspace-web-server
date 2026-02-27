@@ -124,6 +124,19 @@ export class KYCDocument {
   })
   overallStatus?: string;
 
+  @prop({
+    enum: [
+      "not_started",
+      "in_progress",
+      "pending",
+      "approved",
+      "rejected",
+      "resubmit",
+    ],
+    default: "not_started",
+  })
+  kycStatus?: string;
+
   @prop({ default: 0, min: 0, max: 100 })
   progress?: number;
 

@@ -26,6 +26,11 @@ export class PropertyService {
       updateData.features = data.features || data.amenities;
     if (data.location) updateData.location = data.location;
     if (data.images) updateData.images = data.images;
+    if (data.kycStatus) updateData.kycStatus = data.kycStatus;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.status) updateData.status = data.status;
+    if (data.kycRejectionReason)
+      updateData.kycRejectionReason = data.kycRejectionReason;
 
     if (Object.keys(updateData).length === 0) return null;
 

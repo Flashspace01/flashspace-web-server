@@ -1,0 +1,5 @@
+﻿[dotenv@17.3.1] injecting env (21) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+START_ID
+KYC_ID:69904150593dc6f16b487f5c
+USER_ID:6989ccdefc41b1c899d3cd33
+END_ID

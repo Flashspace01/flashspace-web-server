@@ -101,10 +101,14 @@ export class AdminController {
   // GET /api/admin/kyc/:id
   static async getKYCDetails(req: Request, res: Response) {
     const id = req.params.id as string;
+    console.log(`[AdminController] getKYCDetails called with ID: ${id}`);
     const result = await adminService.getKYCDetails(id);
     if (result.success) {
       res.status(200).json(result);
     } else {
+      console.log(
+        `[AdminController] getKYCDetails failed for ID ${id}: ${result.message}`,
+      );
       const statusCode =
         result.message === "KYC document not found" ? 404 : 500;
       res.status(statusCode).json(result);

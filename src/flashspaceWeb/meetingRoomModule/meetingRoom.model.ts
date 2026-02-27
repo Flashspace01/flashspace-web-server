@@ -85,6 +85,9 @@ export class MeetingRoom {
   @prop({ type: () => [String], default: [] })
   public amenities?: string[];
 
+  @prop({ type: () => [String], default: [] })
+  public images?: string[];
+
   @prop({ default: false })
   public isActive!: boolean;
 

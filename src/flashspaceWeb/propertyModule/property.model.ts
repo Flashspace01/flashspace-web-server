@@ -7,8 +7,6 @@ import {
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
 import { GeoLocation } from "../shared/geolocation.schema";
-// Import your KYC model if you have a specific one for properties, otherwise use 'any' or your existing KYC model
-// import { KYCDocument } from "../kycModule/models/kyc.model";
 
 export enum KYCStatus {
   APPROVED = "approved",
@@ -23,6 +21,32 @@ export enum PropertyStatus {
   PENDING_APPROVAL = "pending_approval",
   ACTIVE = "active",
   SUSPENDED = "suspended",
+}
+
+export class PropertyKYCDocumentItem {
+  @prop({ required: true })
+  public type!: string;
+
+  @prop({ required: true })
+  public name!: string;
+
+  @prop()
+  public fileUrl?: string;
+
+  @prop({ enum: ["pending", "approved", "rejected"], default: "pending" })
+  public status?: string;
+
+  @prop()
+  public rejectionReason?: string;
+
+  @prop()
+  public uploadedAt?: Date;
+
+  @prop()
+  public verifiedAt?: Date;
+
+  @prop({ ref: () => User })
+  public verifiedBy?: Ref<User>;
 }
 
 @modelOptions({
@@ -59,6 +83,9 @@ export class Property {
 
   @prop()
   public kycRejectionReason?: string;
+
+  @prop({ type: () => [PropertyKYCDocumentItem], default: [] })
+  public documents?: PropertyKYCDocumentItem[];
 
   // Optional: Link directly to the document submission for this property
   // @prop({ ref: () => KYCDocument })

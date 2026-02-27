@@ -25,6 +25,13 @@ export const addPartner = async (req: Request, res: Response) => {
       });
     }
 
+    if (!Types.ObjectId.isValid(profileId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Profile ID format",
+      });
+    }
+
     // Verify KYC Profile exists and belongs to user
     const kycProfile = await KYCDocumentModel.findOne({
       _id: profileId,
@@ -94,6 +101,13 @@ export const getPartners = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: "Profile ID required",
+      });
+    }
+
+    if (!Types.ObjectId.isValid(profileId as string)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Profile ID format",
       });
     }
 

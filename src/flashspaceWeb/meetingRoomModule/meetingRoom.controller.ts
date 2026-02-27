@@ -29,15 +29,19 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
   try {
     const validation = createMeetingRoomSchema.safeParse(req);
     if (!validation.success) {
-      return sendError(
-        res,
-        400,
-        "Validation Error",
-        validation.error.issues.map((err) => ({
+      console.error(
+        "Meeting Room Validation Error:",
+        JSON.stringify(validation.error.issues, null, 2),
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        data: {},
+        error: validation.error.issues.map((err) => ({
           path: err.path.join("."),
           message: err.message,
         })),
-      );
+      });
     }
 
     const MEETING_ROOM_DATA: any = {

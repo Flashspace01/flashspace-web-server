@@ -33,16 +33,24 @@ export const createVirtualOfficeSchema = z.object({
       .optional(),
 
     // FIXED: Updated to Numbers and matching the Model property names
-    finalGstPricePerYear: z.number().nonnegative(),
-    finalMailingPricePerYear: z.number().nonnegative(),
-    finalBrPricePerYear: z.number().nonnegative(),
+    partnerGstPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupGstPerYear: z.number().nonnegative().optional(),
+    finalGstPricePerYear: z.number().nonnegative().optional(),
 
-    features: z.array(z.string()).min(1, "At least one feature is required"),
-    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
+    partnerMailingPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupMailingPerYear: z.number().nonnegative().optional(),
+    finalMailingPricePerYear: z.number().nonnegative().optional(),
+
+    partnerBrPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupBrPerYear: z.number().nonnegative().optional(),
+    finalBrPricePerYear: z.number().nonnegative().optional(),
+
+    features: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).optional(),
     popular: z.boolean().optional(),
     sponsored: z.boolean().optional(),
     location: LocationSchema.optional(), // FIXED: Replaced coordinates
-    images: z.array(z.string()).min(1, "At least one image is required"),
+    images: z.array(z.string()).optional(),
   }),
 });
 
@@ -57,9 +65,17 @@ export const updateVirtualOfficeSchema = z.object({
     area: z.string().min(2).optional(),
 
     // FIXED: Updated to Numbers
-    gstPlanPricePerYear: z.number().nonnegative().optional(),
-    mailingPlanPricePerYear: z.number().nonnegative().optional(),
-    brPlanPricePerYear: z.number().nonnegative().optional(),
+    partnerGstPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupGstPerYear: z.number().nonnegative().optional(),
+    finalGstPricePerYear: z.number().nonnegative().optional(),
+
+    partnerMailingPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupMailingPerYear: z.number().nonnegative().optional(),
+    finalMailingPricePerYear: z.number().nonnegative().optional(),
+
+    partnerBrPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupBrPerYear: z.number().nonnegative().optional(),
+    finalBrPricePerYear: z.number().nonnegative().optional(),
 
     features: z.array(z.string()).optional(),
     amenities: z.array(z.string()).optional(),
@@ -69,6 +85,7 @@ export const updateVirtualOfficeSchema = z.object({
     images: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
+    approvalStatus: z.string().optional(),
   }),
 });
 
