@@ -14,7 +14,7 @@ import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/af
 import { spacePartnerRoutes } from "./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes";
 import { feedbackRoutes } from "./flashspaceWeb/feebackModule/feedback.routes";
 import { couponRoutes } from "./flashspaceWeb/couponModule/coupon.routes";
-
+import chatRoutes from "./flashspaceWeb/chatModule/routes/chatRoutes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 export const mainRoutes = Router();
 
@@ -82,3 +82,6 @@ mainRoutes.use('/notifications', notificationRoutes);
 // /api/visit
 import visitRoutes from "./flashspaceWeb/visitModule/routes/visit.routes";
 mainRoutes.use('/visit', visitRoutes);
+
+// /api/chat
+mainRoutes.use('/chat', chatRoutes);
