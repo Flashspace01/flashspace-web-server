@@ -17,7 +17,6 @@ export enum CouponStatus {
     timestamps: true,
   },
 })
-@index({ code: 1 }, { unique: true })
 @index({ assignedClientId: 1 })
 @index({ status: 1 })
 export class Coupon {
