@@ -8,8 +8,9 @@ export const requireSpacePartner = async (req: Request, res: Response, next: Nex
             return res.status(401).json({ message: 'Authentication required' });
         }
 
-        if (user.role !== 'partner') {
-            return res.status(403).json({ message: 'Partner access required' });
+        const staffRoles = ['super_admin', 'admin', 'support', 'sales', 'affiliate_manager', 'space_partner_manager'];
+        if (user.role !== 'partner' && !staffRoles.includes(user.role)) {
+            return res.status(403).json({ message: 'Partner or staff access required' });
         }
 
         next();

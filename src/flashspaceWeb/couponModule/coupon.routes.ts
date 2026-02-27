@@ -10,21 +10,21 @@ export const couponRoutes = Router();
 couponRoutes.post(
     "/create",
     AuthMiddleware.authenticate,
-    AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SALES),
+    AuthMiddleware.requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SALES),
     (req, res) => couponController.createCoupon(req, res)
 );
 
 couponRoutes.get(
     "/admin/all",
     AuthMiddleware.authenticate,
-    AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SALES),
+    AuthMiddleware.requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SALES),
     (req, res) => couponController.getAllCoupons(req, res)
 );
 
 couponRoutes.delete(
     "/:id",
     AuthMiddleware.authenticate,
-    AuthMiddleware.requireRole(UserRole.ADMIN),
+    AuthMiddleware.requireRole(UserRole.SUPER_ADMIN, UserRole.ADMIN),
     (req, res) => couponController.deleteCoupon(req, res)
 );
 

@@ -10,9 +10,13 @@ export enum AuthProvider {
 export enum UserRole {
   USER = "user",
   ADMIN = "admin",
+  SUPER_ADMIN = "super_admin",
   PARTNER = "partner",
   SALES = "sales",
   AFFILIATE = "affiliate",
+  AFFILIATE_MANAGER = "affiliate_manager",
+  SPACE_PARTNER_MANAGER = "space_partner_manager",
+  SUPPORT = "support",
 }
 
 @modelOptions({
