@@ -48,16 +48,17 @@ export const createMeetingRoomSchema = z.object({
       .number()
       .int()
       .positive("Price must be a positive integer"),
-    partnerPricePerDay: z.number().positive(),
+    adminMarkupPerHour: z.number().nonnegative().optional(),
+    finalPricePerHour: z.number().nonnegative().optional(),
+    partnerPricePerDay: z.number().positive().optional(),
+    adminMarkupPerDay: z.number().nonnegative().optional(),
+    finalPricePerDay: z.number().nonnegative().optional(),
     operatingHours: OperatingHoursSchema,
     minBookingHours: z.number().int().positive().optional(),
     capacity: z.number().int().positive("Capacity must be a positive integer"),
     type: meetingRoomTypeEnum,
-    amenities: z.array(z.string()).min(1, "At least one amenity is required"),
-    images: z
-      .array(z.string())
-      .min(1, "At least one image is required")
-      .max(10, "Maximum 10 images allowed"),
+    amenities: z.array(z.string()).optional(),
+    images: z.array(z.string()).max(10, "Maximum 10 images allowed").optional(),
     sponsored: z.boolean().optional(),
     popular: z.boolean().optional(),
   }),
@@ -74,9 +75,11 @@ export const updateMeetingRoomSchema = z.object({
     area: z.string().min(2).optional(),
     location: LocationSchema.optional(), // FIXED
     partnerPricePerHour: z.number().int().positive().optional(),
+    adminMarkupPerHour: z.number().nonnegative().optional(),
+    finalPricePerHour: z.number().nonnegative().optional(),
     partnerPricePerDay: z.number().positive().optional(),
-    pricePerHour: z.number().int().positive().optional(),
-    pricePerDay: z.number().positive().optional(), // ADDED
+    adminMarkupPerDay: z.number().nonnegative().optional(),
+    finalPricePerDay: z.number().nonnegative().optional(),
     operatingHours: OperatingHoursSchema.optional(), // ADDED
     minBookingHours: z.number().int().positive().optional(), // ADDED
     capacity: z.number().int().positive().optional(),
@@ -87,6 +90,7 @@ export const updateMeetingRoomSchema = z.object({
     popular: z.boolean().optional(),
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
+    approvalStatus: z.string().optional(),
   }),
 });
 

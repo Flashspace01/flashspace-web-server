@@ -8,7 +8,8 @@ import {
   getAllAffiliates,
   getAffiliateClients,
 } from "../controllers/affiliateAdmin.controller";
-import { reviewSpaceUserKycDocument, reviewSpaceUserKycOverall, getAllSpacePartnerKyc, getSpacePartnerKycById } from '../../spacePartnerModule/controllers/spacekyc.controller';
+import { reviewSpaceUserKycDocument, reviewSpaceUserKycOverall, getAllSpacePartnerKyc, getSpacePartnerKycById, getSpacePartnerPropertiesByKycId,
+  getSpacePartnerPropertiesByUserId } from '../../spacePartnerModule/controllers/spacekyc.controller';
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
@@ -50,6 +51,22 @@ adminRoutes.get(
     Permission.MANAGE_OWN_SPACES,
   ]),
   getSpacePartnerKycById,
+);
+adminRoutes.get(
+  "/spacePartner/kyc/:id/properties",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  getSpacePartnerPropertiesByKycId,
+);
+adminRoutes.get(
+  "/spacePartner/user/:userId/properties",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  getSpacePartnerPropertiesByUserId,
 );
 
 // 1. Authenticate all users (removed as per request)

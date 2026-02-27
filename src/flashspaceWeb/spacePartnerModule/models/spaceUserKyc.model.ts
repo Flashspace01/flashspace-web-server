@@ -106,6 +106,12 @@ export class SpaceUserKyc {
   })
   public overallStatus!: KycDecisionStatus;
 
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public kycStatus!: KycDecisionStatus;
+
   @prop({ trim: true })
   public overallRejectMessage?: string;
 }

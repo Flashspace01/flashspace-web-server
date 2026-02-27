@@ -42,8 +42,24 @@ export const rejectSpaceDetails = async (req: Request, res: Response) => {
 // Get all space details
 export const getAllSpaceDetails = async (req: Request, res: Response) => {
   try {
-    const spaces = await SpaceDetails.find();
-    return res.status(200).json({ success: true, data: spaces });
+    const spaces = await SpaceDetails.find().populate("userKyc");
+
+    const transformedSpaces = spaces.map((space: any) => {
+      const kyc = space.userKyc;
+      return {
+        ...space.toObject(),
+        ownerOfPremisesEmail: kyc?.email || "",
+        ownerOfPremisesPhone: kyc?.phoneNumber || "",
+        companyType: kyc?.companyType || "",
+        cinNumber: kyc?.cinRegistrationNumber || "",
+        gstNumber: kyc?.gstNumber || "",
+        registeredAddress: kyc?.registeredAddress || "",
+        sampleAgreementUrl: space.sampleAgreement?.path || "",
+        propertyTaxReceiptUrl: space.propertyTaxReceipt?.path || "",
+      };
+    });
+
+    return res.status(200).json({ success: true, data: transformedSpaces });
   } catch (error: any) {
     return res.status(500).json({
       success: false,

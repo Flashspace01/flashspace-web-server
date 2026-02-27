@@ -56,9 +56,12 @@ export const upsertSpaceUserKycBusinessInfo = async (
       kyc.registeredAddress = registeredAddress;
     if (companyPartners !== undefined) kyc.companyPartners = companyPartners;
 
-    // Whenever business info changes, we stay in not_started or rejected until explicit submission
-    // kyc.overallStatus = "pending";
-    // kyc.overallRejectMessage = undefined;
+    // Whenever business info changes, we reset status to not_started if it was rejected
+    if (kyc.overallStatus === "rejected") {
+      kyc.overallStatus = "not_started";
+      kyc.kycStatus = "not_started";
+      kyc.overallRejectMessage = undefined;
+    }
 
     await kyc.save();
 
@@ -80,7 +83,7 @@ export const getAllSpacePartnerKyc = async (req: any, res: any) => {
   try {
     // Only show pending KYC requests to admin
     const kycs = await SpaceUserKycModel.find({
-      overallStatus: "pending",
+      overallStatus: { $ne: "not_started" },
     }).populate("userId", "fullName email phoneNumber");
     res.json({ success: true, data: kycs });
   } catch (err: any) {
@@ -212,9 +215,12 @@ export const upsertSpaceUserKyc = async (req: Request, res: Response) => {
       kyc.panNumber = panNumber;
     }
 
-    // Whenever personal info changes, we stay in not_started or rejected until explicit submission
-    // kyc.overallStatus = "pending";
-    // kyc.overallRejectMessage = undefined;
+    // Whenever personal info changes, we reset status to not_started if it was rejected
+    if (kyc.overallStatus === "rejected") {
+      kyc.overallStatus = "not_started";
+      kyc.kycStatus = "not_started";
+      kyc.overallRejectMessage = undefined;
+    }
 
     await kyc.save();
 
@@ -386,6 +392,12 @@ export const reviewSpaceUserKycDocument = async (
       });
     }
 
+    // If a document is rejected, the overall status should reflect that
+    if (status === "rejected") {
+      kyc.overallStatus = "rejected";
+    }
+    kyc.kycStatus = status;
+
     await kyc.save();
 
     return res.status(200).json({
@@ -437,6 +449,7 @@ export const reviewSpaceUserKycOverall = async (
     }
 
     kyc.overallStatus = status;
+    kyc.kycStatus = status;
     kyc.overallRejectMessage =
       status === "rejected" ? rejectMessage : undefined;
 
@@ -484,6 +497,7 @@ export const submitSpaceUserKyc = async (req: Request, res: Response) => {
 
     // Move to pending
     kyc.overallStatus = "pending";
+    kyc.kycStatus = "pending";
     kyc.overallRejectMessage = undefined;
 
     await kyc.save();
@@ -498,6 +512,97 @@ export const submitSpaceUserKyc = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: "Failed to submit KYC for review",
+    });
+  }
+};
+
+import { PropertyModel } from "../../propertyModule/property.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
+
+export const getSpacePartnerPropertiesByKycId = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { id } = req.params;
+    const kyc = await SpaceUserKycModel.findById(id);
+    if (!kyc) {
+      return res
+        .status(404)
+        .json({ success: false, message: "KYC record not found" });
+    }
+
+    const userId = kyc.userId;
+
+    const properties = await PropertyModel.find({
+      partner: userId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Properties retrieved successfully",
+      data: properties,
+    });
+  } catch (error) {
+    console.error("[spaceKYC] getSpacePartnerPropertiesByKycId error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch properties",
+    });
+  }
+};
+export const getSpacePartnerPropertiesByUserId = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { userId } = req.params;
+
+    const properties = await PropertyModel.find({
+      partner: userId,
+      isDeleted: false,
+      kycStatus: { $ne: "not_started" },
+    }).lean();
+
+    const propertiesWithStatus = await Promise.all(
+      properties.map(async (prop: any) => {
+        const [vo, coworking, meeting] = await Promise.all([
+          VirtualOfficeModel.findOne({
+            property: prop._id,
+            approvalStatus: SpaceApprovalStatus.PENDING_ADMIN,
+          }),
+          CoworkingSpaceModel.findOne({
+            property: prop._id,
+            approvalStatus: SpaceApprovalStatus.PENDING_ADMIN,
+          }),
+          MeetingRoomModel.findOne({
+            property: prop._id,
+            approvalStatus: SpaceApprovalStatus.PENDING_ADMIN,
+          }),
+        ]);
+
+        return {
+          ...prop,
+          voPending: !!vo,
+          coworkingPending: !!coworking,
+          meetingPending: !!meeting,
+        };
+      }),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Properties retrieved successfully",
+      data: propertiesWithStatus,
+    });
+  } catch (error) {
+    console.error("[spaceKYC] getSpacePartnerPropertiesByUserId error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch properties",
     });
   }
 };
