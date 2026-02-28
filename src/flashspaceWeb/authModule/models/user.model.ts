@@ -10,9 +10,13 @@ export enum AuthProvider {
 export enum UserRole {
   USER = "user",
   ADMIN = "admin",
+  SUPER_ADMIN = "super_admin",
   PARTNER = "partner",
   SALES = "sales",
   AFFILIATE = "affiliate",
+  AFFILIATE_MANAGER = "affiliate_manager",
+  SPACE_PARTNER_MANAGER = "space_partner_manager",
+  SUPPORT = "support",
 }
 
 @modelOptions({
@@ -132,6 +136,56 @@ export class User extends TimeStamps {
 
   @prop({ select: false })
   public twoFactorSecret?: string;
+
+  // App Preferences
+  @prop({
+    type: () => Object,
+    default: {
+      language: "en",
+      currency: "inr",
+      defaultCity: "delhi",
+      timeZone: "ist",
+      darkMode: false,
+      compactView: false,
+    },
+  })
+  public preferences!: {
+    language: string;
+    currency: string;
+    defaultCity: string;
+    timeZone: string;
+    darkMode: boolean;
+    compactView: boolean;
+  };
+
+  // Notification Preferences
+  @prop({
+    type: () => Object,
+    default: {
+      email: true,
+      push: true,
+      promotional: false,
+      reminders: true,
+      loginAlerts: true,
+    },
+  })
+  public notifications!: {
+    email: boolean;
+    push: boolean;
+    promotional: boolean;
+    reminders: boolean;
+    loginAlerts: boolean;
+  };
+
+  // Security Preferences
+  @prop({
+    type: () => Object,
+    default: { sessionManagement: true, dataSharing: false },
+  })
+  public securityPreferences!: {
+    sessionManagement: boolean;
+    dataSharing: boolean;
+  };
 }
 
 export const UserModel = getModelForClass(User);

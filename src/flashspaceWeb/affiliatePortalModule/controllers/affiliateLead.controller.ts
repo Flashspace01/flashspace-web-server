@@ -33,7 +33,8 @@ export const create = async (req: Request, res: Response): Promise<void> => {
 export const getAll = async (req: Request, res: Response): Promise<void> => {
   try {
     const affiliateId = req.user?.id;
-    const isAdmin = req.user?.role === "admin";
+    const staffRoles = ["super_admin", "admin", "support", "sales", "affiliate_manager", "space_partner_manager"];
+    const isAdmin = staffRoles.includes(req.user?.role as string);
 
     if (!affiliateId && !isAdmin) {
       res.status(401).json({

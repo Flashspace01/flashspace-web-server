@@ -84,7 +84,8 @@ export const createTicket = async (req: Request, res: Response): Promise<void> =
 export const getTickets = async (req: Request, res: Response): Promise<void> => {
     try {
         const affiliateId = req.user?.id;
-        const isAdmin = req.user?.role === "admin";
+        const staffRoles = ["super_admin", "admin", "support", "sales", "affiliate_manager", "space_partner_manager"];
+        const isAdmin = staffRoles.includes(req.user?.role as string);
 
         if (!affiliateId && !isAdmin) {
             res.status(401).json({
@@ -122,7 +123,7 @@ export const getTickets = async (req: Request, res: Response): Promise<void> => 
 export const chat = async (req: Request, res: Response): Promise<void> => {
     try {
         const { message } = req.body;
-        
+
         // Simple keyword-based AI logic
         let reply = "I've received your message and am looking into it.";
         const lowerMsg = message.toLowerCase();
@@ -139,7 +140,7 @@ export const chat = async (req: Request, res: Response): Promise<void> => {
 
         // Simulate network delay
         setTimeout(() => {
-             res.status(200).json({
+            res.status(200).json({
                 success: true,
                 reply,
             });

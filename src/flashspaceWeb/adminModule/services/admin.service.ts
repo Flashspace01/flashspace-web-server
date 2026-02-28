@@ -3,6 +3,7 @@
   AuthProvider,
   UserRole,
 } from "../../authModule/models/user.model";
+import { STAFF_ROLES } from "../../authModule/config/permissions.config";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PartnerKYCModel } from "../../userDashboardModule/models/partnerKYC.model";
@@ -47,12 +48,10 @@ export class AdminService {
   // Get aggregated dashboard stats
   async getDashboardStats(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let spaceIds: string[] = [];
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         spaceIds = await this.getManagedSpaceIds(user.id);
         // If partner has no spaces, return empty stats
         if (spaceIds.length === 0) {
@@ -73,7 +72,7 @@ export class AdminService {
 
       // 1. Total Users
       let totalUsers = 0;
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         totalUsers = await UserModel.countDocuments({ isDeleted: false });
       } else {
         // For partners, count unique users who have booked their spaces
@@ -89,14 +88,14 @@ export class AdminService {
         status: { $in: ["active", "pending_kyc"] },
         isDeleted: false,
       };
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         bookingQuery.spaceId = { $in: spaceIds };
       }
       const totalBookings = await BookingModel.countDocuments(bookingQuery);
 
       // 3. Active Listings
       let activeListings = 0;
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         const [voCount, csCount] = await Promise.all([
           VirtualOfficeModel.countDocuments({
             isActive: true,
@@ -117,7 +116,7 @@ export class AdminService {
         status: { $in: ["active", "pending_kyc"] },
         isDeleted: false,
       };
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         revenueMatch.spaceId = { $in: spaceIds };
       }
 
@@ -139,7 +138,7 @@ export class AdminService {
         isDeleted: { $ne: true }, // Tickets might not have isDeleted, but adding as precaution if it exists
       };
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         // Find tickets linked to partner's bookings
         const bookingIds = await BookingModel.find({
           spaceId: { $in: spaceIds },
@@ -154,7 +153,7 @@ export class AdminService {
       // 5. Recent Activity
       let recentActivity: any[] = [];
 
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         const recentUsers = await UserModel.find({ isDeleted: false })
           .sort({ createdAt: -1 })
           .limit(5)
@@ -212,10 +211,19 @@ export class AdminService {
     limit: number = 10,
     search?: string,
     deleted: boolean = false,
+    role?: string,
   ): Promise<ApiResponse<any>> {
     try {
       const skip = (page - 1) * limit;
-      const query: any = { isDeleted: deleted };
+      const query: any = { isDeleted: deleted ? true : { $ne: true } };
+
+      if (role && role !== "all") {
+        if (role === 'team') {
+          query.role = { $in: STAFF_ROLES };
+        } else {
+          query.role = role;
+        }
+      }
 
       if (search) {
         query.$or = [
@@ -232,11 +240,28 @@ export class AdminService {
 
       const total = await UserModel.countDocuments(query);
 
+      // Global stats for dashboard cards (scoped to current filter)
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const statsQuery = { ...query };
+
+      const stats = {
+        total: await UserModel.countDocuments(statsQuery),
+        verified: await UserModel.countDocuments({ ...statsQuery, isEmailVerified: true }),
+        newThisMonth: await UserModel.countDocuments({
+          ...statsQuery,
+          createdAt: { $gte: startOfMonth }
+        }),
+      };
+
       return {
         success: true,
         message: "Users fetched successfully",
         data: {
           users,
+          stats,
           pagination: {
             total,
             page,
@@ -256,13 +281,11 @@ export class AdminService {
   // Get pending KYC requests
   async getPendingKYC(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let bookingIds: string[] = [];
 
       // If partner, first find all bookings related to their spaces
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
         // Optimization: If no spaces, empty result
         if (spaceIds.length === 0) {
@@ -284,7 +307,7 @@ export class AdminService {
       };
 
       // If partner, filter KYC docs by linkedBookings
-      if (!isAdminOrSales && bookingIds.length > 0) {
+      if (!isAdminOrStaff && bookingIds.length > 0) {
         query.linkedBookings = { $in: bookingIds };
       }
 
@@ -352,11 +375,9 @@ export class AdminService {
       const skip = (page - 1) * limit;
       const query: any = { isDeleted: false };
 
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
         if (spaceIds.length === 0) {
           return {
@@ -1097,9 +1118,7 @@ export class AdminService {
   // Get Revenue Dashboard Stats
   async getRevenueDashboard(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
 
       let matchStage: any = {
         status: { $in: ["active", "completed"] },
@@ -1107,7 +1126,7 @@ export class AdminService {
       };
 
       // Restrict to managed spaces if not admin/sales
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
 
         if (!spaceIds.length) {

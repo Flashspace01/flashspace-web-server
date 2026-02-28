@@ -59,7 +59,6 @@ export interface Message {
     },
   },
 })
-@index({ ticketNumber: 1 }, { unique: true })
 @index({ user: 1, createdAt: -1 })
 @index({ status: 1, priority: 1 })
 @index({ category: 1 })
