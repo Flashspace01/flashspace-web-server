@@ -479,7 +479,15 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
       .populate("user", "fullName email phone")
       .sort({ startDate: -1 });
 
-    res.status(200).json({ success: true, data: bookings });
+    const mappedBookings = bookings.map((b: any) => {
+      const bObj = b.toObject();
+      return {
+        ...bObj,
+        totalAmount: bObj.plan?.finalPrice || bObj.plan?.price || 0,
+      };
+    });
+
+    res.status(200).json({ success: true, data: mappedBookings });
   } catch (error) {
     console.error("Get partner bookings error:", error);
     res
@@ -540,7 +548,15 @@ export const getPartnerPropertyBookings = async (
       .populate("user", "fullName email phone")
       .sort({ createdAt: -1 });
 
-    res.status(200).json({ success: true, data: bookings });
+    const mappedBookings = bookings.map((b: any) => {
+      const bObj = b.toObject();
+      return {
+        ...bObj,
+        totalAmount: bObj.plan?.finalPrice || bObj.plan?.price || 0,
+      };
+    });
+
+    res.status(200).json({ success: true, data: mappedBookings });
   } catch (error) {
     console.error("Get property bookings error:", error);
     res

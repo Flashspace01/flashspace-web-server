@@ -60,6 +60,27 @@ export const updateProperty = async (req: Request, res: Response) => {
       query.partner = partnerId;
     }
 
+    // 1. ADDED: Validation to ensure all documents are approved before KYC approval
+    if (req.body.kycStatus === "approved") {
+      const property = await PropertyModel.findById(propertyId);
+      if (!property) {
+        return sendError(res, 404, "Property not found");
+      }
+
+      const allDocsApproved =
+        property.documents &&
+        property.documents.length > 0 &&
+        property.documents.every((doc) => doc.status === "approved");
+
+      if (!allDocsApproved) {
+        return sendError(
+          res,
+          400,
+          "All property documents must be approved before approving property KYC",
+        );
+      }
+    }
+
     const updatedProperty = await PropertyModel.findOneAndUpdate(
       query,
       { $set: req.body },
