@@ -448,6 +448,29 @@ export const reviewSpaceUserKycOverall = async (
         .json({ success: false, message: "KYC record not found" });
     }
 
+    // 1. ADDED: Validation to ensure all documents are approved before overall approval
+    if (status === "approved") {
+      const docsToHero = [
+        { status: kyc.aadhaarImageStatus, label: "Aadhaar" },
+        { status: kyc.panImageStatus, label: "PAN" },
+      ];
+
+      if (kyc.videoKycUrl) {
+        docsToHero.push({ status: kyc.videoKycStatus, label: "Video KYC" });
+      }
+
+      const unapprovedDocs = docsToHero
+        .filter((d) => d.status !== "approved")
+        .map((d) => d.label);
+
+      if (unapprovedDocs.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `All documents (${unapprovedDocs.join(", ")}) must be approved before overall KYC approval`,
+        });
+      }
+    }
+
     kyc.overallStatus = status;
     kyc.kycStatus = status;
     kyc.overallRejectMessage =
