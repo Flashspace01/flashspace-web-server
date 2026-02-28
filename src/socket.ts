@@ -20,16 +20,14 @@ export const initSocket = (httpServer: HttpServer) => {
 
   const redisHost = process.env.REDIS_HOST || "localhost";
   const redisPort = parseInt(process.env.REDIS_PORT || "6379");
+  const redisUrl = (process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`).trim();
+  const forceTls = (process.env.REDIS_TLS || "").toLowerCase() === "true";
+  const normalizedRedisUrl = forceTls && redisUrl.startsWith("redis://")
+    ? redisUrl.replace(/^redis:\/\//, "rediss://")
+    : redisUrl;
 
-  // Create Redis client
-  const pubClient = createClient(
-    { url: `redis://${redisHost}:${redisPort}`,
-      socket: {
-        tls: true
-      }
-  }
-  
-  );
+  // Create Redis client (TLS via rediss:// protocol)
+  const pubClient = createClient({ url: normalizedRedisUrl });
   const subClient = pubClient.duplicate();
 
   // Handle Redis connection errors to prevent process crash
@@ -43,9 +41,7 @@ export const initSocket = (httpServer: HttpServer) => {
   Promise.all([pubClient.connect(), subClient.connect()])
     .then(() => {
       io.adapter(createAdapter(pubClient, subClient));
-      console.log(
-        `Socket.io Adapter connected to Redis at ${redisHost}:${redisPort}`,
-      );
+      console.log(`Socket.io Adapter connected to Redis at ${normalizedRedisUrl}`);
     })
     .catch((err) => {
       console.error("Failed to connect Socket.io Redis adapter (falling back to memory adapter):", err.message);
