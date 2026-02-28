@@ -22,7 +22,14 @@ export const initSocket = (httpServer: HttpServer) => {
   const redisPort = parseInt(process.env.REDIS_PORT || "6379");
 
   // Create Redis client
-  const pubClient = createClient({ url: `redis://${redisHost}:${redisPort}` });
+  const pubClient = createClient(
+    { url: `redis://${redisHost}:${redisPort}`,
+      socket: {
+        tls: true
+      }
+  }
+  
+  );
   const subClient = pubClient.duplicate();
 
   // Handle Redis connection errors to prevent process crash
