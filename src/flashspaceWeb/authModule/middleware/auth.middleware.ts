@@ -333,21 +333,30 @@ export class AuthMiddleware {
     return req.cookies?.refreshToken || null;
   }
 
+  private static getCookieSecurityOptions() {
+    const frontendUrl = (process.env.FRONTEND_URL || "").trim();
+    const isLocalFrontend =
+      frontendUrl.includes("localhost") || frontendUrl.includes("127.0.0.1");
+    const shouldUseSecureCookies =
+      process.env.COOKIE_SECURE === "true" ||
+      process.env.NODE_ENV === "production" ||
+      (!!frontendUrl && !isLocalFrontend);
+
+    return {
+      httpOnly: true,
+      secure: shouldUseSecureCookies,
+      sameSite: shouldUseSecureCookies ? ("none" as const) : ("lax" as const),
+      path: "/",
+    };
+  }
+
   // Set secure cookies
   static setTokenCookies(
     res: Response,
     accessToken: string,
     refreshToken: string,
   ): void {
-    const isProduction = process.env.NODE_ENV === "production";
-
-    // Cookie configuration for cross-origin requests
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction, // Only true in production (requires HTTPS)
-      sameSite: isProduction ? ("none" as const) : ("lax" as const), // 'none' for production cross-origin, 'lax' for dev
-      path: "/",
-    };
+    const cookieOptions = this.getCookieSecurityOptions();
 
     // Set access token cookie (shorter expiry)
     res.cookie("accessToken", accessToken, {
@@ -364,13 +373,7 @@ export class AuthMiddleware {
 
   // Clear authentication cookies
   static clearTokenCookies(res: Response): void {
-    const isProduction = process.env.NODE_ENV === "production";
-    const cookieOptions = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? ("none" as const) : ("lax" as const),
-      path: "/",
-    };
+    const cookieOptions = this.getCookieSecurityOptions();
 
     res.clearCookie("accessToken", cookieOptions);
     res.clearCookie("refreshToken", cookieOptions);
