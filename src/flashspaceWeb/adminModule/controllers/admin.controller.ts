@@ -32,7 +32,13 @@ export class AdminController {
     const deleted = String(req.query.deleted) === "true";
     const role = req.query.role as string;
 
-    const result = await adminService.getUsers(page, limit, search, deleted, role);
+    const result = await adminService.getUsers(
+      page,
+      limit,
+      search,
+      deleted,
+      role,
+    );
     if (result.success) {
       res.status(200).json(result);
     } else {
@@ -84,7 +90,13 @@ export class AdminController {
     const search = req.query.search as string;
     const status = req.query.status as string;
 
-    const result = await adminService.getClients(req.user, page, limit, search, status);
+    const result = await adminService.getClients(
+      req.user,
+      page,
+      limit,
+      search,
+      status,
+    );
     if (result.success) {
       res.status(200).json(result);
     } else {
@@ -312,6 +324,27 @@ export class AdminController {
       const statusCode =
         result.message === "Business info not found" ? 404 : 500;
       res.status(statusCode).json(result);
+    }
+  }
+
+  // GET /api/admin/invoices
+  static async getInvoices(req: Request, res: Response) {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const { type, search, startDate, endDate, status } = req.query;
+
+    const result = await adminService.getAllInvoices(req.user, page, limit, {
+      type: type as string,
+      search: search as string,
+      startDate: startDate as string,
+      endDate: endDate as string,
+      status: status as string,
+    });
+
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
     }
   }
 }
