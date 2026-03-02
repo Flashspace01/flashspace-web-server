@@ -1,4 +1,10 @@
-import { prop, modelOptions, getModelForClass, index } from "@typegoose/typegoose";
+import {
+  prop,
+  modelOptions,
+  getModelForClass,
+  index,
+  Severity,
+} from "@typegoose/typegoose";
 import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 import { Types } from "mongoose";
 
@@ -13,6 +19,31 @@ export enum UserRole {
   PARTNER = "partner",
   SALES = "sales",
   AFFILIATE = "affiliate",
+}
+
+export class SecurityPreferences {
+  @prop({ default: false })
+  public twoFactorEnabled!: boolean;
+
+  @prop({ default: true })
+  public loginNotifications!: boolean;
+
+  @prop({ default: false })
+  public browserSessionPersistence!: boolean;
+
+  @prop({ type: () => [String], default: [] })
+  public recognizedDevices!: string[];
+}
+
+export class UserPreferences {
+  @prop({ default: "en" })
+  public language!: string;
+
+  @prop({ default: "light" })
+  public theme!: string;
+
+  @prop({ default: "INR" })
+  public currency!: string;
 }
 
 @modelOptions({
@@ -30,10 +61,10 @@ export enum UserRole {
         delete ret.emailVerificationToken;
         delete ret.passwordResetToken;
         return ret;
-      }
-    }
+      },
+    },
   },
-  options: { allowMixed: 0 },
+  options: { allowMixed: Severity.ALLOW },
 })
 @index({ email: 1 }, { unique: true })
 @index({ googleId: 1 }, { sparse: true, unique: true })
@@ -41,7 +72,10 @@ export enum UserRole {
 @index({ role: 1 }) // Role-based access queries
 @index({ authProvider: 1 }) // Provider-specific queries
 @index({ lastLogin: -1 }) // Recent activity tracking
-@index({ emailVerificationOTPExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired OTPs
+@index(
+  { emailVerificationOTPExpiry: 1 },
+  { sparse: true, expireAfterSeconds: 0 },
+) // Auto-cleanup expired OTPs
 @index({ resetPasswordExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired reset tokens
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
@@ -80,7 +114,6 @@ export class User extends TimeStamps {
 
   @prop({ default: false })
   public kycVerified!: boolean;
-
 
   @prop()
   public emailVerificationToken?: string;
@@ -134,6 +167,20 @@ export class User extends TimeStamps {
 
   @prop({ select: false })
   public twoFactorSecret?: string;
+
+  @prop({ type: () => SecurityPreferences, _id: false, default: () => ({}) })
+  public securityPreferences!: SecurityPreferences;
+
+  @prop({ type: () => UserPreferences, _id: false, default: () => ({}) })
+  public preferences!: UserPreferences;
+
+  // Virtual for user notifications
+  @prop({
+    ref: "Notification",
+    localField: "_id",
+    foreignField: "recipient",
+  })
+  public notifications?: any[];
 }
 
 export const UserModel = getModelForClass(User);

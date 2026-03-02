@@ -123,7 +123,7 @@ export class AuthService {
   async login(loginData: LoginRequest): Promise<AuthResponse> {
     try {
       const { email, password } = loginData;
-
+      console.log("Login request:", loginData);
       // Find user with password field for authentication
       const user = await this.userRepository.findByEmailForAuth(email);
       if (!user) {
@@ -457,8 +457,8 @@ export class AuthService {
       // Update user
       await this.userRepository.update(user._id.toString(), {
         password: hashedPassword,
-        passwordResetToken: undefined,
-        passwordResetExpires: undefined,
+        resetPasswordToken: undefined,
+        resetPasswordExpiry: undefined,
         refreshTokens: [], // Clear all refresh tokens for security
       });
 
