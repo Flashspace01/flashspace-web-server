@@ -1,5 +1,5 @@
-import { User, UserModel } from '../models/user.model';
-import { FilterQuery, UpdateQuery } from 'mongoose';
+import { User, UserModel } from "../models/user.model";
+import { FilterQuery, UpdateQuery } from "mongoose";
 
 export class UserRepository {
   async create(userData: Partial<User>): Promise<User> {
@@ -7,113 +7,122 @@ export class UserRepository {
     return await user.save();
   }
 
-  async findByEmail(email: string, selectPassword: boolean = false): Promise<User | null> {
-    const query = UserModel.findOne({ 
+  async findByEmail(
+    email: string,
+    selectPassword: boolean = false,
+  ): Promise<User | null> {
+    const query = UserModel.findOne({
       email: email.toLowerCase(),
-      isDeleted: false 
+      isDeleted: false,
     });
-    
+
     // Explicitly select password field if needed (for authentication)
     if (selectPassword) {
-      query.select('+password');
+      query.select("+password");
     }
-    
+
     return await query.exec();
   }
-  
+
   // Specifically for authentication - always includes password
   async findByEmailForAuth(email: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       email: email.toLowerCase(),
-      isDeleted: false 
+      isDeleted: false,
     })
-    .select('+password')
-    .exec();
+      .select("+password")
+      .exec();
   }
 
   async findById(id: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       _id: id,
-      isDeleted: false 
+      isDeleted: false,
     }).exec();
   }
 
   async findByGoogleId(googleId: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       googleId,
-      isDeleted: false 
+      isDeleted: false,
     }).exec();
   }
 
   async findByEmailVerificationToken(token: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       emailVerificationToken: token,
       isDeleted: false,
-      emailVerificationExpires: { $gt: new Date() }
+      emailVerificationExpiry: { $gt: new Date() },
     }).exec();
   }
 
   async findByPasswordResetToken(token: string): Promise<User | null> {
-    return await UserModel.findOne({ 
-      passwordResetToken: token,
+    return await UserModel.findOne({
+      resetPasswordToken: token,
       isDeleted: false,
-      passwordResetExpires: { $gt: new Date() }
+      resetPasswordExpiry: { $gt: new Date() },
     }).exec();
   }
 
   async findByRefreshToken(refreshToken: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       refreshTokens: refreshToken,
-      isDeleted: false 
+      isDeleted: false,
     }).exec();
   }
 
-  async update(id: string, updateData: UpdateQuery<User>): Promise<User | null> {
+  async update(
+    id: string,
+    updateData: UpdateQuery<User>,
+  ): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { _id: id, isDeleted: false },
       updateData,
-      { new: true }
+      { new: true },
     ).exec();
   }
 
-  async updateByEmail(email: string, updateData: UpdateQuery<User>): Promise<User | null> {
+  async updateByEmail(
+    email: string,
+    updateData: UpdateQuery<User>,
+  ): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { email: email.toLowerCase(), isDeleted: false },
       updateData,
-      { new: true }
+      { new: true },
     ).exec();
   }
 
   async verifyEmail(token: string): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
-      { 
+      {
         emailVerificationToken: token,
         isDeleted: false,
-        emailVerificationExpires: { $gt: new Date() }
+        emailVerificationExpiry: { $gt: new Date() },
       },
       {
         isEmailVerified: true,
         emailVerificationToken: undefined,
-        emailVerificationExpires: undefined
+        emailVerificationExpiry: undefined,
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
   // OTP Methods
   async findByEmailWithOTP(email: string): Promise<User | null> {
-    return await UserModel.findOne({ 
+    return await UserModel.findOne({
       email: email.toLowerCase(),
-      isDeleted: false 
+      isDeleted: false,
     })
-    .select('+emailVerificationOTP')
-    .exec();
+      .select("+emailVerificationOTP")
+      .exec();
   }
 
   async updateEmailVerificationOTP(
-    email: string, 
-    otp: string, 
-    expiresAt: Date
+    email: string,
+    otp: string,
+    expiresAt: Date,
   ): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { email: email.toLowerCase(), isDeleted: false },
@@ -122,9 +131,9 @@ export class UserRepository {
         emailVerificationOTPExpiry: expiresAt,
         emailVerificationOTPAttempts: 0,
         lastOTPRequestTime: new Date(),
-        $inc: { otpRequestCount: 1 }
+        $inc: { otpRequestCount: 1 },
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
@@ -132,7 +141,7 @@ export class UserRepository {
     return await UserModel.findOneAndUpdate(
       { _id: userId, isDeleted: false },
       { $inc: { emailVerificationOTPAttempts: 1 } },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
@@ -145,9 +154,9 @@ export class UserRepository {
         emailVerificationOTPExpiry: undefined,
         emailVerificationOTPAttempts: 0,
         emailVerificationToken: undefined,
-        emailVerificationExpiry: undefined
+        emailVerificationExpiry: undefined,
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
@@ -157,9 +166,9 @@ export class UserRepository {
       {
         emailVerificationOTP: undefined,
         emailVerificationOTPExpiry: undefined,
-        emailVerificationOTPAttempts: 0
+        emailVerificationOTPAttempts: 0,
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
@@ -168,25 +177,31 @@ export class UserRepository {
       { email: email.toLowerCase(), isDeleted: false },
       {
         otpRequestCount: 0,
-        lastOTPRequestTime: undefined
+        lastOTPRequestTime: undefined,
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
-  async addRefreshToken(userId: string, refreshToken: string): Promise<User | null> {
+  async addRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { _id: userId, isDeleted: false },
       { $push: { refreshTokens: refreshToken } },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
-  async removeRefreshToken(userId: string, refreshToken: string): Promise<User | null> {
+  async removeRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { _id: userId, isDeleted: false },
       { $pull: { refreshTokens: refreshToken } },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
@@ -194,26 +209,30 @@ export class UserRepository {
     return await UserModel.findOneAndUpdate(
       { _id: userId, isDeleted: false },
       { refreshTokens: [] },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
   async softDelete(id: string): Promise<User | null> {
     return await UserModel.findOneAndUpdate(
       { _id: id, isDeleted: false },
-      { 
+      {
         isDeleted: true,
         deletedAt: new Date(),
-        refreshTokens: [] // Clear refresh tokens on delete
+        refreshTokens: [], // Clear refresh tokens on delete
       },
-      { new: true }
+      { new: true },
     ).exec();
   }
 
-  async findMany(filter: FilterQuery<User> = {}, limit?: number, skip?: number): Promise<User[]> {
-    const query = UserModel.find({ 
-      ...filter, 
-      isDeleted: false 
+  async findMany(
+    filter: FilterQuery<User> = {},
+    limit?: number,
+    skip?: number,
+  ): Promise<User[]> {
+    const query = UserModel.find({
+      ...filter,
+      isDeleted: false,
     });
 
     if (skip) query.skip(skip);
@@ -223,9 +242,9 @@ export class UserRepository {
   }
 
   async count(filter: FilterQuery<User> = {}): Promise<number> {
-    return await UserModel.countDocuments({ 
-      ...filter, 
-      isDeleted: false 
+    return await UserModel.countDocuments({
+      ...filter,
+      isDeleted: false,
     }).exec();
   }
 }

@@ -8,8 +8,14 @@ import {
   getAllAffiliates,
   getAffiliateClients,
 } from "../controllers/affiliateAdmin.controller";
-import { reviewSpaceUserKycDocument, reviewSpaceUserKycOverall, getAllSpacePartnerKyc, getSpacePartnerKycById, getSpacePartnerPropertiesByKycId,
-  getSpacePartnerPropertiesByUserId } from '../../spacePartnerModule/controllers/spacekyc.controller';
+import{
+  reviewSpaceUserKycOverall,
+  getAllSpacePartnerKyc,
+  getSpacePartnerKycById,
+  getSpacePartnerPropertiesByKycId,
+  getSpacePartnerPropertiesByUserId,
+} from "../../spacePartnerModule/controllers/spacekyc.controller";
+import { AffiliateAdminController } from "../../affiliatePortalModule/controllers/affiliateAdmin.controller";
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
@@ -297,6 +303,11 @@ adminRoutes.get(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.getInvoices,
+
+adminRoutes.get(
+  "/affiliates/:id/stats",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  AffiliateAdminController.getAffiliateStats,
 );
 
 // Note: The ticket routes from ticketModule already have /admin prefix
