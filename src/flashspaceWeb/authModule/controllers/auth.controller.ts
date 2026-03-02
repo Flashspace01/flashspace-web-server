@@ -395,7 +395,7 @@ export class AuthController {
         error: {}
       });
     } catch (error) {
-      console.error('Logout all controller error:', error);
+      console.error("Logout all controller error:", error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -469,7 +469,7 @@ export class AuthController {
         if (user) {
           res.status(200).json({
             success: true,
-            message: 'User is authenticated',
+            message: "User is authenticated",
             data: {
               isAuthenticated: true,
               user: {
@@ -714,7 +714,77 @@ export class AuthController {
         });
       }
     } catch (error) {
-      console.error('Google callback controller error:', error);
+      console.error("Google callback controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        data: {},
+        error: "Internal server error",
+      });
+    }
+  };
+
+  // Update user profile settings (authenticated user)
+  updateProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: "Authentication required",
+          data: {},
+          error: "Not authenticated",
+        });
+        return;
+      }
+
+      const updates = req.body;
+
+      // Prevent updating sensitive fields directly
+      delete updates.password;
+      delete updates.email;
+      delete updates.role;
+      delete updates.authProvider;
+      delete updates.kycVerified;
+      delete updates.isEmailVerified;
+
+      // Import UserModel locally to break any circular dependencies in the controller layer
+      const { UserModel } = await import("../models/user.model");
+
+      // Flatten the updates to support atomic partial nested updates (e.g. "preferences.darkMode")
+      // We'll let mongoose handle the straightforward patching
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        req.user.id,
+        { $set: updates },
+        { new: true, runValidators: true },
+      );
+
+      if (!updatedUser) {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+          data: {},
+          error: "User not found",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully",
+        data: {
+          id: updatedUser._id.toString(),
+          email: updatedUser.email,
+          fullName: updatedUser.fullName,
+          phoneNumber: updatedUser.phoneNumber,
+          profilePicture: updatedUser.profilePicture,
+          preferences: updatedUser.preferences,
+          notifications: updatedUser.notifications,
+          securityPreferences: updatedUser.securityPreferences,
+        },
+        error: {},
+      });
+    } catch (error) {
+      console.error("Update profile controller error:", error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

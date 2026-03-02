@@ -21,6 +21,9 @@ const PORT: string | number = process.env.PORT || 5000;
 const app: Application = express();
 const server = http.createServer(app); // Create HTTP server
 
+// Required behind reverse proxies (Render/Nginx) for secure cookies and protocol detection
+app.set('trust proxy', 1);
+
 // Initialize email service
 EmailUtil.initialize();
 

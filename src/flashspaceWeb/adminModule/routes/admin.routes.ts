@@ -4,7 +4,10 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { RBACMiddleware } from "../../authModule/middleware/rbac.middleware";
 import { Permission } from "../../authModule/config/permissions.config";
 import { ticketRoutes } from "../../ticketModule/routes/ticket.routes";
-import { getAllAffiliates, getAffiliateClients } from "../controllers/affiliateAdmin.controller";
+import {
+  getAllAffiliates,
+  getAffiliateClients,
+} from "../controllers/affiliateAdmin.controller";
 
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
@@ -20,6 +23,7 @@ adminRoutes.get(
     Permission.MANAGE_ALL_SPACES,
     Permission.MANAGE_OWN_SPACES,
     Permission.VIEW_ALL_SPACES,
+    Permission.VIEW_DASHBOARD,
   ]),
   AdminController.getDashboardStats,
 );
@@ -38,7 +42,10 @@ adminRoutes.get(
 // 3. User Management - Currently Super Admin only
 adminRoutes.get(
   "/users",
-  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
   AdminController.getUsers,
 );
 adminRoutes.post(
@@ -212,6 +219,16 @@ adminRoutes.get(
   getAffiliateClients,
 );
 
+// 8. Payment Invoices
+adminRoutes.get(
+  "/invoices",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.VIEW_ALL_SPACES,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getInvoices,
+);
 
 // Note: The ticket routes from ticketModule already have /admin prefix
 // So they will be accessible at:

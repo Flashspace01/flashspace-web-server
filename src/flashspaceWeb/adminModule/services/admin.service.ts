@@ -3,6 +3,7 @@
   AuthProvider,
   UserRole,
 } from "../../authModule/models/user.model";
+import { STAFF_ROLES } from "../../authModule/config/permissions.config";
 import { BookingModel } from "../../userDashboardModule/models/booking.model";
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PartnerKYCModel } from "../../userDashboardModule/models/partnerKYC.model";
@@ -15,6 +16,8 @@ import mongoose from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
 import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
+import { PaymentModel } from "../../paymentModule/payment.model";
+import { InvoiceModel } from "../../userDashboardModule/models/invoice.model";
 
 export class AdminService {
   /**
@@ -47,12 +50,10 @@ export class AdminService {
   // Get aggregated dashboard stats
   async getDashboardStats(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let spaceIds: string[] = [];
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         spaceIds = await this.getManagedSpaceIds(user.id);
         // If partner has no spaces, return empty stats
         if (spaceIds.length === 0) {
@@ -73,7 +74,7 @@ export class AdminService {
 
       // 1. Total Users
       let totalUsers = 0;
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         totalUsers = await UserModel.countDocuments({ isDeleted: false });
       } else {
         // For partners, count unique users who have booked their spaces
@@ -89,14 +90,14 @@ export class AdminService {
         status: { $in: ["active", "pending_kyc"] },
         isDeleted: false,
       };
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         bookingQuery.spaceId = { $in: spaceIds };
       }
       const totalBookings = await BookingModel.countDocuments(bookingQuery);
 
       // 3. Active Listings
       let activeListings = 0;
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         const [voCount, csCount] = await Promise.all([
           VirtualOfficeModel.countDocuments({
             isActive: true,
@@ -117,7 +118,7 @@ export class AdminService {
         status: { $in: ["active", "pending_kyc"] },
         isDeleted: false,
       };
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         revenueMatch.spaceId = { $in: spaceIds };
       }
 
@@ -139,7 +140,7 @@ export class AdminService {
         isDeleted: { $ne: true }, // Tickets might not have isDeleted, but adding as precaution if it exists
       };
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         // Find tickets linked to partner's bookings
         const bookingIds = await BookingModel.find({
           spaceId: { $in: spaceIds },
@@ -154,7 +155,7 @@ export class AdminService {
       // 5. Recent Activity
       let recentActivity: any[] = [];
 
-      if (isAdminOrSales) {
+      if (isAdminOrStaff) {
         const recentUsers = await UserModel.find({ isDeleted: false })
           .sort({ createdAt: -1 })
           .limit(5)
@@ -212,10 +213,19 @@ export class AdminService {
     limit: number = 10,
     search?: string,
     deleted: boolean = false,
+    role?: string,
   ): Promise<ApiResponse<any>> {
     try {
       const skip = (page - 1) * limit;
-      const query: any = { isDeleted: deleted };
+      const query: any = { isDeleted: deleted ? true : { $ne: true } };
+
+      if (role && role !== "all") {
+        if (role === "team") {
+          query.role = { $in: STAFF_ROLES };
+        } else {
+          query.role = role;
+        }
+      }
 
       if (search) {
         query.$or = [
@@ -232,11 +242,31 @@ export class AdminService {
 
       const total = await UserModel.countDocuments(query);
 
+      // Global stats for dashboard cards (scoped to current filter)
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const statsQuery = { ...query };
+
+      const stats = {
+        total: await UserModel.countDocuments(statsQuery),
+        verified: await UserModel.countDocuments({
+          ...statsQuery,
+          isEmailVerified: true,
+        }),
+        newThisMonth: await UserModel.countDocuments({
+          ...statsQuery,
+          createdAt: { $gte: startOfMonth },
+        }),
+      };
+
       return {
         success: true,
         message: "Users fetched successfully",
         data: {
           users,
+          stats,
           pagination: {
             total,
             page,
@@ -256,13 +286,11 @@ export class AdminService {
   // Get pending KYC requests
   async getPendingKYC(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let bookingIds: string[] = [];
 
       // If partner, first find all bookings related to their spaces
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
         // Optimization: If no spaces, empty result
         if (spaceIds.length === 0) {
@@ -284,7 +312,7 @@ export class AdminService {
       };
 
       // If partner, filter KYC docs by linkedBookings
-      if (!isAdminOrSales && bookingIds.length > 0) {
+      if (!isAdminOrStaff && bookingIds.length > 0) {
         query.linkedBookings = { $in: bookingIds };
       }
 
@@ -312,7 +340,6 @@ export class AdminService {
     restore: boolean = false,
   ): Promise<ApiResponse<any>> {
     try {
-
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
@@ -352,11 +379,9 @@ export class AdminService {
       const skip = (page - 1) * limit;
       const query: any = { isDeleted: false };
 
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
 
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
         if (spaceIds.length === 0) {
           return {
@@ -407,10 +432,12 @@ export class AdminService {
     page: number = 1,
     limit: number = 50,
     search?: string,
-    statusFilter?: string
+    statusFilter?: string,
   ): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(user.role);
+      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
+        user.role,
+      );
       const query: any = { isDeleted: false };
 
       if (!isAdminOrSales) {
@@ -419,7 +446,11 @@ export class AdminService {
           return {
             success: true,
             message: "Clients fetched successfully",
-            data: { clients: [], pagination: { total: 0, page, pages: 0 }, stats: { total: 0, active: 0, atRisk: 0, churned: 0 } },
+            data: {
+              clients: [],
+              pagination: { total: 0, page, pages: 0 },
+              stats: { total: 0, active: 0, atRisk: 0, churned: 0 },
+            },
           };
         }
         query.spaceId = { $in: spaceIds };
@@ -449,7 +480,8 @@ export class AdminService {
           endDate = new Date(startDate);
           const tenure = Number(booking.plan.tenure) || 12;
           const unit = booking.plan.tenureUnit || "months";
-          if (unit === "year" || unit === "years") endDate.setFullYear(endDate.getFullYear() + tenure);
+          if (unit === "year" || unit === "years")
+            endDate.setFullYear(endDate.getFullYear() + tenure);
           else endDate.setMonth(endDate.getMonth() + tenure);
         }
 
@@ -459,7 +491,10 @@ export class AdminService {
           if (date > existing.lastActivityDate) {
             existing.lastActivityDate = date;
             existing.plan = booking.plan?.name || booking.type;
-            existing.spaceName = booking.spaceSnapshot?.name || booking.location || existing.spaceName;
+            existing.spaceName =
+              booking.spaceSnapshot?.name ||
+              booking.location ||
+              existing.spaceName;
           }
           if (startDate < existing.startDate) {
             existing.startDate = startDate;
@@ -472,17 +507,21 @@ export class AdminService {
             id: userId,
             clientId: `CL-${userId.substring(userId.length - 4).toUpperCase()}`,
             name: booking.user.email || "Unknown Email",
-            companyName: booking.user.company || booking.user.fullName || "Individual",
+            companyName:
+              booking.user.company || booking.user.fullName || "Individual",
             email: booking.user.email,
             phone: booking.user.phoneNumber || "+91 98765 43210",
             plan: booking.plan?.name || booking.type || "Standard Access",
-            spaceName: booking.spaceSnapshot?.name || booking.location || "Main Hub",
+            spaceName:
+              booking.spaceSnapshot?.name || booking.location || "Main Hub",
             revenue: amount,
             bookingCount: 1,
             lastActivityDate: date,
             startDate: startDate,
             endDate: endDate,
-            initials: (booking.user.fullName || "CL").substring(0, 2).toUpperCase(),
+            initials: (booking.user.fullName || "CL")
+              .substring(0, 2)
+              .toUpperCase(),
           });
         }
       });
@@ -492,43 +531,49 @@ export class AdminService {
       // Search filter
       if (search) {
         const lowerSearch = search.toLowerCase();
-        clients = clients.filter(c =>
-          c.name.toLowerCase().includes(lowerSearch) ||
-          c.companyName.toLowerCase().includes(lowerSearch) ||
-          c.email.toLowerCase().includes(lowerSearch)
+        clients = clients.filter(
+          (c) =>
+            c.name.toLowerCase().includes(lowerSearch) ||
+            c.companyName.toLowerCase().includes(lowerSearch) ||
+            c.email.toLowerCase().includes(lowerSearch),
         );
       }
 
       // Calculate health & status
       const stats = { total: clients.length, active: 0, atRisk: 0, churned: 0 };
 
-      clients = clients.map(client => {
-        const daysSinceActive = (new Date().getTime() - client.lastActivityDate.getTime()) / (1000 * 3600 * 24);
+      clients = clients.map((client) => {
+        const daysSinceActive =
+          (new Date().getTime() - client.lastActivityDate.getTime()) /
+          (1000 * 3600 * 24);
 
         // Instead of random, use a stable health score based on recency & bookings
         let healthScore = 100 - Math.min(daysSinceActive, 50); // Decay up to 50
-        healthScore = Math.max(50, Math.min(100, Math.floor(healthScore + (client.bookingCount * 2))));
+        healthScore = Math.max(
+          50,
+          Math.min(100, Math.floor(healthScore + client.bookingCount * 2)),
+        );
 
-        let statusLabel = 'Active';
-        if (daysSinceActive > 60) statusLabel = 'Churned';
-        else if (daysSinceActive > 30) statusLabel = 'At Risk';
-        else if (healthScore < 60) statusLabel = 'At Risk';
+        let statusLabel = "Active";
+        if (daysSinceActive > 60) statusLabel = "Churned";
+        else if (daysSinceActive > 30) statusLabel = "At Risk";
+        else if (healthScore < 60) statusLabel = "At Risk";
 
-        if (statusLabel === 'Active') stats.active++;
-        else if (statusLabel === 'At Risk') stats.atRisk++;
+        if (statusLabel === "Active") stats.active++;
+        else if (statusLabel === "At Risk") stats.atRisk++;
         else stats.churned++;
 
         return {
           ...client,
           displayName: client.companyName,
           health: healthScore,
-          statusLabel: statusLabel
+          statusLabel: statusLabel,
         };
       });
 
       // Status filter
-      if (statusFilter && statusFilter !== 'All Clients') {
-        clients = clients.filter(c => c.statusLabel === statusFilter);
+      if (statusFilter && statusFilter !== "All Clients") {
+        clients = clients.filter((c) => c.statusLabel === statusFilter);
       }
 
       // Pagination
@@ -678,17 +723,20 @@ export class AdminService {
       // Notify User
       try {
         if (doc.user) {
-          const title = `KYC ${action === 'approve' ? 'Approved' : 'Rejected'}`;
-          const message = action === 'approve'
-            ? `Your KYC application has been approved.`
-            : `Your KYC application has been rejected. Reason: ${rejectionReason || 'Documents invalid'}`;
+          const title = `KYC ${action === "approve" ? "Approved" : "Rejected"}`;
+          const message =
+            action === "approve"
+              ? `Your KYC application has been approved.`
+              : `Your KYC application has been rejected. Reason: ${rejectionReason || "Documents invalid"}`;
 
           await NotificationService.notifyUser(
             doc.user.toString(),
             title,
             message,
-            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
-            { kycId, type }
+            action === "approve"
+              ? NotificationType.SUCCESS
+              : NotificationType.WARNING,
+            { kycId, type },
           );
         }
       } catch (notifError) {
@@ -1056,7 +1104,6 @@ export class AdminService {
   // Update user details
   async updateUser(userId: string, updates: any): Promise<ApiResponse<any>> {
     try {
-
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return { success: false, message: "Invalid user ID format" };
       }
@@ -1097,9 +1144,7 @@ export class AdminService {
   // Get Revenue Dashboard Stats
   async getRevenueDashboard(user: any): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
 
       let matchStage: any = {
         status: { $in: ["active", "completed"] },
@@ -1107,7 +1152,7 @@ export class AdminService {
       };
 
       // Restrict to managed spaces if not admin/sales
-      if (!isAdminOrSales) {
+      if (!isAdminOrStaff) {
         const spaceIds = await this.getManagedSpaceIds(user.id);
 
         if (!spaceIds.length) {
@@ -1282,21 +1327,27 @@ export class AdminService {
       // Notify User
       try {
         if (partner.user) {
-          const title = `Partner Application ${action === 'approve' ? 'Approved' : 'Rejected'}`;
-          const message = action === 'approve'
-            ? `Your Partner application has been approved.`
-            : `Your Partner application has been rejected. Reason: ${rejectionReason}`;
+          const title = `Partner Application ${action === "approve" ? "Approved" : "Rejected"}`;
+          const message =
+            action === "approve"
+              ? `Your Partner application has been approved.`
+              : `Your Partner application has been rejected. Reason: ${rejectionReason}`;
 
           await NotificationService.notifyUser(
             partner.user.toString(),
             title,
             message,
-            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
-            { partnerId, type: 'partner' }
+            action === "approve"
+              ? NotificationType.SUCCESS
+              : NotificationType.WARNING,
+            { partnerId, type: "partner" },
           );
         }
       } catch (notifError) {
-        console.error("[updatePartnerStatus] Failed to send notification:", notifError);
+        console.error(
+          "[updatePartnerStatus] Failed to send notification:",
+          notifError,
+        );
       }
 
       return {
@@ -1509,21 +1560,27 @@ export class AdminService {
       // Notify User
       try {
         if (businessInfo.user) {
-          const title = `Business Profile ${action === 'approve' ? 'Approved' : 'Rejected'}`;
-          const message = action === 'approve'
-            ? `Your Business Profile (${businessInfo.companyName}) has been approved.`
-            : `Your Business Profile (${businessInfo.companyName}) has been rejected. Reason: ${rejectionReason}`;
+          const title = `Business Profile ${action === "approve" ? "Approved" : "Rejected"}`;
+          const message =
+            action === "approve"
+              ? `Your Business Profile (${businessInfo.companyName}) has been approved.`
+              : `Your Business Profile (${businessInfo.companyName}) has been rejected. Reason: ${rejectionReason}`;
 
           await NotificationService.notifyUser(
             businessInfo.user.toString(),
             title,
             message,
-            action === 'approve' ? NotificationType.SUCCESS : NotificationType.WARNING,
-            { businessId: id, type: 'business' }
+            action === "approve"
+              ? NotificationType.SUCCESS
+              : NotificationType.WARNING,
+            { businessId: id, type: "business" },
           );
         }
       } catch (notifError) {
-        console.error("[updateBusinessInfoStatus] Failed to send notification:", notifError);
+        console.error(
+          "[updateBusinessInfoStatus] Failed to send notification:",
+          notifError,
+        );
       }
 
       return {
@@ -1547,5 +1604,118 @@ export class AdminService {
       byCity: [],
       byCategory: [],
     };
+  }
+
+  // Get all invoices (payments)
+  async getAllInvoices(
+    user: any,
+    page: number = 1,
+    limit: number = 10,
+    filters: {
+      type?: string;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+    } = {},
+  ): Promise<ApiResponse<any>> {
+    try {
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
+      const skip = (page - 1) * limit;
+      const query: any = { isDeleted: { $ne: true } };
+
+      if (!isAdminOrStaff) {
+        const spaceIds = await this.getManagedSpaceIds(user.id);
+        if (spaceIds.length === 0) {
+          return {
+            success: true,
+            message: "Invoices fetched successfully",
+            data: {
+              invoices: [],
+              pagination: { total: 0, page, pages: 0 },
+            },
+          };
+        }
+        query.spaceId = { $in: spaceIds };
+      }
+
+      // Apply Filters
+      if (filters.type && filters.type !== "all") {
+        query.paymentType = filters.type;
+      }
+
+      if (filters.status && filters.status !== "all") {
+        query.status = filters.status;
+      }
+
+      if (filters.search) {
+        query.$or = [
+          { userName: { $regex: filters.search, $options: "i" } },
+          { userEmail: { $regex: filters.search, $options: "i" } },
+          { razorpayOrderId: { $regex: filters.search, $options: "i" } },
+          { spaceName: { $regex: filters.search, $options: "i" } },
+        ];
+      }
+
+      if (filters.startDate || filters.endDate) {
+        query.createdAt = {};
+        if (filters.startDate) {
+          query.createdAt.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          const endDate = new Date(filters.endDate);
+          endDate.setHours(23, 59, 59, 999);
+          query.createdAt.$lte = endDate;
+        }
+      }
+
+      // Fetch payments (invoices)
+      const payments = await PaymentModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      // Get invoice details for these payments
+      const paymentIds = payments.map((p) => p._id.toString());
+      const invoices = await InvoiceModel.find({
+        paymentId: { $in: paymentIds },
+        isDeleted: { $ne: true },
+      }).lean();
+
+      // Merge invoice data (like invoiceNumber) into payment data
+      const mergedData = payments.map((payment) => {
+        const invoice = invoices.find(
+          (inv) => inv.paymentId === payment._id.toString(),
+        );
+        return {
+          ...payment,
+          invoiceNumber: invoice?.invoiceNumber || "N/A",
+          invoiceId: invoice?._id || null,
+        };
+      });
+
+      const total = await PaymentModel.countDocuments(query);
+
+      return {
+        success: true,
+        message: "Invoices fetched successfully",
+        data: {
+          invoices: mergedData,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("Error fetching all invoices:", error);
+      return {
+        success: false,
+        message: "Failed to fetch invoices",
+        error: error.message,
+      };
+    }
   }
 }
