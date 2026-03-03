@@ -115,33 +115,18 @@ async function createBookingAndInvoice(payment: any) {
           coordinates: (space.property as any).location?.coordinates || [],
         };
       }
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.spaceId).populate(
-        "property",
-      );
-      if (space) {
-        spaceSnapshot = {
-          _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
-        };
-      }
     }
 
     // Get partner ID from the space model directly (used for security & fast queries)
     let foundPartnerId;
     if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-      const space = await VirtualOfficeModel.findById(payment.spaceId);
+      const space = await VirtualOfficeModel.findById(payment.space);
       foundPartnerId = space?.partner;
     } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-      const space = await CoworkingSpaceModel.findById(payment.spaceId);
+      const space = await CoworkingSpaceModel.findById(payment.space);
       foundPartnerId = space?.partner;
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.spaceId);
+      const space = await MeetingRoomModel.findById(payment.space);
       foundPartnerId = space?.partner;
     }
 
@@ -149,7 +134,7 @@ async function createBookingAndInvoice(payment: any) {
     // This prevents booking failure when space data is incomplete.
     if (!foundPartnerId) {
       console.warn(
-        `Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`,
+        `Partner ID not found for space ${payment.space}. Falling back to first admin.`,
       );
       const adminUser = await UserModel.findOne({
         role: UserRole.ADMIN,
