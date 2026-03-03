@@ -32,11 +32,11 @@ services:
 
       - ./uploads:/app/uploads
 
-    # depends_on:
+    depends_on:
 
-    #   - redis
+      # - redis
 
-    #   - mongo
+      - mongo
 
     networks:
 
@@ -62,25 +62,25 @@ services:
 
 
 
-  # mongo:
+  mongo:
 
-  #   image: mongo:latest
+    image: mongo:latest
 
-  #   container_name: flashspace-mongo
+    container_name: flashspace-mongo
 
-  #   restart: always
+    restart: always
 
-  #   ports:
+    ports:
 
-  #     - "27018:27017" # Expose to host on 27018 to avoid conflict with local DB
+      - "27018:27017" # Expose to host on 27018 to avoid conflict with local DB
 
-  #   volumes:
+    volumes:
 
-  #     - mongo-data:/data/db # Persist data
+      - mongo-data:/data/db # Persist data
 
-  #   networks:
+    networks:
 
-  #     - flashspace-network
+      - flashspace-network
 
 
 

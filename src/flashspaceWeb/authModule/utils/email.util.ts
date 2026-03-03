@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-// import sgMail from '@sendgrid/mail'; // COMMENTED OUT - SendGrid temporarily disabled
+  import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
 export interface EmailOptions {
@@ -16,18 +16,16 @@ export class EmailUtil {
   static initialize() {
     const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
-    // COMMENTED OUT - SendGrid temporarily disabled
-    // if (service === 'sendgrid') {
-    //   const apiKey = process.env.SENDGRID_API_KEY;
-    //   if (!apiKey) {
-    //     console.warn('⚠️ SENDGRID_API_KEY not configured');
-    //     return;
-    //   }
-    //   sgMail.setApiKey(apiKey);
-    //   console.log('✅ SendGrid email service initialized');
-    //   this.isInitialized = true;
-    // } else 
-    if (service === 'gmail') {
+    if (service === 'sendgrid') {
+      const apiKey = process.env.SENDGRID_API_KEY;
+      if (!apiKey) {
+        console.warn('⚠️ SENDGRID_API_KEY not configured');
+        return;
+      }
+      sgMail.setApiKey(apiKey);
+      console.log('✅ SendGrid email service initialized');
+      this.isInitialized = true;
+    } else if (service === 'gmail') {
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -51,21 +49,19 @@ export class EmailUtil {
         this.initialize();
       }
 
-      // COMMENTED OUT - SendGrid temporarily disabled
-      // if (service === 'sendgrid') {
-      //   const msg = {
-      //     to: options.to,
-      //     from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
-      //     subject: options.subject,
-      //     text: options.text || options.html.replace(/<[^>]*>/g, ''),
-      //     html: options.html,
-      //   };
+      if (service === 'sendgrid') {
+        const msg = {
+          to: options.to,
+          from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
+          subject: options.subject,
+          text: options.text || options.html.replace(/<[^>]*>/g, ''),
+          html: options.html,
+        };
 
-      //   const result = await sgMail.send(msg);
-      //   console.log('✅ Email sent successfully via SendGrid to:', options.to);
-      //   return;
-      // } else 
-      if (service === 'gmail') {
+        const result = await sgMail.send(msg);
+        console.log('✅ Email sent successfully via SendGrid to:', options.to);
+        return;
+      } else if (service === 'gmail') {
         if (!this.transporter) {
           throw new Error('Gmail transporter not initialized');
         }
@@ -86,12 +82,12 @@ export class EmailUtil {
       }
     } catch (error: any) {
       console.error('❌ Error sending email:', error);
-      
+
       // COMMENTED OUT - SendGrid error logging
       // if (service === 'sendgrid' && error.response?.body) {
       //   console.error('📝 SendGrid Error Details:', JSON.stringify(error.response.body, null, 2));
       // }
-      
+
       // Don't throw error - just log it so app continues working
       console.log('⚠️ Email sending failed but continuing...');
     }
@@ -103,7 +99,7 @@ export class EmailUtil {
 
   static async sendVerificationEmail(email: string, token: string, fullName: string): Promise<void> {
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
-    
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -170,7 +166,7 @@ export class EmailUtil {
 
   static async sendPasswordResetEmail(email: string, token: string, fullName: string): Promise<void> {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-    
+
     const html = `
       <!DOCTYPE html>
       <html>

@@ -14,7 +14,6 @@ import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
 import { BusinessInfoModel } from "../models/businessInfo.model";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
-
 // ============ DASHBOARD ============
 
 export const getDashboardOverview = async (req: Request, res: Response) => {
@@ -2148,3 +2147,4 @@ export const getUserVisits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
+
