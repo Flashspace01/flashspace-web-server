@@ -91,7 +91,7 @@ export class VirtualOfficeService {
 
     const offices = await VirtualOfficeModel.find(filter)
       .populate("property")
-      .sort({ createdAt: -1 })
+      .sort({ avgRating: -1, totalReviews: -1, createdAt: -1 })
       .limit(limit)
       .skip((page - 1) * limit);
 

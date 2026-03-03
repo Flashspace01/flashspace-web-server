@@ -87,7 +87,7 @@ export class MeetingRoomService {
 
     return await MeetingRoomModel.find(filter)
       .populate("property")
-      .sort({ createdAt: -1 })
+      .sort({ avgRating: -1, totalReviews: -1, createdAt: -1 })
       .limit(limit);
   }
   static async getRoomById(roomId: string) {

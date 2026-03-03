@@ -122,7 +122,7 @@ export class CoworkingSpaceService {
       isDeleted: false,
     })
       .populate("property")
-      .sort({ createdAt: -1 });
+      .sort({ avgRating: -1, totalReviews: -1, createdAt: -1 });
   }
 
   static async getSpaceById(spaceId: string) {

@@ -1,0 +1,435 @@
+console.log("Starting comprehensive seed script for all modules...");
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import fs from "fs";
+
+import { UserModel, UserRole, AuthProvider } from "../flashspaceWeb/authModule/models/user.model";
+import { PropertyModel, PropertyStatus } from "../flashspaceWeb/propertyModule/property.model";
+import { CoworkingSpaceModel } from "../flashspaceWeb/coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../flashspaceWeb/virtualOfficeModule/virtualOffice.model";
+import { MeetingRoomModel, MeetingRoomType } from "../flashspaceWeb/meetingRoomModule/meetingRoom.model";
+import { SpaceApprovalStatus } from "../flashspaceWeb/shared/enums/spaceApproval.enum";
+
+import { BookingModel } from "../flashspaceWeb/bookingModule/booking.model";
+import { PaymentModel, PaymentStatus, PaymentType } from "../flashspaceWeb/paymentModule/payment.model";
+import { InvoiceModel } from "../flashspaceWeb/invoiceModule/invoice.model";
+import { ReviewModel } from "../flashspaceWeb/reviewsModule/review.model";
+import { CouponModel, CouponStatus } from "../flashspaceWeb/couponModule/coupon.model";
+import { SupportTicketModel } from "../flashspaceWeb/userDashboardModule/models/supportTicket.model";
+
+dotenv.config();
+
+// MOCK DATA from the old seedData.ts script
+const coworkingSpaces = [
+    // Ahmedabad
+    { name: "Workzone - Ahmedabad", address: "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India", city: "Ahmedabad", price: "₹1,083/month", originalPrice: "₹1,333", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Makarba", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
+    { name: "Sweet Spot Spaces", address: "Office No 4-D fourth, Vardaan Complex, Tower, Lakhudi Rd, near SARDAR PATEL STADIUM, Vithalbhai Patel Colony, Nathalal Colony, Navrangpura, Ahmedabad, Gujarat 380009, India", city: "Ahmedabad", price: "₹1,167/month", originalPrice: "₹1,417", rating: 4.7, reviews: 189, type: "Dedicated Desk", features: ["Premium Location", "Parking", "Event Space", "Cafeteria"], area: "Navrangpura", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Bangalore 
+    { name: "IndiraNagar - Aspire Coworks", address: "17, 7th Main Rd, Indira Nagar II Stage, Hoysala Nagar, Indiranagar, Bengaluru, Karnataka 560038, India", city: "Bangalore", price: "₹833/month", originalPrice: "₹1,083", rating: 4.8, reviews: 267, type: "Hot Desk", features: ["Tech Hub", "Innovation Labs", "Startup Ecosystem", "Outdoor Terrace"], area: "Indiranagar", availability: "Available Now", popular: true, image: "https://shorturl.at/LdEgA" },
+    { name: "Koramangala - Aspire Coworks", address: "2nd & 3rd Floor, Balaji Arcade, 472/7, 20th L Cross Rd, 4th Block, Koramangala, Bengaluru, Karnataka 560095, India", city: "Bangalore", price: "₹1,000/month", originalPrice: "₹1,250", rating: 4.6, reviews: 189, type: "Dedicated Desk", features: ["IT Corridor", "Shuttle Service", "Gaming Area", "Wellness Programs"], area: "Koramangala", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+    { name: "EcoSpace - Hebbal, HMT Layout", address: "No,33, 4th Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India", city: "Bangalore", price: "₹833/month", originalPrice: "₹1,083", rating: 4.5, reviews: 134, type: "Hot Desk", features: ["Residential Area", "Quiet Environment", "Flexible Hours", "Community Kitchen"], area: "HMT Layout", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+
+    // Chennai
+    { name: "WBB Office", address: "Room no 1 No. 19, Metro Station, 35, Anna Salai, near Little Mount, Little Mount, Nandanam, Chennai, Tamil Nadu 600015, India", city: "Chennai", price: "₹4,800/month", originalPrice: "₹6,000", rating: 4.7, reviews: 198, type: "Hot Desk", features: ["Metro Connectivity", "Modern Facilities", "Parking", "Food Court"], area: "Nandanam", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+    { name: "Senate Space", address: "W-126, 3rd Floor, 3rd Ave, Anna Nagar, Chennai, Tamil Nadu 600040, India", city: "Chennai", price: "₹917/month", originalPrice: "₹1,167", rating: 4.4, reviews: 112, type: "Dedicated Desk", features: ["Residential Area", "Peaceful Environment", "Basic Amenities", "WiFi"], area: "Anna Nagar", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Delhi
+    { name: "Stirring Minds", address: "Kundan Mansion, 2-A/3, Asaf Ali Rd, Turkman Gate, Chandni Chowk, New Delhi, Delhi, 110002, India", city: "Delhi", price: "₹800/month", originalPrice: "₹1,000", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Chandni Chowk", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696478/chrome_y4ymlwh9SR_apwgug.png" },
+    { name: "CP Alt F", address: "J6JF+53C, Connaught Lane, Barakhamba, New Delhi, Delhi 110001, India", city: "Delhi", price: "₹2,667/month", originalPrice: "₹3,333", rating: 4.7, reviews: 189, type: "Dedicated Desk", features: ["Private Cabin Option", "Parking", "Event Space", "Cafeteria"], area: "Connaught Place", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696830/chrome_tF4p9FCNvN_e0w4dd.png" },
+    { name: "Virtualexcel", address: "Lower Ground Floor, Saket Salcon, Rasvilas, next to Select Citywalk Mall, Saket District Centre, District Centre, Sector 6, Pushp Vihar, Mal, New Delhi, Delhi 110017, India", city: "Delhi", price: "₹1,000/month", originalPrice: "₹1,250", rating: 4.6, reviews: 156, type: "Hot Desk", features: ["Shopping Mall Access", "Premium Location", "Networking Events", "Printer Access"], area: "Saket", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696936/chrome_y6UfCoipUj_wkpxel.png" },
+    { name: "Mytime Cowork", address: "55 Lane-2, Westend Marg, Saiyad Ul Ajaib Village, Saket, New Delhi, Delhi 110030, India", city: "Delhi", price: "₹6,500/month", originalPrice: "₹8,000", rating: 4.9, reviews: 198, type: "Private Office", features: ["Premium Location", "Executive Lounge", "Concierge", "Valet Parking"], area: "Saket", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696150/chrome_F5QP1MGRA2_whrsth.png" },
+    { name: "Okhla Alt F", address: "101, NH-19, CRRI, Ishwar Nagar, Okhla, New Delhi, Delhi 110044, India", city: "Delhi", price: "₹2,500/month", originalPrice: "₹3,167", rating: 4.5, reviews: 134, type: "Hot Desk", features: ["Industrial Area", "Flexible Hours", "Gaming Zone", "Wellness Room"], area: "Okhla", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697088/chrome_nweqds48I9_i7xwhi.png" },
+    { name: "WBB Office", address: "Office no. 102, 52A first floor, Vijay Block, Block E, Laxmi Nagar, Delhi, 110092, India", city: "Delhi", price: "₹4,800/month", originalPrice: "₹6,000", rating: 4.3, reviews: 89, type: "Shared Desk", features: ["Budget Friendly", "Basic Amenities", "WiFi", "Print Access"], area: "Laxmi Nagar", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697269/chrome_e1S9bRUX5L_t3ltud.png" },
+    { name: "Budha Coworking Spaces", address: "3rd floor, H.no 33, Pocket 5, Sector-24, Rohini, Delhi, 110085, India", city: "Delhi", price: "₹4,200/month", originalPrice: "₹5,500", rating: 4.4, reviews: 112, type: "Hot Desk", features: ["Suburban Location", "Parking Available", "Community Events", "Cafeteria"], area: "Rohini", availability: "Available Now", popular: false, image: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
+    { name: "Work & Beyond", address: "E-518 first floor Kocchar plaza near Ramphal Chowk dwark sector 7, Block E, Palam Extension, Palam, Delhi, 110077, India", city: "Delhi", price: "₹5,500/month", originalPrice: "₹7,000", rating: 4.5, reviews: 145, type: "Dedicated Desk", features: ["Airport Proximity", "Modern Amenities", "Meeting Rooms", "Parking"], area: "Dwarka", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697175/chrome_4eVI3pxb5I_qpev0q.png" },
+    { name: "Getset Spaces", address: "3rd Floor, LMR House, S-16, Block C, Green Park Extension, Green Park, New Delhi, Delhi 110016, India", city: "Delhi", price: "₹5,000/month", originalPrice: "₹6,500", rating: 4.6, reviews: 167, type: "Private Office", features: ["South Delhi", "Premium Facilities", "Networking", "Cafeteria"], area: "Green Park", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696619/chrome_Usn5xZsDny_b59bwf.png" },
+
+    // Gurgaon
+    { name: "Infrapro - Sector 44", address: "Plot no 4, 2nd floor, Minarch Tower, Sector 44, Gurugram, Haryana 122003, India", city: "Gurgaon", price: "₹1,000/month", originalPrice: "₹1,250", rating: 4.7, reviews: 178, type: "Dedicated Desk", features: ["Corporate Hub", "Modern Facilities", "Ample Parking", "Food Court"], area: "Sector 44", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
+    { name: "Palm Court - Gurgaon", address: "Mehrauli Rd, Gurugram, Haryana 122022, India", city: "Gurgaon", price: "₹1,000/month", originalPrice: "₹1,250", rating: 4.4, reviews: 134, type: "Hot Desk", features: ["Premium Location", "Creative Spaces", "Event Hosting", "Bike Parking"], area: "Mehrauli Road", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+
+    // Himachal Pradesh
+    { name: "Ghoomakkad", address: "V.P.o, Sidhbari, Rakkar, Himachal Pradesh 176057, India", city: "Dharamshala", price: "₹667/month", originalPrice: "₹833", rating: 4.6, reviews: 156, type: "Dedicated Desk", features: ["Mountain View", "Peaceful Environment", "Nature Workspace", "Wellness Programs"], area: "Sidhbari", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Hyderabad
+    { name: "Cabins 24/7", address: "h, 5/86, Golden Tulip Estate, JV Hills, HITEC City, Kondapur, Telangana 500081, India", city: "Hyderabad", price: "₹1,000/month", originalPrice: "₹1,083", rating: 4.3, reviews: 98, type: "Hot Desk", features: ["IT Hub", "Flexible Plans", "Community Events", "Gaming Area"], area: "Kondapur", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+    { name: "CS Coworking", address: "Door No. 1-60, A & B, 3rd Floor, KNR Square, opp. The Platina, Gachibowli, Hyderabad, Telangana 500032, India", city: "Hyderabad", price: "₹917/month", originalPrice: "₹1,167", rating: 4.5, reviews: 123, type: "Dedicated Desk", features: ["Tech Park", "Modern Infrastructure", "Parking", "Cafeteria"], area: "Gachibowli", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+
+    // Jaipur
+    { name: "Jeev Business Solutions", address: "548 1, Tonk Rd, behind Jaipur Hospital, Mahaveer Nagar, Gopal Pura Mode, Jaipur, Rajasthan 302018, India", city: "Jaipur", price: "₹833/month", originalPrice: "₹1,000", rating: 4.4, reviews: 145, type: "Hot Desk", features: ["Central Location", "Budget Friendly", "WiFi", "Meeting Rooms"], area: "Tonk Road", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+
+    // Jammu
+    { name: "Qubicle Coworking", address: "Trikuta Nagar Ext 1/A", city: "Jammu", price: "₹1,000/month", originalPrice: "₹1,250", rating: 4.5, reviews: 89, type: "Hot Desk", features: ["Residential Area", "Quiet Environment", "Basic Amenities", "WiFi"], area: "Trikuta Nagar", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+    { name: "Kaytech Solutions", address: "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003", city: "Jammu", price: "₹1,500/month", originalPrice: "₹1,833", rating: 4.6, reviews: 112, type: "Private Office", features: ["Airport Proximity", "Premium Amenities", "Parking", "Meeting Rooms"], area: "Satwari", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+];
+
+const virtualOffices = [
+    // Ahmedabad
+    { name: "Workzone - Ahmedabad", address: "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India", city: "Ahmedabad", price: "₹1,083/month", originalPrice: "₹1,333", gstPlanPrice: "₹1,083/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,275/month", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Makarba", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
+    { name: "Sweet Spot Spaces", address: "Office No 4-D fourth, Vardaan Complex, Tower, Lakhudi Rd, near SARDAR PATEL STADIUM, Vithalbhai Patel Colony, Nathalal Colony, Navrangpura, Ahmedabad, Gujarat 380009, India", city: "Ahmedabad", price: "₹1,167/month", originalPrice: "₹1,417", gstPlanPrice: "₹1,167/month", mailingPlanPrice: "₹833/month", brPlanPrice: "₹1,375/month", rating: 4.7, reviews: 189, type: "Dedicated Desk", features: ["Premium Location", "Parking", "Event Space", "Cafeteria"], area: "Navrangpura", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Bangalore
+    { name: "IndiraNagar - Aspire Coworks", address: "17, 7th Main Rd, Indira Nagar II Stage, Hoysala Nagar, Indiranagar, Bengaluru, Karnataka 560038, India", city: "Bangalore", price: "₹833/month", originalPrice: "₹1,083", gstPlanPrice: "₹833/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,000/month", rating: 4.8, reviews: 267, type: "Hot Desk", features: ["Tech Hub", "Innovation Labs", "Startup Ecosystem", "Outdoor Terrace"], area: "Indiranagar", availability: "Available Now", popular: true, image: "https://shorturl.at/LdEgA" },
+    { name: "Koramangala - Aspire Coworks", address: "2nd & 3rd Floor, Balaji Arcade, 472/7, 20th L Cross Rd, 4th Block, Koramangala, Bengaluru, Karnataka 560095, India", city: "Bangalore", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,175/month", rating: 4.6, reviews: 189, type: "Dedicated Desk", features: ["IT Corridor", "Shuttle Service", "Gaming Area", "Wellness Programs"], area: "Koramangala", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+    { name: "EcoSpace - Hebbal, HMT Layout", address: "No,33, 4th Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India", city: "Bangalore", price: "₹833/month", originalPrice: "₹1,083", gstPlanPrice: "₹833/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,000/month", rating: 4.5, reviews: 134, type: "Hot Desk", features: ["Residential Area", "Quiet Environment", "Flexible Hours", "Community Kitchen"], area: "HMT Layout", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+
+    // Chennai
+    { name: "WBB Office", address: "Room no 1 No. 19, Metro Station, 35, Anna Salai, near Little Mount, Little Mount, Nandanam, Chennai, Tamil Nadu 600015, India", city: "Chennai", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,175/month", rating: 4.7, reviews: 198, type: "Hot Desk", features: ["Metro Connectivity", "Modern Facilities", "Parking", "Food Court"], area: "Nandanam", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+    { name: "Senate Space", address: "W-126, 3rd Floor, 3rd Ave, Anna Nagar, Chennai, Tamil Nadu 600040, India", city: "Chennai", price: "₹917/month", originalPrice: "₹1,167", gstPlanPrice: "₹917/month", mailingPlanPrice: "₹733/month", brPlanPrice: "₹1,083/month", rating: 4.4, reviews: 112, type: "Dedicated Desk", features: ["Residential Area", "Peaceful Environment", "Basic Amenities", "WiFi"], area: "Anna Nagar", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Delhi
+    { name: "Stirring Minds", address: "Kundan Mansion, 2-A/3, Asaf Ali Rd, Turkman Gate, Chandni Chowk, New Delhi, Delhi, 110002, India", city: "Delhi", price: "₹800/month", originalPrice: "₹1,000", gstPlanPrice: "₹800/month", mailingPlanPrice: "₹640/month", brPlanPrice: "₹942/month", rating: 4.8, reviews: 245, type: "Hot Desk", features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Chandni Chowk", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767849333/chrome_Z3AywYVrjz_wb1idq.png" },
+    { name: "CP Alt F", address: "J6JF+53C, Connaught Lane, Barakhamba, New Delhi, Delhi 110001, India", city: "Delhi", price: "₹2,667/month", originalPrice: "₹3,333", gstPlanPrice: "₹2,667/month", mailingPlanPrice: "₹1,500/month", brPlanPrice: "₹3,133/month", rating: 4.7, reviews: 189, type: "Dedicated Desk", features: ["Private Cabin Option", "Parking", "Event Space", "Cafeteria"], area: "Connaught Place", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696830/chrome_tF4p9FCNvN_e0w4dd.png" },
+    { name: "Virtualexcel", address: "Lower Ground Floor, Saket Salcon, Rasvilas, next to Select Citywalk Mall, Saket District Centre, District Centre, Sector 6, Pushp Vihar, Mal, New Delhi, Delhi 110017, India", city: "Delhi", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹833/month", brPlanPrice: "₹1,175/month", rating: 4.6, reviews: 156, type: "Hot Desk", features: ["Shopping Mall Access", "Premium Location", "Networking Events", "Printer Access"], area: "Saket", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767849535/chrome_v2poSAMRhE_iwknqu.png" },
+    { name: "Mytime Cowork", address: "55 Lane-2, Westend Marg, Saiyad Ul Ajaib Village, Saket, New Delhi, Delhi 110030, India", city: "Delhi", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹833/month", brPlanPrice: "₹1,175/month", rating: 4.9, reviews: 198, type: "Private Office", features: ["Premium Location", "Executive Lounge", "Concierge", "Valet Parking"], area: "Saket", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767848454/chrome_mw5gzNjq6G_vqyjti.png" },
+    { name: "Okhla Alt F", address: "101, NH-19, CRRI, Ishwar Nagar, Okhla, New Delhi, Delhi 110044, India", city: "Delhi", price: "₹2,500/month", originalPrice: "₹3,167", gstPlanPrice: "₹2,500/month", mailingPlanPrice: "₹1,250/month", brPlanPrice: "₹2,942/month", rating: 4.5, reviews: 134, type: "Hot Desk", features: ["Industrial Area", "Flexible Hours", "Gaming Zone", "Wellness Room"], area: "Okhla", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697088/chrome_nweqds48I9_i7xwhi.png" },
+    { name: "WBB Office", address: "Office no. 102, 52A first floor, Vijay Block, Block E, Laxmi Nagar, Delhi, 110092, India", city: "Delhi", price: "₹1,167/month", originalPrice: "₹1,417", gstPlanPrice: "₹1,167/month", mailingPlanPrice: "₹750/month", brPlanPrice: "₹1,375/month", rating: 4.3, reviews: 89, type: "Shared Desk", features: ["Budget Friendly", "Basic Amenities", "WiFi", "Print Access"], area: "Laxmi Nagar", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697269/chrome_e1S9bRUX5L_t3ltud.png " },
+    { name: "Budha Coworking Spaces", address: "3rd floor, H.no 33, Pocket 5, Sector-24, Rohini, Delhi, 110085, India", city: "Delhi", price: "₹917/month", originalPrice: "₹1,167", gstPlanPrice: "₹917/month", mailingPlanPrice: "₹733/month", brPlanPrice: "₹1,083/month", rating: 4.4, reviews: 112, type: "Hot Desk", features: ["Suburban Location", "Parking Available", "Community Events", "Cafeteria"], area: "Rohini", availability: "Not Available", popular: false, image: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
+    { name: "Work & Beyond", address: "E-518 first floor Kocchar plaza near Ramphal Chowk dwark sector 7, Block E, Palam Extension, Palam, Delhi, 110077, India", city: "Delhi", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹800/month", brPlanPrice: "₹1,175/month", rating: 4.5, reviews: 145, type: "Dedicated Desk", features: ["Airport Proximity", "Modern Amenities", "Meeting Rooms", "Parking"], area: "Dwarka", availability: "Available Now", popular: false, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767849615/chrome_8vkBaQth6g_idknvj.png" },
+    { name: "Getset Spaces", address: "3rd Floor, LMR House, S-16, Block C, Green Park Extension, Green Park, New Delhi, Delhi 110016, India", city: "Delhi", price: "₹1,083/month", originalPrice: "₹1,333", gstPlanPrice: "₹1,083/month", mailingPlanPrice: "₹867/month", brPlanPrice: "₹1,275/month", rating: 4.6, reviews: 167, type: "Private Office", features: ["South Delhi", "Premium Facilities", "Networking", "Cafeteria"], area: "Green Park", availability: "Available Now", popular: true, image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767849459/chrome_Bn0q3U4F3v_wx4jpa.png" },
+
+    // Gurgaon
+    { name: "Infrapro - Sector 44", address: "Plot no 4, 2nd floor, Minarch Tower, Sector 44, Gurugram, Haryana 122003, India", city: "Gurgaon", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,175/month", rating: 4.7, reviews: 178, type: "Dedicated Desk", features: ["Corporate Hub", "Modern Facilities", "Ample Parking", "Food Court"], area: "Sector 44", availability: "Available Now", popular: true, image: "https://shorturl.at/Fyr6o" },
+    { name: "Palm Court - Gurgaon", address: "Mehrauli Rd, Gurugram, Haryana 122022, India", city: "Gurgaon", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹750/month", brPlanPrice: "₹1,175/month", rating: 4.4, reviews: 134, type: "Hot Desk", features: ["Premium Location", "Creative Spaces", "Event Hosting", "Bike Parking"], area: "Mehrauli Road", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+
+    // Himachal Pradesh
+    { name: "Ghoomakkad", address: "V.P.o, Sidhbari, Rakkar, Himachal Pradesh 176057, India", city: "Dharamshala", price: "₹667/month", originalPrice: "₹833", gstPlanPrice: "₹667/month", mailingPlanPrice: "₹533/month", brPlanPrice: "₹783/month", rating: 4.6, reviews: 156, type: "Dedicated Desk", features: ["Mountain View", "Peaceful Environment", "Nature Workspace", "Wellness Programs"], area: "Sidhbari", availability: "Available Now", popular: false, image: "https://shorturl.at/LdEgA" },
+
+    // Hyderabad
+    { name: "Cabins 24/7", address: "h, 5/86, Golden Tulip Estate, JV Hills, HITEC City, Kondapur, Telangana 500081, India", city: "Hyderabad", price: "₹1,000/month", originalPrice: "₹1,083", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,175/month", rating: 4.3, reviews: 98, type: "Hot Desk", features: ["IT Hub", "Flexible Plans", "Community Events", "Gaming Area"], area: "Kondapur", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+    { name: "CS Coworking", address: "Door No. 1-60, A & B, 3rd Floor, KNR Square, opp. The Platina, Gachibowli, Hyderabad, Telangana 500032, India", city: "Hyderabad", price: "₹917/month", originalPrice: "₹1,167", gstPlanPrice: "₹917/month", mailingPlanPrice: "₹733/month", brPlanPrice: "₹1,083/month", rating: 4.5, reviews: 123, type: "Dedicated Desk", features: ["Tech Park", "Modern Infrastructure", "Parking", "Cafeteria"], area: "Gachibowli", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+
+    // Jaipur
+    { name: "Jeev Business Solutions", address: "548 1, Tonk Rd, behind Jaipur Hospital, Mahaveer Nagar, Gopal Pura Mode, Jaipur, Rajasthan 302018, India", city: "Jaipur", price: "₹833/month", originalPrice: "₹1,000", gstPlanPrice: "₹833/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,000/month", rating: 4.4, reviews: 145, type: "Hot Desk", features: ["Central Location", "Budget Friendly", "WiFi", "Meeting Rooms"], area: "Tonk Road", availability: "Available Now", popular: false, image: "https://shorturl.at/Fyr6o" },
+
+    // Jammu
+    { name: "Qubicle Coworking", address: "Trikuta Nagar Ext 1/A", city: "Jammu", price: "₹1,000/month", originalPrice: "₹1,250", gstPlanPrice: "₹1,000/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,175/month", rating: 4.5, reviews: 89, type: "Hot Desk", features: ["Residential Area", "Quiet Environment", "Basic Amenities", "WiFi"], area: "Trikuta Nagar", availability: "Available Now", popular: false, image: "https://shorturl.at/S4XWY" },
+    { name: "Kaytech Solutions", address: "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003", city: "Jammu", price: "₹1,500/month", originalPrice: "₹1,833", gstPlanPrice: "₹1,500/month", mailingPlanPrice: "₹667/month", brPlanPrice: "₹1,767/month", rating: 4.6, reviews: 112, type: "Private Office", features: ["Airport Proximity", "Premium Amenities", "Parking", "Meeting Rooms"], area: "Satwari", availability: "Available Now", popular: true, image: "https://shorturl.at/NUpzM" },
+];
+
+const parsePrice = (priceString: string) => {
+    if (!priceString) return 0;
+    return parseInt(priceString.replace(/\D/g, ""), 10) || 0;
+};
+
+async function seedDatabase() {
+    try {
+        console.log("Connecting to database...");
+        const dbUri = process.env.DB_URI || "mongodb://localhost:27017/myapp";
+        await mongoose.connect(dbUri);
+        console.log("Connected to database successfully!");
+
+        console.log("\nClearing existing data across all modules...");
+        await CoworkingSpaceModel.deleteMany({});
+        await VirtualOfficeModel.deleteMany({});
+        await MeetingRoomModel.deleteMany({});
+        await PropertyModel.deleteMany({});
+        await BookingModel.deleteMany({});
+        await PaymentModel.deleteMany({});
+        await InvoiceModel.deleteMany({});
+        await ReviewModel.deleteMany({});
+        await CouponModel.deleteMany({});
+        await SupportTicketModel.deleteMany({});
+
+        // Delete only the mock users we create
+        await UserModel.deleteMany({
+            email: { $in: ["admin@flashspace.com", "seedpartner@flashspace.com", "client@flashspace.com"] }
+        });
+        console.log("Existing data cleared!");
+
+        // Create Users
+        console.log("\nCreating Users (Admin, Partner, Client)...");
+        const admin = await UserModel.create({
+            email: "admin@flashspace.com",
+            fullName: "Super Admin",
+            phoneNumber: "+91-9999999991",
+            password: "$2b$12$But4Rwpe9obqCA2JsKz9nO3LaHtHAi51Ca7SJQ4Qtv0XNDE7zU1be", // hashed password
+            role: UserRole.ADMIN,
+            authProvider: AuthProvider.LOCAL,
+            isEmailVerified: true,
+            kycVerified: true,
+            isActive: true,
+        });
+
+        const partner = await UserModel.create({
+            email: "seedpartner@flashspace.com",
+            fullName: "Seed Partner",
+            phoneNumber: "+91-9999999992",
+            password: "$2b$12$But4Rwpe9obqCA2JsKz9nO3LaHtHAi51Ca7SJQ4Qtv0XNDE7zU1be", // hashed password
+            role: UserRole.PARTNER,
+            authProvider: AuthProvider.LOCAL,
+            isEmailVerified: true,
+            kycVerified: true,
+            isActive: true,
+        });
+
+        const client = await UserModel.create({
+            email: "client@flashspace.com",
+            fullName: "Test Client",
+            phoneNumber: "+91-9999999993",
+            password: "$2b$12$But4Rwpe9obqCA2JsKz9nO3LaHtHAi51Ca7SJQ4Qtv0XNDE7zU1be", // hashed password
+            role: UserRole.USER,
+            authProvider: AuthProvider.LOCAL,
+            isEmailVerified: true,
+            kycVerified: true,
+            isActive: true,
+        });
+        console.log("Created Admin, Partner, and Client.");
+
+        // Track created properties to avoid duplication
+        const propertyMap: { [key: string]: mongoose.Types.ObjectId } = {};
+        const allSpaces = [...coworkingSpaces, ...virtualOffices];
+
+        for (const space of allSpaces) {
+            const propKey = space.name + '|' + space.address;
+            if (!propertyMap[propKey]) {
+                const property = await PropertyModel.create({
+                    name: space.name,
+                    address: space.address,
+                    city: space.city,
+                    area: space.area,
+                    features: space.features || [],
+                    images: space.image ? [space.image] : [],
+                    status: PropertyStatus.ACTIVE,
+                    isActive: true,
+                    partner: partner._id,
+                });
+                propertyMap[propKey] = property._id as mongoose.Types.ObjectId;
+            }
+        }
+        const propertyKeys = Object.keys(propertyMap);
+        console.log(`\nCreated ${propertyKeys.length} Properties!`);
+
+        console.log("\nSeeding Coworking Spaces...");
+        const cowrkDocs = coworkingSpaces.map((c) => {
+            const MonthlyPrice = parsePrice(c.price);
+            return {
+                property: propertyMap[c.name + '|' + c.address],
+                partner: partner._id,
+                capacity: 100,
+                approvalStatus: SpaceApprovalStatus.ACTIVE,
+                partnerPricePerMonth: MonthlyPrice,
+                finalPricePerMonth: MonthlyPrice,
+                adminMarkupPerMonth: 0,
+                floors: [],
+                operatingHours: {
+                    openTime: "09:00",
+                    closeTime: "18:00",
+                    daysOpen: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                },
+                avgRating: c.rating || 0,
+                totalReviews: c.reviews || 0,
+                popular: c.popular || false,
+                amenities: c.features || [],
+                images: c.image ? [c.image] : [],
+                isActive: true,
+            };
+        });
+        const insertedCowrk = await CoworkingSpaceModel.insertMany(cowrkDocs);
+        console.log(`${insertedCowrk.length} Coworking Spaces inserted!`);
+
+        console.log("\nSeeding Virtual Offices...");
+        const voDocs = virtualOffices.map((v) => {
+            const gstPrice = parsePrice(v.gstPlanPrice) * 12;
+            const mailPrice = parsePrice(v.mailingPlanPrice) * 12;
+            const brPrice = parsePrice(v.brPlanPrice) * 12;
+            return {
+                property: propertyMap[v.name + '|' + v.address],
+                partner: partner._id,
+                approvalStatus: SpaceApprovalStatus.ACTIVE,
+                partnerGstPricePerYear: gstPrice,
+                finalGstPricePerYear: gstPrice,
+                partnerMailingPricePerYear: mailPrice,
+                finalMailingPricePerYear: mailPrice,
+                partnerBrPricePerYear: brPrice,
+                finalBrPricePerYear: brPrice,
+                adminMarkupGstPerYear: 0,
+                adminMarkupMailingPerYear: 0,
+                adminMarkupBrPerYear: 0,
+                avgRating: v.rating || 0,
+                totalReviews: v.reviews || 0,
+                popular: v.popular || false,
+                amenities: v.features || [],
+                images: v.image ? [v.image] : [],
+                isActive: true,
+            };
+        });
+        const insertedVO = await VirtualOfficeModel.insertMany(voDocs);
+        console.log(`${insertedVO.length} Virtual Offices inserted!`);
+
+        console.log("\nSeeding Meeting Rooms...");
+        // Just mock 5 meeting rooms for the first 5 properties
+        const mrDocs = propertyKeys.slice(0, 5).map((key, index) => {
+            return {
+                property: propertyMap[key],
+                partner: partner._id,
+                approvalStatus: SpaceApprovalStatus.ACTIVE,
+                partnerPricePerHour: 500,
+                finalPricePerHour: 500,
+                adminMarkupPerHour: 0,
+                capacity: 10,
+                type: MeetingRoomType.CONFERENCE_ROOM,
+                operatingHours: {
+                    openTime: "09:00",
+                    closeTime: "18:00",
+                    daysOpen: ["Monday", "Tuesday", "Wednesday"],
+                },
+                avgRating: 4.5,
+                totalReviews: 12,
+                popular: index % 2 === 0,
+                amenities: ["Projector", "Whiteboard"],
+                images: ["https://shorturl.at/NUpzM"],
+                isActive: true,
+            };
+        });
+        const insertedMR = await MeetingRoomModel.insertMany(mrDocs);
+        console.log(`${insertedMR.length} Meeting Rooms inserted!`);
+
+        console.log("\nCreating Coupons...");
+        const coupon = await CouponModel.create({
+            code: "WELCOME20",
+            discountType: "percentage",
+            discountValue: 20,
+            assignedClientId: client._id.toString(),
+            status: CouponStatus.ACTIVE,
+            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+            createdBy: admin._id.toString(),
+        });
+        console.log(`Created Coupon: ${coupon.code}`);
+
+        console.log("\nCreating Operations (Bookings, Payments, Invoices)...");
+        // Pick the first VO for booking
+        const targetVO = insertedVO[0];
+        const generatedBookingNumber = "BKG-" + Math.floor(Math.random() * 10000);
+
+        const payment = await PaymentModel.create({
+            user: client._id,
+            userEmail: client.email,
+            userName: client.fullName,
+            razorpayOrderId: "order_" + Math.random().toString(36).substr(2, 9),
+            razorpayPaymentId: "pay_" + Math.random().toString(36).substr(2, 9),
+            amount: targetVO.finalGstPricePerYear! * 100, // In paise
+            currency: "INR",
+            status: PaymentStatus.COMPLETED,
+            paymentType: PaymentType.VIRTUAL_OFFICE,
+            spaceModel: "VirtualOffice",
+            space: targetVO._id,
+            spaceName: "Mock Virtual Office Booking",
+            planName: "GST Plan",
+            planKey: "gst",
+            tenure: 1,
+            yearlyPrice: targetVO.finalGstPricePerYear!,
+            totalAmount: targetVO.finalGstPricePerYear!,
+            discountPercent: 0,
+            discountAmount: 0,
+        });
+
+        const booking = await BookingModel.create({
+            bookingNumber: generatedBookingNumber,
+            user: client._id,
+            partner: partner._id,
+            type: "VirtualOffice",
+            spaceId: targetVO._id,
+            plan: {
+                name: "GST Plan",
+                price: targetVO.finalGstPricePerYear!,
+                tenure: 1,
+                tenureUnit: "years"
+            },
+            payment: payment._id,
+            razorpayOrderId: payment.razorpayOrderId,
+            razorpayPaymentId: payment.razorpayPaymentId,
+            status: "active",
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            timeline: [{
+                status: "active",
+                date: new Date(),
+                by: "system"
+            }]
+        });
+
+        const invoice = await InvoiceModel.create({
+            invoiceNumber: "INV-" + Math.floor(Math.random() * 10000),
+            user: client._id,
+            partner: partner._id,
+            booking: booking._id,
+            bookingNumber: booking.bookingNumber,
+            payment: payment._id,
+            description: "Virtual Office GST Plan - 1 Year",
+            subtotal: targetVO.finalGstPricePerYear!,
+            taxRate: 18,
+            taxAmount: targetVO.finalGstPricePerYear! * 0.18,
+            total: targetVO.finalGstPricePerYear! * 1.18,
+            status: "paid",
+            dueDate: new Date(),
+            paidAt: new Date(),
+        });
+        console.log(`Created Booking (${booking.bookingNumber}), Payment, and Invoice.`);
+
+        console.log("\nCreating Customer Reviews...");
+        // Generate mock reviews for all spaces
+        const sampleComments = [
+            "Absolutely amazing experience, highly recommend this space!",
+            "Great location and very productive environment. Amenities are top notch.",
+            "Good value for money. The staff is very helpful and friendly.",
+            "Quiet and professional. The internet speed is fantastic.",
+            "I love the community events here. Best place to network.",
+            "Nice aesthetic and comfortable seating. Will definitely book again.",
+            "The booking process was seamless. The workspace exceeded my expectations."
+        ];
+
+        const allReviewDocs: any[] = [];
+
+        // Helper to generate reviews
+        const generateReviews = (spaces: any[], modelName: string) => {
+            spaces.forEach((space) => {
+                // Generate exactly 1 review per space because the schema has a unique index on { user: 1, space: 1 }
+                const randomRating = Math.floor(Math.random() * 2) + 4; // 4 or 5
+                const randomComment = sampleComments[Math.floor(Math.random() * sampleComments.length)];
+                allReviewDocs.push({
+                    user: client._id,
+                    space: space._id,
+                    spaceModel: modelName,
+                    rating: randomRating,
+                    comment: randomComment,
+                    npsScore: randomRating === 5 ? 10 : 8
+                });
+            });
+        };
+
+        generateReviews(insertedCowrk, "CoworkingSpace");
+        generateReviews(insertedVO, "VirtualOffice");
+        generateReviews(insertedMR, "MeetingRoom");
+
+        const insertedReviews = await ReviewModel.insertMany(allReviewDocs);
+        console.log(`${insertedReviews.length} Mock Reviews created!`);
+
+        await SupportTicketModel.create({
+            ticketNumber: "TKT-" + Math.floor(Math.random() * 1000),
+            user: client._id,
+            bookingId: booking.bookingNumber,
+            subject: "How do I download my virtual office contract?",
+            category: "virtual_office",
+            priority: "medium",
+            status: "open",
+            messages: [{
+                sender: "user",
+                senderName: client.fullName,
+                senderId: client._id,
+                message: "Hello team, I paid for my GST plan but can't find the contract document. Can you help?",
+            }]
+        });
+        console.log("Created Mock Review and Support Ticket.");
+
+        console.log("\n✅ Database seeded completely across all modules!");
+        process.exit(0);
+    } catch (error) {
+        console.error("Error seeding database:", error);
+        fs.writeFileSync("seedAllModules-error.log", `Error seeding: ${error}\n${error instanceof Error ? error.stack : ''}`);
+        process.exit(1);
+    }
+}
+
+seedDatabase();

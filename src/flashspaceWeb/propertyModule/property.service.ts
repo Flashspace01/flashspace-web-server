@@ -42,7 +42,7 @@ export class PropertyService {
   }
 
   static async getProperties(query: any) {
-    return await PropertyModel.find(query);
+    return await PropertyModel.find(query).sort({ avgRating: -1, totalReviews: -1, createdAt: -1 });
   }
 
   static async deleteProperty(propertyId: string) {
@@ -76,7 +76,15 @@ export const flattenProperty = (spaceDoc: any) => {
       images: property.images,
       features: property.features,
       amenities: property.features, // Send as amenities for backwards compatibility if needed
+      // Map backend fields to frontend-expected field names
+      rating: rest.avgRating ?? 0,
+      reviews: rest.totalReviews ?? 0,
     };
   }
-  return docObj;
+  return {
+    ...docObj,
+    // Map backend fields to frontend-expected field names
+    rating: docObj.avgRating ?? 0,
+    reviews: docObj.totalReviews ?? 0,
+  };
 };
