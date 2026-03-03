@@ -30,7 +30,7 @@ export const createTicket = async (
       });
     }
 
-    const { subject, description, category, priority, attachments } = req.body;
+    const { subject, description, category, priority, attachments, bookingId } = req.body;
 
     if (!description || description.trim().length < 10) {
       return res.status(400).json({
@@ -45,6 +45,7 @@ export const createTicket = async (
       category,
       priority,
       attachments,
+      bookingId,
     });
 
     // Notify admins
@@ -53,6 +54,11 @@ export const createTicket = async (
     );
     getIO().to("admin_feed").emit("new_ticket_created", ticket);
 
+    // Notify the partner if a bookingId was supplied
+    if (bookingId) {
+      // The partner will pick this up in the partner portal
+      getIO().emit("partner_new_ticket", { ticket });
+    }
     res.status(201).json({
       success: true,
       message: "Ticket created successfully",
@@ -524,9 +530,14 @@ export const addPartnerReply = async (
       message,
     );
 
-    // Emit socket event
-    if (ticket) {
-      getIO().to(ticketId).emit("new_message", { ticketId, ticket });
+    // Emit socket event - emit the new message to the ticket room
+    if (ticket && ticket.messages && ticket.messages.length > 0) {
+      getIO()
+        .to(ticketId)
+        .emit("new_message", {
+          ticketId,
+          message: ticket.messages[ticket.messages.length - 1],
+        });
     }
 
     res.status(200).json({
