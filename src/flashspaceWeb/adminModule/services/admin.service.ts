@@ -19,7 +19,7 @@ import { NotificationService } from "../../notificationModule/services/notificat
 import { NotificationType } from "../../notificationModule/models/Notification";
 import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
 import { PaymentModel } from "../../paymentModule/payment.model";
-import { InvoiceModel } from "../../userDashboardModule/models/invoice.model";
+import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
 import { PropertyModel } from "../../propertyModule/property.model";
@@ -1834,14 +1834,14 @@ export class AdminService {
       // Get invoice details for these payments
       const paymentIds = payments.map((p) => p._id.toString());
       const invoices = await InvoiceModel.find({
-        paymentId: { $in: paymentIds },
+        payment: { $in: paymentIds },
         isDeleted: { $ne: true },
       }).lean();
 
       // Merge invoice data (like invoiceNumber) into payment data
       const mergedData = payments.map((payment) => {
         const invoice = invoices.find(
-          (inv) => inv.paymentId === payment._id.toString(),
+          (inv) => inv.payment?.toString() === payment._id.toString(),
         );
         return {
           ...payment,

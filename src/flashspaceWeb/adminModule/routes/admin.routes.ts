@@ -8,8 +8,9 @@ import {
   getAllAffiliates,
   getAffiliateClients,
 } from "../controllers/affiliateAdmin.controller";
-import{
+import {
   reviewSpaceUserKycOverall,
+  reviewSpaceUserKycDocument,
   getAllSpacePartnerKyc,
   getSpacePartnerKycById,
   getSpacePartnerPropertiesByKycId,
@@ -303,6 +304,7 @@ adminRoutes.get(
     Permission.MANAGE_OWN_SPACES,
   ]),
   AdminController.getInvoices,
+);
 
 adminRoutes.get(
   "/affiliates/:id/stats",
