@@ -344,6 +344,7 @@ export class AdminController {
       endDate: endDate as string,
       status: status as string,
     });
+  }
 
   // --- B2B2C Space Onboarding ---
 

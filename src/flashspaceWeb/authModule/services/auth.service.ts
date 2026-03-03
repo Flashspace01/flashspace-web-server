@@ -28,13 +28,8 @@ export class AuthService {
 
   async signup(signupData: SignupRequest): Promise<AuthResponse> {
     try {
-<<<<<<< HEAD
-      const { email, password, confirmPassword, fullName, phoneNumber, role } = signupData;
-      console.log('Backend signup - Processing role:', role);
-=======
       const { email, password, confirmPassword, fullName, phoneNumber, role } =
         signupData;
->>>>>>> f1b4dcd (Added kyc feature for partner and spaces)
 
       // Validate passwords match
       if (password !== confirmPassword) {
@@ -54,17 +49,10 @@ export class AuthService {
       }
 
       // Validate role (only allow 'user' or 'partner', default to 'user')
-<<<<<<< HEAD
-      const allowedRoles: string[] = [UserRole.USER, UserRole.PARTNER, UserRole.AFFILIATE];
-      console.log('Allowed Roles:', allowedRoles);
-      const selectedRole: UserRole = (role && allowedRoles.includes(role) ? role : UserRole.USER) as UserRole;
-      console.log('Selected Role:', selectedRole);
-=======
       const allowedRoles: string[] = [UserRole.USER, UserRole.PARTNER];
       const selectedRole: UserRole = (
         role && allowedRoles.includes(role) ? role : UserRole.USER
       ) as UserRole;
->>>>>>> f1b4dcd (Added kyc feature for partner and spaces)
 
       // Check if user already exists
       const existingUser = await this.userRepository.findByEmail(email);
@@ -103,15 +91,8 @@ export class AuthService {
       // Send OTP email
       try {
         await EmailUtil.sendEmailVerificationOTP(email, otpData.otp, fullName);
-<<<<<<< HEAD
-        console.log('✅ Verification OTP sent to:', email);
-        console.log('Signup Request Body:', JSON.stringify(signupData, null, 2));
-        console.log('Received Role:', signupData.role);
-        console.log('📌 OTP Code (for testing):', otpData.otp);
-=======
         console.log("✅ Verification OTP sent to:", email);
         console.log("📌 OTP Code (for testing):", otpData.otp);
->>>>>>> f1b4dcd (Added kyc feature for partner and spaces)
       } catch (emailError) {
         console.error("Error sending verification OTP:", emailError);
         // Continue with registration even if email fails
@@ -127,8 +108,7 @@ export class AuthService {
           fullName: user.fullName,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
-          kycVerified: user.kycVerified
-        }
+          kycVerified: user.kycVerified,
           credits: user.credits || 0,
         },
       };
@@ -222,7 +202,7 @@ export class AuthService {
           fullName: user.fullName,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
-          kycVerified: user.kycVerified
+          kycVerified: user.kycVerified,
           credits: user.credits || 0,
         },
         tokens,
@@ -239,15 +219,21 @@ export class AuthService {
     }
   }
 
-  async googleAuthWithToken(idToken: string, role?: string): Promise<AuthResponse> {
+  async googleAuthWithToken(
+    idToken: string,
+    role?: string,
+  ): Promise<AuthResponse> {
     try {
       // Import GoogleUtil
       const { GoogleUtil } = await import("../utils/google.util");
 
       // Verify the token with Google
-      console.log('🔍 Verifying Google ID Token...');
+      console.log("🔍 Verifying Google ID Token...");
       const profile = await GoogleUtil.verifyIdToken(idToken);
-      console.log('✅ Google Profile retrieved:', profile ? profile.emails[0].value : 'NULL');
+      console.log(
+        "✅ Google Profile retrieved:",
+        profile ? profile.emails[0].value : "NULL",
+      );
 
       if (!profile) {
         return {
@@ -346,7 +332,7 @@ export class AuthService {
           fullName: user.fullName,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
-          kycVerified: user.kycVerified
+          kycVerified: user.kycVerified,
           credits: user.credits || 0,
         },
         tokens,
@@ -387,12 +373,8 @@ export class AuthService {
           fullName: user.fullName,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
-<<<<<<< HEAD
-          kycVerified: user.kycVerified
-        }
-=======
+          kycVerified: user.kycVerified ?? false,
         },
->>>>>>> f1b4dcd (Added kyc feature for partner and spaces)
       };
     } catch (error) {
       console.error("Email verification error:", error);
@@ -793,7 +775,7 @@ export class AuthService {
           fullName: verifiedUser.fullName,
           role: verifiedUser.role,
           isEmailVerified: verifiedUser.isEmailVerified,
-          kycVerified: verifiedUser.kycVerified
+          kycVerified: verifiedUser.kycVerified,
           credits: verifiedUser.credits || 0,
         },
         tokens,
