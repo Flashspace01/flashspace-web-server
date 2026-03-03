@@ -2371,7 +2371,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
       pagination: {
         total,
         page: Number(page),
-        pages: Math.ceil(total / limitNum),
+        pages: Math.ceil(total / Number(req.query.limit || 10)),
       },
     });
   } catch (error) {
@@ -2757,12 +2757,7 @@ export const getUserMails = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-
-    // Case-insensitive exact match
-    const mails = await Mail.find({
-      email: { $regex: new RegExp(`^${userEmail}$`, "i") },
-    }).sort({ createdAt: -1 });
-
+    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
     const mails = await Mail.find({
       $or: [
         { email: { $regex: userEmailRegex } },
@@ -2798,11 +2793,7 @@ export const getUserVisits = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-
-    // Case-insensitive exact match
-    const visits = await Visit.find({
-      email: { $regex: new RegExp(`^${userEmail}$`, "i") },
-    }).sort({ createdAt: -1 });
+    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
 
     const visits = await Visit.find({
       $or: [

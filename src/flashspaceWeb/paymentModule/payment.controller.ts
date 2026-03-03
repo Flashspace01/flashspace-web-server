@@ -8,7 +8,7 @@ import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
-import { UserModel } from "../authModule/models/user.model";
+import { UserModel, UserRole } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
   CreditType,
@@ -18,6 +18,8 @@ import {
   NotificationType,
   NotificationRecipientType,
 } from "../notificationModule/models/Notification";
+import { NotificationService } from "../notificationModule/services/notification.service";
+import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
 import { getIO } from "../../socket";
 import { BookingService } from "../seatingModule/seating.service";
 import {
@@ -114,73 +116,83 @@ async function createBookingAndInvoice(payment: any) {
         };
       }
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.spaceId);
+      const space = await MeetingRoomModel.findById(payment.spaceId).populate(
+        "property",
+      );
       if (space) {
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: space.name,
-          address: space.address,
-          city: space.city,
-          area: space.area,
-          image: space.images?.[0] || "",
-          coordinates: space.location?.coordinates || [],
+          name: (space.property as any).name,
+          address: (space.property as any).address,
+          city: (space.property as any).city,
+          area: (space.property as any).area,
+          image: (space.property as any).images?.[0] || "",
+          coordinates: (space.property as any).location?.coordinates || [],
         };
       }
     }
 
     // Get partner ID from the space model directly (used for security & fast queries)
-    let partnerId;
+    let foundPartnerId;
     if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
       const space = await VirtualOfficeModel.findById(payment.spaceId);
-      partnerId = space?.partner;
+      foundPartnerId = space?.partner;
     } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
       const space = await CoworkingSpaceModel.findById(payment.spaceId);
-      partnerId = space?.partner;
+      foundPartnerId = space?.partner;
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
       const space = await MeetingRoomModel.findById(payment.spaceId);
-      partnerId = space?.partner;
+      foundPartnerId = space?.partner;
     }
 
     // Fallback: If no partner is assigned to the space, find the first admin to assign as partner
     // This prevents booking failure when space data is incomplete.
-    if (!partnerId) {
-      console.warn(`Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`);
-      const adminUser = await UserModel.findOne({ role: UserRole.ADMIN, isDeleted: { $ne: true } });
+    if (!foundPartnerId) {
+      console.warn(
+        `Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`,
+      );
+      const adminUser = await UserModel.findOne({
+        role: UserRole.ADMIN,
+        isDeleted: { $ne: true },
+      });
       if (adminUser) {
-        partnerId = adminUser._id;
+        foundPartnerId = adminUser._id;
       } else {
         // Last resort: Use the user themselves or keep undefined if we really have no admins (unlikely)
-        console.error("No admin found for fallback. Booking might still fail validation.");
+        console.error(
+          "No admin found for fallback. Booking might still fail validation.",
+        );
       }
     }
 
     // 2. Resolve Partner ID from the space
-    let partnerId = null;
-    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-      const spaceSet = await VirtualOfficeModel.findById(payment.space);
-      partnerId = spaceSet?.partner;
-    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-      const spaceSet = await CoworkingSpaceModel.findById(payment.space);
-      partnerId = spaceSet?.partner;
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const spaceSet = await MeetingRoomModel.findById(payment.space);
-      partnerId = spaceSet?.partner;
-    } else if (payment.paymentType === PaymentType.SEAT_BOOKING) {
-      const spaceSet = await CoworkingSpaceModel.findById(payment.space);
-      partnerId = spaceSet?.partner;
+    let finalPartnerId: any = foundPartnerId || null;
+    if (!finalPartnerId) {
+      if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+        const spaceSet = await VirtualOfficeModel.findById(payment.space);
+        finalPartnerId = spaceSet?.partner || null;
+      } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
+        const spaceSet = await CoworkingSpaceModel.findById(payment.space);
+        finalPartnerId = spaceSet?.partner || null;
+      } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+        const spaceSet = await MeetingRoomModel.findById(payment.space);
+        finalPartnerId = spaceSet?.partner || null;
+      } else if (payment.paymentType === PaymentType.SEAT_BOOKING) {
+        const spaceSet = await CoworkingSpaceModel.findById(payment.space);
+        finalPartnerId = spaceSet?.partner || null;
+      }
     }
 
-    // Default to a system admin or seller if partnerId is still missing to avoid validation failure
-    if (!partnerId) {
+    // Default to a system admin or seller if finalPartnerId is still missing to avoid validation failure
+    if (!finalPartnerId) {
       console.warn(
         `Partner ID not found for space ${payment.space}. Defaulting to seller...`,
       );
-      // In a real system, you'd have a default system admin ID here.
-      // For now, we'll try to use the space's partner if possible, or leave as null (which triggers warning)
-      // but the Invoice model REQUIREs it, so we MUST provide a valid ObjectId.
-      // We will use the ADMIN's ID if we can find one, or fallback to the userId (self-billing) as a last resort to prevent crash.
-      partnerId = payment.user;
+      finalPartnerId = payment.user;
     }
+
+    // Normalize to variable partnerId used below
+    const partnerId = finalPartnerId;
 
     // Calculate dates
     const startDate = payment.startDate
@@ -427,7 +439,7 @@ export const createOrder = async (req: Request, res: Response) => {
       affiliateId,
       holdId,
       creditsToUse,
-    } = validation.data.body;
+    } = validation.data.body as any; // Type override since we know these fields are present in the request schema
 
     // Verify credits if being used
     let adjustedTotalAmount = totalAmount;
@@ -578,7 +590,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
     // DEV MODE: Skip signature verification for development
     if (devMode === true) {
-      const payment = await PaymentModel.findOneAndUpdate(
+      const devPayment = await PaymentModel.findOneAndUpdate(
         { razorpayOrderId: razorpay_order_id },
         {
           razorpayPaymentId: razorpay_payment_id || `pay_dev_${Date.now()}`,
@@ -588,7 +600,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         { new: true },
       );
 
-      if (!payment) {
+      if (!devPayment) {
         return res.status(404).json({
           success: false,
           message: "Payment order not found",
@@ -596,41 +608,45 @@ export const verifyPayment = async (req: Request, res: Response) => {
       }
 
       // Create booking and invoice
-      let bookingData = null;
+      let devBookingData: any = null;
       try {
-        bookingData = await createBookingAndInvoice(payment);
+        devBookingData = await createBookingAndInvoice(devPayment);
 
         // --- NOTIFICATION LOGIC (DEV MODE) ---
         const notification = await NotificationModel.create({
-          recipient: payment.user,
+          recipient: devPayment.user,
           recipientType: NotificationRecipientType.USER,
           type: NotificationType.SUCCESS,
           title: "Booking Confirmed! 🎉",
-          message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          message: `Your booking for ${devPayment.spaceName} has been successfully confirmed.`,
           read: false,
           metadata: {
-            bookingId: bookingData?.booking?._id,
-            paymentId: payment._id,
+            bookingId: devBookingData?.booking?._id,
+            paymentId: devPayment._id,
             type: "booking_confirmation",
-          }
-        );
+          },
+        });
 
-        if (bookingData?.invoiceNumber) {
+        if (devBookingData?.invoiceNumber) {
           await NotificationService.notifyUser(
-            payment.userId.toString(),
+            devPayment.user.toString(),
             "Invoice Generated 📄",
-            `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+            `Your invoice ${devBookingData.invoiceNumber} for ${devPayment.spaceName} is now available to download.`,
             NotificationType.INFO,
             {
-              invoiceNumber: bookingData.invoiceNumber,
+              invoiceNumber: devBookingData.invoiceNumber,
               type: "invoice_generated",
-              actionUrl: "/dashboard/documents"
-            }
+              actionUrl: "/dashboard/documents",
+            },
           );
+        }
         // Emit Socket Event
         try {
           const io = getIO();
-          io.to(payment.user.toString()).emit("notification:new", notification);
+          io.to(devPayment.user.toString()).emit(
+            "notification:new",
+            notification,
+          );
         } catch (socketError) {
           console.error("Socket emission failed:", socketError);
         }
@@ -640,24 +656,33 @@ export const verifyPayment = async (req: Request, res: Response) => {
       }
 
       // --- MARK COUPON AS USED (DEV MODE) ---
-      if (payment.couponCode) {
+      if (devPayment.couponCode) {
         try {
-          const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+          const coupon = await CouponModel.findOne({
+            code: devPayment.couponCode,
+            isDeleted: { $ne: true },
+          });
           if (coupon) {
             if (coupon.isAffiliateCoupon) {
               await CouponModel.updateOne(
                 { _id: coupon._id },
-                { $addToSet: { usedBy: payment.userId.toString() } }
+                { $addToSet: { usedBy: devPayment.user.toString() } },
               );
             } else {
               coupon.status = CouponStatus.USED;
               coupon.usedAt = new Date();
-              coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+              coupon.usedBy = [
+                ...(coupon.usedBy || []),
+                devPayment.user.toString(),
+              ];
               await coupon.save();
             }
           }
         } catch (couponErr) {
-          console.error("Failed to mark coupon as used in DEV MODE:", couponErr);
+          console.error(
+            "Failed to mark coupon as used in DEV MODE:",
+            couponErr,
+          );
         }
       }
       // -------------------------------------
@@ -666,15 +691,15 @@ export const verifyPayment = async (req: Request, res: Response) => {
         success: true,
         message: "Payment verified successfully (DEV MODE)",
         data: {
-          paymentId: payment._id,
-          orderId: payment.razorpayOrderId,
-          status: payment.status,
-          spaceName: payment.spaceName,
-          planName: payment.planName,
-          tenure: payment.tenure,
-          totalAmount: payment.totalAmount,
-          bookingNumber: bookingData?.booking?.bookingNumber,
-          invoiceNumber: bookingData?.invoiceNumber,
+          paymentId: devPayment._id,
+          orderId: devPayment.razorpayOrderId,
+          status: devPayment.status,
+          spaceName: devPayment.spaceName,
+          planName: devPayment.planName,
+          tenure: devPayment.tenure,
+          totalAmount: devPayment.totalAmount,
+          bookingNumber: devBookingData?.booking?.bookingNumber,
+          invoiceNumber: devBookingData?.invoiceNumber,
           devMode: true,
         },
       });
@@ -715,7 +740,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
     }
 
     // Update payment to completed
-    const payment = await PaymentModel.findOneAndUpdate(
+    const prodPayment = await PaymentModel.findOneAndUpdate(
       { razorpayOrderId: razorpay_order_id },
       {
         razorpayPaymentId: razorpay_payment_id,
@@ -725,7 +750,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
       { new: true },
     );
 
-    if (!payment) {
+    if (!prodPayment) {
       return res.status(404).json({
         success: false,
         message: "Payment order not found",
@@ -733,21 +758,21 @@ export const verifyPayment = async (req: Request, res: Response) => {
     }
 
     // Create booking and invoice
-    let bookingData = null;
+    let prodBookingData: any = null;
     try {
-      bookingData = await createBookingAndInvoice(payment);
+      prodBookingData = await createBookingAndInvoice(prodPayment);
 
       // --- NOTIFICATION LOGIC (PROD MODE) ---
       const notification = await NotificationModel.create({
-        recipient: payment.user,
+        recipient: prodPayment.user,
         recipientType: NotificationRecipientType.USER,
         type: NotificationType.SUCCESS,
         title: "Booking Confirmed! 🎉",
-        message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+        message: `Your booking for ${prodPayment.spaceName} has been successfully confirmed.`,
         read: false,
         metadata: {
-          bookingId: bookingData?.booking?._id || payment._id,
-          paymentId: payment._id,
+          bookingId: prodBookingData?.booking?._id || prodPayment._id,
+          paymentId: prodPayment._id,
           type: "booking_confirmation",
         },
       });
@@ -755,7 +780,10 @@ export const verifyPayment = async (req: Request, res: Response) => {
       // Emit Socket Event
       try {
         const io = getIO();
-        io.to(payment.user.toString()).emit("notification:new", notification);
+        io.to(prodPayment.user.toString()).emit(
+          "notification:new",
+          notification,
+        );
       } catch (socketError) {
         console.error("Socket emission failed:", socketError);
       }
@@ -765,19 +793,25 @@ export const verifyPayment = async (req: Request, res: Response) => {
     }
 
     // --- MARK COUPON AS USED (PROD MODE) ---
-    if (payment.couponCode) {
+    if (prodPayment.couponCode) {
       try {
-        const coupon = await CouponModel.findOne({ code: payment.couponCode, isDeleted: { $ne: true } });
+        const coupon = await CouponModel.findOne({
+          code: prodPayment.couponCode,
+          isDeleted: { $ne: true },
+        });
         if (coupon) {
           if (coupon.isAffiliateCoupon) {
             await CouponModel.updateOne(
               { _id: coupon._id },
-              { $addToSet: { usedBy: payment.userId.toString() } }
+              { $addToSet: { usedBy: prodPayment.user.toString() } },
             );
           } else {
             coupon.status = CouponStatus.USED;
             coupon.usedAt = new Date();
-            coupon.usedBy = [...(coupon.usedBy || []), payment.userId.toString()];
+            coupon.usedBy = [
+              ...(coupon.usedBy || []),
+              prodPayment.user.toString(),
+            ];
             await coupon.save();
           }
         }
@@ -789,28 +823,28 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
     // --- NOTIFICATION LOGIC (PROD MODE) ---
     await NotificationService.notifyUser(
-      payment.userId.toString(),
+      prodPayment.user.toString(),
       "Booking Confirmed! 🎉",
-      `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+      `Your booking for ${prodPayment.spaceName} has been successfully confirmed.`,
       NotificationType.SUCCESS,
       {
-        bookingId: bookingData?.booking?._id,
-        paymentId: payment._id,
+        bookingId: prodBookingData?.booking?._id,
+        paymentId: prodPayment._id,
         type: "booking_confirmation",
-      }
+      },
     );
 
-    if (bookingData?.invoiceNumber) {
+    if (prodBookingData?.invoiceNumber) {
       await NotificationService.notifyUser(
-        payment.userId.toString(),
+        prodPayment.user.toString(),
         "Invoice Generated 📄",
-        `Your invoice ${bookingData.invoiceNumber} for ${payment.spaceName} is now available to download.`,
+        `Your invoice ${prodBookingData.invoiceNumber} for ${prodPayment.spaceName} is now available to download.`,
         NotificationType.INFO,
         {
-          invoiceNumber: bookingData.invoiceNumber,
+          invoiceNumber: prodBookingData.invoiceNumber,
           type: "invoice_generated",
-          actionUrl: "/dashboard/documents"
-        }
+          actionUrl: "/dashboard/documents",
+        },
       );
     }
     // -------------------------------------
@@ -819,15 +853,15 @@ export const verifyPayment = async (req: Request, res: Response) => {
       success: true,
       message: "Payment verified successfully",
       data: {
-        paymentId: payment._id,
-        orderId: payment.razorpayOrderId,
-        status: payment.status,
-        spaceName: payment.spaceName,
-        planName: payment.planName,
-        tenure: payment.tenure,
-        totalAmount: payment.totalAmount,
-        bookingNumber: bookingData?.booking?.bookingNumber,
-        invoiceNumber: bookingData?.invoiceNumber,
+        paymentId: prodPayment._id,
+        orderId: prodPayment.razorpayOrderId,
+        status: prodPayment.status,
+        spaceName: prodPayment.spaceName,
+        planName: prodPayment.planName,
+        tenure: prodPayment.tenure,
+        totalAmount: prodPayment.totalAmount,
+        bookingNumber: prodBookingData?.booking?.bookingNumber,
+        invoiceNumber: prodBookingData?.invoiceNumber,
       },
     });
   } catch (error: any) {
