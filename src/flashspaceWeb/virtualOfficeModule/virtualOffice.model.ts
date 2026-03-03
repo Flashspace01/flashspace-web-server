@@ -6,38 +6,52 @@ import {
   Ref,
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
-import { GeoLocation } from "../shared/geolocation.schema"; 
+import { Property } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 @modelOptions({
   schemaOptions: { timestamps: true },
 })
-@index({ city: 1, area: 1 }) 
-@index({ isDeleted: 1, isActive: 1 }) 
-@index({ popular: 1, avgRating: -1 }) 
-@index({ location: "2dsphere" }) 
 export class VirtualOffice {
-  @prop({ required: true, trim: true })
-  public name!: string;
+  @prop({ ref: () => Property, required: true })
+  public property!: Ref<Property>;
 
-  @prop({ required: true })
-  public address!: string;
+  @prop({
+    type: () => String,
+    enum: SpaceApprovalStatus,
+    default: SpaceApprovalStatus.DRAFT,
+  })
+  public approvalStatus!: SpaceApprovalStatus;
 
-  @prop({ required: true, trim: true })
-  public city!: string;
-
-  @prop({ required: true, trim: true })
-  public area!: string;
-
-  // --- UPDATED: Explicitly named as Per Year ---
+  // --- Split Pricing: GST Plan ---
   @prop({ required: false })
-  public gstPlanPricePerYear?: number;
+  public partnerGstPricePerYear?: number;
 
   @prop({ required: false })
-  public mailingPlanPricePerYear?: number;
+  public adminMarkupGstPerYear?: number;
 
   @prop({ required: false })
-  public brPlanPricePerYear?: number;
-  // ---------------------------------------------
+  public finalGstPricePerYear?: number; // Calculated virtual field equivalent
+
+  // --- Split Pricing: Mailing Plan ---
+  @prop({ required: false })
+  public partnerMailingPricePerYear?: number;
+
+  @prop({ required: false })
+  public adminMarkupMailingPerYear?: number;
+
+  @prop({ required: false })
+  public finalMailingPricePerYear?: number;
+
+  // --- Split Pricing: Business Registration Plan ---
+  @prop({ required: false })
+  public partnerBrPricePerYear?: number;
+
+  @prop({ required: false })
+  public adminMarkupBrPerYear?: number;
+
+  @prop({ required: false })
+  public finalBrPricePerYear?: number;
 
   @prop({ required: true, default: 0 })
   public avgRating!: number;
@@ -45,11 +59,11 @@ export class VirtualOffice {
   @prop({ required: true, default: 0 })
   public totalReviews!: number;
 
-  @prop({ required: true, type: () => [String] })
-  public features!: string[];
+  @prop({ type: () => [String], default: [] })
+  public amenities?: string[];
 
-  @prop({ required: true, default: "Available Now" })
-  public availability!: string;
+  @prop({ type: () => [String], default: [] })
+  public images?: string[];
 
   @prop({ default: false })
   public popular!: boolean;
@@ -57,17 +71,11 @@ export class VirtualOffice {
   @prop({ default: false })
   public sponsored!: boolean;
 
-  @prop({ type: () => GeoLocation, _id: false })
-  public location?: GeoLocation;
-
-  @prop({ type: () => [String], default: [] })
-  public images!: string[];
-
   @prop({ default: false })
   public isDeleted?: boolean;
 
-  @prop({ default: true })
-  public isActive?: boolean;
+  @prop({ default: false })
+  public isActive!: boolean;
 
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;

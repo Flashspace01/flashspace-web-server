@@ -11,22 +11,46 @@ const LocationSchema = z.object({
 
 export const createVirtualOfficeSchema = z.object({
   body: z.object({
-    name: z.string().min(3, "Name must be at least 3 characters long"),
-    address: z.string().min(5, "Address must be at least 5 characters long"),
-    city: z.string().min(2, "City must be at least 2 characters long"),
-    area: z.string().min(2, "Area must be at least 2 characters long"),
-    
+    name: z
+      .string()
+      .min(3, "Name must be at least 3 characters long")
+      .optional(),
+    address: z
+      .string()
+      .min(5, "Address must be at least 5 characters long")
+      .optional(),
+    city: z
+      .string()
+      .min(2, "City must be at least 2 characters long")
+      .optional(),
+    area: z
+      .string()
+      .min(2, "Area must be at least 2 characters long")
+      .optional(),
+    propertyId: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
+
     // FIXED: Updated to Numbers and matching the Model property names
-    gstPlanPricePerYear: z.number().nonnegative().optional(),
-    mailingPlanPricePerYear: z.number().nonnegative().optional(),
-    brPlanPricePerYear: z.number().nonnegative().optional(),
-    
-    features: z.array(z.string()).min(1, "At least one feature is required"),
-    availability: z.string().default("Available Now"),
+    partnerGstPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupGstPerYear: z.number().nonnegative().optional(),
+    finalGstPricePerYear: z.number().nonnegative().optional(),
+
+    partnerMailingPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupMailingPerYear: z.number().nonnegative().optional(),
+    finalMailingPricePerYear: z.number().nonnegative().optional(),
+
+    partnerBrPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupBrPerYear: z.number().nonnegative().optional(),
+    finalBrPricePerYear: z.number().nonnegative().optional(),
+
+    features: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).optional(),
     popular: z.boolean().optional(),
     sponsored: z.boolean().optional(),
     location: LocationSchema.optional(), // FIXED: Replaced coordinates
-    images: z.array(z.string()).min(1, "At least one image is required"),
+    images: z.array(z.string()).optional(),
   }),
 });
 
@@ -39,19 +63,90 @@ export const updateVirtualOfficeSchema = z.object({
     address: z.string().min(5).optional(),
     city: z.string().min(2).optional(),
     area: z.string().min(2).optional(),
-    
+
     // FIXED: Updated to Numbers
-    gstPlanPricePerYear: z.number().nonnegative().optional(),
-    mailingPlanPricePerYear: z.number().nonnegative().optional(),
-    brPlanPricePerYear: z.number().nonnegative().optional(),
-    
+    partnerGstPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupGstPerYear: z.number().nonnegative().optional(),
+    finalGstPricePerYear: z.number().nonnegative().optional(),
+
+    partnerMailingPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupMailingPerYear: z.number().nonnegative().optional(),
+    finalMailingPricePerYear: z.number().nonnegative().optional(),
+
+    partnerBrPricePerYear: z.number().nonnegative().optional(),
+    adminMarkupBrPerYear: z.number().nonnegative().optional(),
+    finalBrPricePerYear: z.number().nonnegative().optional(),
+
     features: z.array(z.string()).optional(),
-    availability: z.string().optional(),
+    amenities: z.array(z.string()).optional(),
     popular: z.boolean().optional(),
     sponsored: z.boolean().optional(),
     location: LocationSchema.optional(), // FIXED: Replaced coordinates
     images: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
+    approvalStatus: z.string().optional(),
+  }),
+});
+
+const objectIdSchema = z
+  .string()
+  .refine((val) => /^[0-9a-fA-F]{24}$/.test(val), {
+    message: "Invalid ObjectId",
+  });
+
+export const getVirtualOfficesSchema = z.object({
+  query: z.object({
+    deleted: z.enum(["true", "false"]).optional(),
+    page: z.string().regex(/^\d+$/).transform(Number).optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
+    property: z
+      .string()
+      .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
+      .optional(),
+  }),
+});
+
+export const getVirtualOfficeByIdSchema = z.object({
+  params: z.object({
+    virtualOfficeId: objectIdSchema,
+  }),
+});
+
+export const getVirtualOfficesByCitySchema = z.object({
+  params: z.object({
+    city: z.string().min(2),
+  }),
+  query: z.object({
+    page: z.string().regex(/^\d+$/).transform(Number).optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
+  }),
+});
+
+export const getPartnerVirtualOfficesSchema = z.object({
+  query: z.object({
+    page: z.string().regex(/^\d+$/).transform(Number).optional(),
+    limit: z
+      .string()
+      .regex(/^\d+$/)
+      .transform(Number)
+      .refine((val) => !val || val <= 100, {
+        message: "Limit cannot exceed 100",
+      })
+      .optional(),
   }),
 });

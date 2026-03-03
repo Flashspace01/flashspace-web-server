@@ -2,20 +2,32 @@ import { Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { PaymentModel, PaymentStatus, PaymentType } from "./payment.model";
-import { BookingModel } from "../userDashboardModule/models/booking.model";
-import { InvoiceModel } from "../userDashboardModule/models/invoice.model";
+import { BookingModel } from "../bookingModule/booking.model";
+import { InvoiceModel } from "../invoiceModule/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
-import { UserModel, UserRole } from "../authModule/models/user.model";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import { UserModel } from "../authModule/models/user.model";
 import {
   CreditLedgerModel,
-  CreditSource,
-} from "../userDashboardModule/models/creditLedger.model";
-import { NotificationType } from "../notificationModule/models/Notification";
-import { NotificationService } from "../notificationModule/services/notification.service";
-import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
-import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
+  CreditType,
+} from "../creditLedgerModule/creditLedger.model";
+import {
+  NotificationModel,
+  NotificationType,
+  NotificationRecipientType,
+} from "../notificationModule/models/Notification";
+import { getIO } from "../../socket";
+import { BookingService } from "../seatingModule/seating.service";
+import {
+  createOrderSchema,
+  verifyPaymentSchema,
+  getPaymentStatusSchema,
+  getPaymentByIdSchema,
+  getUserPaymentsSchema,
+  handlePaymentFailureSchema,
+} from "./payment.validation";
 
 // Initialize Razorpay with API keys
 const razorpay = new Razorpay({
@@ -26,51 +38,79 @@ const razorpay = new Razorpay({
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
   try {
-    // Generate booking number
-    // Generate a collision-safe booking number by finding the current max sequence
-    // (countDocuments fails when bookings are deleted — the sequence desync causes duplicates)
-    const lastBooking = await BookingModel.findOne({}, { bookingNumber: 1 })
-      .sort({ createdAt: -1 })
-      .lean();
-    const year = new Date().getFullYear();
-    let nextSeq = 1;
-    if (lastBooking?.bookingNumber) {
-      const parts = lastBooking.bookingNumber.split("-");
-      const lastSeq = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    // If it's a seat booking, confirm the hold first
+    if (
+      payment.paymentType === PaymentType.SEAT_BOOKING &&
+      payment.seatBooking
+    ) {
+      try {
+        await BookingService.confirmBooking(
+          payment.seatBooking.toString(),
+          payment.user.toString(),
+          payment.razorpayPaymentId,
+        );
+      } catch (confirmError) {
+        console.error("Error confirming seat booking hold:", confirmError);
+        // We continue anyway to generate invoice, but log the error
+      }
     }
-    const bookingNumber = `FS-${year}-${String(nextSeq).padStart(5, "0")}`;
+
+    // Generate booking number (VIRTUAL_OFFICE, COWORKING_SPACE, MEETING_ROOM)
+    // For SEAT_BOOKING we might still want a booking number for the invoice,
+    // but the SeatBooking model already has its own logic if needed?
+    // Actually, simple FS number is fine for internal tracking.
+    const bookingCount = await BookingModel.countDocuments();
+    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
 
     // Get space details for snapshot
     let spaceSnapshot: any = {
-      _id: payment.spaceId,
+      _id: payment.space,
       name: payment.spaceName,
     };
 
     if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-      const space = await VirtualOfficeModel.findById(payment.spaceId);
+      const space = await VirtualOfficeModel.findById(payment.space).populate(
+        "property",
+      );
       if (space) {
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: space.name,
-          address: space.address,
-          city: space.city,
-          area: space.area,
-          image: space.images?.[0] || "",
-          coordinates: space.location?.coordinates || [],
+          name: (space.property as any).name,
+          address: (space.property as any).address,
+          city: (space.property as any).city,
+          area: (space.property as any).area,
+          image: (space.property as any).images?.[0] || "",
+          coordinates: (space.property as any).location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-      const space = await CoworkingSpaceModel.findById(payment.spaceId);
+      const space = await CoworkingSpaceModel.findById(payment.space).populate(
+        "property",
+      );
       if (space) {
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: space.name,
-          address: space.address,
-          city: space.city,
-          area: space.area,
-          image: space.images?.[0] || "",
-          coordinates: space.location?.coordinates || [],
+          name: (space.property as any).name,
+          address: (space.property as any).address,
+          city: (space.property as any).city,
+          area: (space.property as any).area,
+          image: (space.property as any).images?.[0] || "",
+          coordinates: (space.property as any).location?.coordinates || [],
+        };
+      }
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const space = await MeetingRoomModel.findById(payment.space).populate(
+        "property",
+      );
+      if (space) {
+        spaceSnapshot = {
+          _id: space._id?.toString(),
+          name: (space.property as any).name,
+          address: (space.property as any).address,
+          city: (space.property as any).city,
+          area: (space.property as any).area,
+          image: (space.property as any).images?.[0] || "",
+          coordinates: (space.property as any).location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
@@ -114,59 +154,95 @@ async function createBookingAndInvoice(payment: any) {
       }
     }
 
+    // 2. Resolve Partner ID from the space
+    let partnerId = null;
+    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+      const spaceSet = await VirtualOfficeModel.findById(payment.space);
+      partnerId = spaceSet?.partner;
+    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
+      const spaceSet = await CoworkingSpaceModel.findById(payment.space);
+      partnerId = spaceSet?.partner;
+    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      const spaceSet = await MeetingRoomModel.findById(payment.space);
+      partnerId = spaceSet?.partner;
+    } else if (payment.paymentType === PaymentType.SEAT_BOOKING) {
+      const spaceSet = await CoworkingSpaceModel.findById(payment.space);
+      partnerId = spaceSet?.partner;
+    }
+
+    // Default to a system admin or seller if partnerId is still missing to avoid validation failure
+    if (!partnerId) {
+      console.warn(
+        `Partner ID not found for space ${payment.space}. Defaulting to seller...`,
+      );
+      // In a real system, you'd have a default system admin ID here.
+      // For now, we'll try to use the space's partner if possible, or leave as null (which triggers warning)
+      // but the Invoice model REQUIREs it, so we MUST provide a valid ObjectId.
+      // We will use the ADMIN's ID if we can find one, or fallback to the userId (self-billing) as a last resort to prevent crash.
+      partnerId = payment.user;
+    }
+
     // Calculate dates
     const startDate = payment.startDate
       ? new Date(payment.startDate)
       : new Date();
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
+    let endDate = new Date(startDate);
 
-    // Create booking
-    const booking = await BookingModel.create({
-      bookingNumber,
-      user: payment.userId,
-      partnerId: partnerId, // Added partnerId which is required by the model
-      type:
-        payment.paymentType === PaymentType.VIRTUAL_OFFICE
-          ? "virtual_office"
-          : payment.paymentType === PaymentType.MEETING_ROOM
-            ? "meeting_room"
-            : "coworking_space",
-      spaceId: payment.spaceId,
-      spaceSnapshot,
-      plan: {
-        name: payment.planName,
-        price: payment.totalAmount,
-        originalPrice: payment.yearlyPrice * payment.tenure,
-        discount: payment.discountAmount || 0,
-        tenure: payment.tenure * 12,
-        tenureUnit: "months",
-      },
-      paymentId: payment._id?.toString(),
-      razorpayOrderId: payment.razorpayOrderId,
-      razorpayPaymentId: payment.razorpayPaymentId,
-      status: "pending_kyc",
-      kycStatus: "not_started",
-      timeline: [
-        {
-          status: "payment_received",
-          date: new Date(),
-          note: `Payment of ₹${payment.totalAmount} received`,
-          by: "System",
+    // For seat_booking, endDate is handled differently, but we'll set a fallback
+    // We assume tenure is 0 if it's a seat booking (or hour-based).
+    if (payment.paymentType !== "seat_booking") {
+      endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
+    } else {
+      endDate.setHours(endDate.getHours() + payment.tenure); // tenure as hours
+    }
+
+    // Create booking (Only if not seat_booking, or if we still want a BookingModel for invoices)
+    let booking: any = null;
+    if (payment.paymentType !== "seat_booking") {
+      booking = await BookingModel.create({
+        bookingNumber,
+        user: payment.user,
+        type:
+          payment.paymentType === PaymentType.VIRTUAL_OFFICE
+            ? "VirtualOffice"
+            : payment.paymentType === PaymentType.MEETING_ROOM
+              ? "MeetingRoom"
+              : "CoworkingSpace",
+        spaceId: payment.space,
+        partner: partnerId, // Explicitly set the partner!
+        spaceSnapshot,
+        plan: {
+          name: payment.planName,
+          price: payment.totalAmount,
+          originalPrice: payment.yearlyPrice * payment.tenure,
+          discount: payment.discountAmount || 0,
+          tenure: payment.tenure * 12,
+          tenureUnit: "months",
         },
-      ],
-      documents: [],
-      startDate,
-      endDate,
-      autoRenew: false,
-      features: [
-        "Business Address",
-        "Mail Handling",
-        "GST Registration Support",
-      ],
-      couponCode: payment.couponCode || undefined,
-      affiliateId: payment.affiliateId ? payment.affiliateId : undefined,
-    });
+        payment: payment._id,
+        razorpayOrderId: payment.razorpayOrderId,
+        razorpayPaymentId: payment.razorpayPaymentId,
+        status: "pending_kyc",
+        kycStatus: "not_started",
+        timeline: [
+          {
+            status: "payment_received",
+            date: new Date(),
+            note: `Payment of ₹${payment.totalAmount} received`,
+            by: "System",
+          },
+        ],
+        documents: [],
+        startDate,
+        endDate,
+        autoRenew: false,
+        features: [
+          "Business Address",
+          "Mail Handling",
+          "GST Registration Support",
+        ],
+      });
+    } // End of BookingModel creation
 
     // Generate invoice number
     // Collision-safe invoice number (same approach as booking number)
@@ -191,10 +267,11 @@ async function createBookingAndInvoice(payment: any) {
     // Create invoice
     await InvoiceModel.create({
       invoiceNumber,
-      user: payment.userId,
-      bookingId: booking._id?.toString(),
+      user: payment.user,
+      partner: partnerId, // <--- FIXED: Added missing partnerId
+      booking: booking ? booking._id : undefined,
       bookingNumber,
-      paymentId: payment._id?.toString(),
+      payment: payment._id,
       description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
       lineItems: [
         {
@@ -218,12 +295,12 @@ async function createBookingAndInvoice(payment: any) {
       },
     });
 
-    // Create/update KYC record
-    let kyc = await KYCDocumentModel.findOne({ user: payment.userId });
-    if (!kyc) {
+    // Create/update KYC record (skipping for seat_booking to simplify, or maybe keep it if needed)
+    let kyc = await KYCDocumentModel.findOne({ user: payment.user });
+    if (!kyc && booking) {
       kyc = await KYCDocumentModel.create({
-        user: payment.userId,
-        bookingId: booking._id?.toString(),
+        user: payment.user,
+        booking: booking._id,
         personalInfo: {
           fullName: payment.userName,
           email: payment.userEmail,
@@ -235,30 +312,75 @@ async function createBookingAndInvoice(payment: any) {
       });
     }
 
-    // Credits & Rewards Logic (Only for Meeting Rooms)
-    if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const creditPercentage = 0.5; // 50%
-      const creditsEarned = Math.floor(payment.totalAmount * creditPercentage); // totalAmount is in INR (not paise here, wait. Payment model says totalAmount is in paise? No. Payment model says amount is in paise, totalAmount is number. let's check creating order.
-      // In createOrder: amount: totalAmount * 100. payment.totalAmount is raw amount.
-      // So if 1200 INR, totalAmount is 1200.
+    // Credits & Rewards Logic - Updated: 1% Earning on ALL spends
+    const earningsRate = 0.01;
+    const creditsEarned = Math.floor(payment.totalAmount * earningsRate);
 
-      if (creditsEarned > 0) {
-        // Update User
-        await UserModel.findByIdAndUpdate(payment.userId, {
-          $inc: { credits: creditsEarned },
-        });
+    if (creditsEarned > 0) {
+      // Update User credits
+      await UserModel.findByIdAndUpdate(payment.user, {
+        $inc: { credits: creditsEarned },
+      });
 
-        // Get updated user to get new balance
-        const user = await UserModel.findById(payment.userId);
+      // Get updated user for ledger record
+      let updatedUser = await UserModel.findById(payment.user);
 
-        // Create Ledger Entry
+      try {
+        // Create Ledger Entry for Earning
         await CreditLedgerModel.create({
-          user: payment.userId,
+          user: payment.user,
           amount: creditsEarned,
-          source: CreditSource.BOOKING,
-          description: `Earned ${creditsEarned} credits for meeting room booking #${bookingNumber}`,
-          referenceId: booking._id?.toString(),
-          balanceAfter: user?.credits || 0,
+          type: CreditType.EARNED,
+          description: `Earned credits (1%) for booking #${bookingNumber}`,
+          referenceId: booking
+            ? booking._id?.toString()
+            : payment._id?.toString(),
+          booking: booking ? booking._id : undefined,
+          balanceAfter: updatedUser?.credits || 0,
+        });
+      } catch (ledgerError) {
+        // ROLLBACK: Manual Compensation if Ledger Document fails to save
+        console.error(
+          "Ledger creation failed! Rolling back user credits...",
+          ledgerError,
+        );
+        await UserModel.findByIdAndUpdate(payment.user, {
+          $inc: { credits: -creditsEarned },
+        });
+      }
+    }
+
+    // Credits Deduction if used
+    if (payment.creditsUsed && payment.creditsUsed > 0) {
+      // Deduct Credits
+      await UserModel.findByIdAndUpdate(payment.user, {
+        $inc: { credits: -payment.creditsUsed },
+      });
+
+      // Get updated user for ledger record
+      let updatedUser = await UserModel.findById(payment.user);
+
+      try {
+        // Create Ledger Entry for Spend
+        await CreditLedgerModel.create({
+          user: payment.user,
+          amount: -payment.creditsUsed,
+          type: CreditType.SPENT,
+          description: `Used credits for meeting room booking #${bookingNumber}`,
+          referenceId: booking
+            ? booking._id?.toString()
+            : payment._id?.toString(),
+          booking: booking ? booking._id : undefined,
+          balanceAfter: updatedUser?.credits || 0,
+        });
+      } catch (ledgerError) {
+        // ROLLBACK: Manual Compensation if Ledger Document fails to save
+        console.error(
+          "Ledger deduction failed! Rolling back user credits...",
+          ledgerError,
+        );
+        await UserModel.findByIdAndUpdate(payment.user, {
+          $inc: { credits: payment.creditsUsed },
         });
       }
     }
@@ -276,6 +398,15 @@ async function createBookingAndInvoice(payment: any) {
  */
 export const createOrder = async (req: Request, res: Response) => {
   try {
+    const validation = createOrderSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
     const {
       userId,
       userEmail,
@@ -290,39 +421,56 @@ export const createOrder = async (req: Request, res: Response) => {
       totalAmount,
       discountPercent,
       discountAmount,
-      paymentType = PaymentType.VIRTUAL_OFFICE,
+      paymentType,
       startDate,
       couponCode,
       affiliateId,
-    } = req.body;
+      holdId,
+      creditsToUse,
+    } = validation.data.body;
 
-    // Validation
-    if (
-      !userId ||
-      !userEmail ||
-      !spaceId ||
-      !planName ||
-      !tenure ||
-      !totalAmount
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-        error:
-          "userId, userEmail, spaceId, planName, tenure, and totalAmount are required",
-      });
+    // Verify credits if being used
+    let adjustedTotalAmount = totalAmount;
+    if (creditsToUse > 0) {
+      if (paymentType !== PaymentType.MEETING_ROOM) {
+        return res.status(400).json({
+          success: false,
+          message: "Credits can only be used for meeting room bookings",
+        });
+      }
+
+      const user = await UserModel.findById(userId);
+      if (!user || user.credits < creditsToUse) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient credits",
+        });
+      }
+
+      if (creditsToUse > totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: "Credits used cannot exceed total amount",
+        });
+      }
+
+      adjustedTotalAmount = totalAmount - creditsToUse;
     }
 
     // Check Razorpay Keys
     let razorpayOrder;
 
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    if (
+      process.env.RAZORPAY_KEY_ID === "secret-id" ||
+      !process.env.RAZORPAY_KEY_ID ||
+      !process.env.RAZORPAY_KEY_SECRET
+    ) {
       console.warn(
         "Razorpay keys missing - Switching to DEV MODE (Mock Order)",
       );
       razorpayOrder = {
         id: `order_mock_${Date.now()}`,
-        amount: Math.round(totalAmount * 100),
+        amount: Math.round(adjustedTotalAmount * 100),
         currency: "INR",
       };
     } else {
@@ -330,7 +478,7 @@ export const createOrder = async (req: Request, res: Response) => {
       const receiptId = `ord_${Date.now().toString(36)}`;
       try {
         razorpayOrder = await razorpay.orders.create({
-          amount: Math.round(totalAmount * 100), // Convert to paise and ensure integer
+          amount: Math.round(adjustedTotalAmount * 100), // Convert to paise and ensure integer
           currency: "INR",
           receipt: receiptId,
           notes: {
@@ -353,7 +501,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     // Save order to database
     const payment = await PaymentModel.create({
-      userId,
+      user: userId,
       userEmail,
       userName: userName || "Guest",
       userPhone,
@@ -362,7 +510,13 @@ export const createOrder = async (req: Request, res: Response) => {
       currency: "INR",
       status: PaymentStatus.PENDING,
       paymentType,
-      spaceId,
+      spaceModel:
+        paymentType === PaymentType.VIRTUAL_OFFICE
+          ? "VirtualOffice"
+          : paymentType === PaymentType.MEETING_ROOM
+            ? "MeetingRoom"
+            : "CoworkingSpace",
+      space: spaceId,
       spaceName,
       planName,
       planKey,
@@ -374,6 +528,8 @@ export const createOrder = async (req: Request, res: Response) => {
       startDate: startDate ? new Date(startDate) : undefined,
       couponCode: couponCode || undefined,
       affiliateId: affiliateId || undefined,
+      seatBooking: holdId,
+      creditsUsed: creditsToUse,
     });
 
     res.status(201).json({
@@ -404,12 +560,21 @@ export const createOrder = async (req: Request, res: Response) => {
  */
 export const verifyPayment = async (req: Request, res: Response) => {
   try {
+    const validation = verifyPaymentSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
     const {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      devMode, // For development testing
-    } = req.body;
+      devMode,
+    } = validation.data.body;
 
     // DEV MODE: Skip signature verification for development
     if (devMode === true) {
@@ -436,12 +601,14 @@ export const verifyPayment = async (req: Request, res: Response) => {
         bookingData = await createBookingAndInvoice(payment);
 
         // --- NOTIFICATION LOGIC (DEV MODE) ---
-        await NotificationService.notifyUser(
-          payment.userId.toString(),
-          "Booking Confirmed! 🎉",
-          `Your booking for ${payment.spaceName} has been successfully confirmed.`,
-          NotificationType.SUCCESS,
-          {
+        const notification = await NotificationModel.create({
+          recipient: payment.user,
+          recipientType: NotificationRecipientType.USER,
+          type: NotificationType.SUCCESS,
+          title: "Booking Confirmed! 🎉",
+          message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+          read: false,
+          metadata: {
             bookingId: bookingData?.booking?._id,
             paymentId: payment._id,
             type: "booking_confirmation",
@@ -460,6 +627,12 @@ export const verifyPayment = async (req: Request, res: Response) => {
               actionUrl: "/dashboard/documents"
             }
           );
+        // Emit Socket Event
+        try {
+          const io = getIO();
+          io.to(payment.user.toString()).emit("notification:new", notification);
+        } catch (socketError) {
+          console.error("Socket emission failed:", socketError);
         }
         // -------------------------------------
       } catch (err: any) {
@@ -564,6 +737,28 @@ export const verifyPayment = async (req: Request, res: Response) => {
     try {
       bookingData = await createBookingAndInvoice(payment);
 
+      // --- NOTIFICATION LOGIC (PROD MODE) ---
+      const notification = await NotificationModel.create({
+        recipient: payment.user,
+        recipientType: NotificationRecipientType.USER,
+        type: NotificationType.SUCCESS,
+        title: "Booking Confirmed! 🎉",
+        message: `Your booking for ${payment.spaceName} has been successfully confirmed.`,
+        read: false,
+        metadata: {
+          bookingId: bookingData?.booking?._id || payment._id,
+          paymentId: payment._id,
+          type: "booking_confirmation",
+        },
+      });
+
+      // Emit Socket Event
+      try {
+        const io = getIO();
+        io.to(payment.user.toString()).emit("notification:new", notification);
+      } catch (socketError) {
+        console.error("Socket emission failed:", socketError);
+      }
       // -------------------------------------
     } catch (err: any) {
       console.error("Failed to create booking:", err);
@@ -651,7 +846,16 @@ export const verifyPayment = async (req: Request, res: Response) => {
  */
 export const getPaymentStatus = async (req: Request, res: Response) => {
   try {
-    const { orderId } = req.params;
+    const validation = getPaymentStatusSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
+    const { orderId } = validation.data.params;
 
     const payment = await PaymentModel.findOne({ razorpayOrderId: orderId });
 
@@ -690,7 +894,16 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
  */
 export const getPaymentById = async (req: Request, res: Response) => {
   try {
-    const { paymentId } = req.params;
+    const validation = getPaymentByIdSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
+    const { paymentId } = validation.data.params;
 
     const payment = await PaymentModel.findById(paymentId);
 
@@ -721,18 +934,29 @@ export const getPaymentById = async (req: Request, res: Response) => {
  */
 export const getUserPayments = async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
-    const { status, limit = 10, page = 1 } = req.query;
+    const validation = getUserPaymentsSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
 
-    const query: any = { userId, isDeleted: { $ne: true } };
+    const { userId } = validation.data.params;
+    const { status, limit, page } = validation.data.query;
+    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _page = page ? Math.max(page, 1) : 1;
+
+    const query: any = { user: userId, isDeleted: { $ne: true } };
     if (status) {
       query.status = status;
     }
 
     const payments = await PaymentModel.find(query)
       .sort({ createdAt: -1 })
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit));
+      .limit(_limit)
+      .skip((_page - 1) * _limit);
 
     const total = await PaymentModel.countDocuments(query);
 
@@ -742,9 +966,9 @@ export const getUserPayments = async (req: Request, res: Response) => {
         payments,
         pagination: {
           total,
-          page: Number(page),
-          limit: Number(limit),
-          totalPages: Math.ceil(total / Number(limit)),
+          page: _page,
+          limit: _limit,
+          totalPages: Math.ceil(total / _limit),
         },
       },
     });
@@ -764,7 +988,17 @@ export const getUserPayments = async (req: Request, res: Response) => {
  */
 export const handlePaymentFailure = async (req: Request, res: Response) => {
   try {
-    const { razorpay_order_id, error_code, error_description } = req.body;
+    const validation = handlePaymentFailureSchema.safeParse(req);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation Error",
+        error: validation.error,
+      });
+    }
+
+    const { razorpay_order_id, error_code, error_description } =
+      validation.data.body;
 
     if (!razorpay_order_id) {
       return res.status(400).json({

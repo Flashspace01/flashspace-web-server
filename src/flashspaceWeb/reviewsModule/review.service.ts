@@ -12,4 +12,22 @@ export class ReviewService {
 
     return review;
   }
+
+  static async getReviewsBySpace(spaceId: string, limit: number, page: number) {
+    const reviews = await ReviewModel.find({ space: spaceId })
+      .populate("user", "firstName lastName profilePicture") // Optional user payload
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit);
+
+    const total = await ReviewModel.countDocuments({ space: spaceId });
+
+    return {
+      reviews,
+      total,
+      limit,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 }

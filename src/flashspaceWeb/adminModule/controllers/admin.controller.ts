@@ -129,10 +129,14 @@ export class AdminController {
   // GET /api/admin/kyc/:id
   static async getKYCDetails(req: Request, res: Response) {
     const id = req.params.id as string;
+    console.log(`[AdminController] getKYCDetails called with ID: ${id}`);
     const result = await adminService.getKYCDetails(id);
     if (result.success) {
       res.status(200).json(result);
     } else {
+      console.log(
+        `[AdminController] getKYCDetails failed for ID ${id}: ${result.message}`,
+      );
       const statusCode =
         result.message === "KYC document not found" ? 404 : 500;
       res.status(statusCode).json(result);
@@ -341,10 +345,30 @@ export class AdminController {
       status: status as string,
     });
 
+  // --- B2B2C Space Onboarding ---
+
+  // GET /api/admin/spaces/pending
+  static async getPendingSpaces(req: Request, res: Response) {
+    const result = await adminService.getPendingSpaces();
     if (result.success) {
       res.status(200).json(result);
     } else {
       res.status(500).json(result);
+    }
+  }
+
+  // PUT /api/admin/spaces/:spaceType/:id/approve
+  static async approveSpace(req: Request, res: Response) {
+    const spaceType = req.params.spaceType as string;
+    const id = req.params.id as string;
+    const adminMarkups = req.body;
+
+    const result = await adminService.approveSpace(spaceType, id, adminMarkups);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message.includes("not found") ? 404 : 400;
+      res.status(statusCode).json(result);
     }
   }
 }

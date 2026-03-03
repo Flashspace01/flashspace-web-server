@@ -3,13 +3,15 @@
   AuthProvider,
   UserRole,
 } from "../../authModule/models/user.model";
+import { BookingModel } from "../../bookingModule/booking.model";
 import { STAFF_ROLES } from "../../authModule/config/permissions.config";
-import { BookingModel } from "../../userDashboardModule/models/booking.model";
+
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PartnerKYCModel } from "../../userDashboardModule/models/partnerKYC.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
 import { BusinessInfoModel } from "../../userDashboardModule/models/businessInfo.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { ApiResponse } from "../../authModule/types/auth.types";
 import { PasswordUtil } from "../../authModule/utils/password.util";
 import mongoose from "mongoose";
@@ -18,6 +20,9 @@ import { NotificationType } from "../../notificationModule/models/Notification";
 import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
 import { PaymentModel } from "../../paymentModule/payment.model";
 import { InvoiceModel } from "../../userDashboardModule/models/invoice.model";
+import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
+import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
+import { PropertyModel } from "../../propertyModule/property.model";
 
 export class AdminService {
   /**
@@ -658,6 +663,20 @@ export class AdminService {
             }
           }
           doc.status = "approved";
+
+          // Trigger B2B2C Onboarding Hook
+          try {
+            const properties = await PropertyModel.find({ partner: doc.user });
+            for (const prop of properties) {
+              if (prop._id)
+                await checkAndAdvanceSpaceStatus(
+                  doc.user.toString(),
+                  prop._id.toString(),
+                );
+            }
+          } catch (hookError) {
+            console.error("KYC Approval Space Hook Error:", hookError);
+          }
         } else if (type === "business") {
           doc.status = "approved";
           await UserModel.findByIdAndUpdate(doc.user, { kycVerified: true });
@@ -1593,6 +1612,142 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to update business info status",
+        error: error.message,
+      };
+    }
+  }
+
+  // --- B2B2C Space Onboarding ---
+
+  async getPendingSpaces(): Promise<ApiResponse<any>> {
+    try {
+      const query = {
+        approvalStatus: SpaceApprovalStatus.PENDING_ADMIN,
+        isDeleted: false,
+      };
+
+      const [vo, cs, mr] = await Promise.all([
+        VirtualOfficeModel.find(query)
+          .populate("partner", "fullName email")
+          .populate("property", "name city"),
+        CoworkingSpaceModel.find(query)
+          .populate("partner", "fullName email")
+          .populate("property", "name city"),
+        MeetingRoomModel.find(query)
+          .populate("partner", "fullName email")
+          .populate("property", "name city"),
+      ]);
+
+      const mapSpace = (space: any, type: string) => ({
+        ...space.toObject(),
+        spaceType: type,
+      });
+
+      const allPendingSpaces = [
+        ...vo.map((s) => mapSpace(s, "virtual_office")),
+        ...cs.map((s) => mapSpace(s, "coworking")),
+        ...mr.map((s) => mapSpace(s, "meeting_room")),
+      ];
+
+      return {
+        success: true,
+        message: "Pending spaces fetched successfully",
+        data: allPendingSpaces.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to fetch pending spaces",
+        error: error.message,
+      };
+    }
+  }
+
+  async approveSpace(
+    spaceType: string,
+    spaceId: string,
+    markups: any,
+  ): Promise<ApiResponse<any>> {
+    try {
+      let activeModel: any;
+      let finalUpdateData: any = {
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
+        isActive: true,
+      };
+
+      if (spaceType === "virtual_office") {
+        activeModel = VirtualOfficeModel;
+        const space = await activeModel.findById(spaceId);
+        if (!space)
+          return { success: false, message: "Virtual Office not found" };
+
+        if (markups.adminMarkupGstPerYear !== undefined) {
+          finalUpdateData.adminMarkupGstPerYear = markups.adminMarkupGstPerYear;
+          finalUpdateData.finalGstPricePerYear =
+            (space.partnerGstPricePerYear || 0) + markups.adminMarkupGstPerYear;
+        }
+        if (markups.adminMarkupMailingPerYear !== undefined) {
+          finalUpdateData.adminMarkupMailingPerYear =
+            markups.adminMarkupMailingPerYear;
+          finalUpdateData.finalMailingPricePerYear =
+            (space.partnerMailingPricePerYear || 0) +
+            markups.adminMarkupMailingPerYear;
+        }
+        if (markups.adminMarkupBrPerYear !== undefined) {
+          finalUpdateData.adminMarkupBrPerYear = markups.adminMarkupBrPerYear;
+          finalUpdateData.finalBrPricePerYear =
+            (space.partnerBrPricePerYear || 0) + markups.adminMarkupBrPerYear;
+        }
+      } else if (spaceType === "coworking") {
+        activeModel = CoworkingSpaceModel;
+        const space = await activeModel.findById(spaceId);
+        if (!space)
+          return { success: false, message: "Coworking Space not found" };
+
+        if (markups.adminMarkupPerMonth !== undefined) {
+          finalUpdateData.adminMarkupPerMonth = markups.adminMarkupPerMonth;
+          finalUpdateData.finalPricePerMonth =
+            (space.partnerPricePerMonth || 0) + markups.adminMarkupPerMonth;
+        }
+      } else if (spaceType === "meeting_room") {
+        activeModel = MeetingRoomModel;
+        const space = await activeModel.findById(spaceId);
+        if (!space)
+          return { success: false, message: "Meeting Room not found" };
+
+        if (markups.adminMarkupPerHour !== undefined) {
+          finalUpdateData.adminMarkupPerHour = markups.adminMarkupPerHour;
+          finalUpdateData.finalPricePerHour =
+            (space.partnerPricePerHour || 0) + markups.adminMarkupPerHour;
+        }
+        if (markups.adminMarkupPerDay !== undefined) {
+          finalUpdateData.adminMarkupPerDay = markups.adminMarkupPerDay;
+          finalUpdateData.finalPricePerDay =
+            (space.partnerPricePerDay || 0) + markups.adminMarkupPerDay;
+        }
+      } else {
+        return { success: false, message: "Invalid space type" };
+      }
+
+      const updatedSpace = await activeModel.findByIdAndUpdate(
+        spaceId,
+        { $set: finalUpdateData },
+        { new: true },
+      );
+
+      return {
+        success: true,
+        message: "Space approved and activated successfully",
+        data: updatedSpace,
+      };
+    } catch (error: any) {
+      console.error("Space approval error:", error);
+      return {
+        success: false,
+        message: "Failed to approve space",
         error: error.message,
       };
     }

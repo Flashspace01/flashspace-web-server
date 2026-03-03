@@ -1,0 +1,117 @@
+﻿
+> flashspace-server@1.0.0 dev
+> nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): 'src\**\*.ts'[39m
+[33m[nodemon] watching extensions: ts,json[39m
+[32m[nodemon] starting `ts-node src/app.ts`[39m
+[dotenv@17.3.1] injecting env (21) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+node.exe : Setting 
+"Mixed" for property "S
+paceSnapshot.coordinate
+s"
+At C:\Program Files\nod
+ejs\npm.ps1:29 char:3
++   & $NODE_EXE 
+$NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Setting "Mixe   
+ d"...ot.coordinate    
+s":String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property "SpaceSnapshot
+.coordinates"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.attachments"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Admin Routes Loaded
+≡ƒôº Email service disabled - emails will be logged only
+Γ£à Google OAuth client initialized successfully
+CORS enabled for origin: http://localhost:5173 with credentials support
+Attempting to connect to MongoDB at: mongodb://localhost:27017/myapp
+(node:3912) [MONGOOSE] 
+Warning: Duplicate 
+schema index on 
+{"ticketNumber":1} 
+found. This is often 
+due to declaring an 
+index using both 
+"index: true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+(node:3912) [MONGOOSE] 
+Warning: Duplicate 
+schema index on 
+{"code":1} found. This 
+is often due to 
+declaring an index 
+using both "index: 
+true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+Connected to Database!
+Database connection established successfully.
+API server started at http://localhost:5000
+Socket.io Adapter connected to Redis at localhost:6379
+New client connected XK3lDUtQKf08gebmAAAG
+New client connected hjNxBy6k0y7n6BPNAAAH
+New client connected 1kdszYIpJGTqfvUTAAAI
+New client connected SMSvMb7V_6F9G755AAAJ
+New client connected l2jsiOeqlmb22Q4ZAAAK
+New client connected 3bZ98XAAQYOAHWfVAAAL
+[REQUEST] GET /api/health
+[REQUEST] GET /api/user/partner/spaces

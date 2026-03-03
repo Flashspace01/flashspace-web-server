@@ -1,33 +1,41 @@
-import jwt, { SignOptions } from 'jsonwebtoken';
-import { JwtPayload } from '../types/auth.types';
+import jwt, { SignOptions } from "jsonwebtoken";
+import { JwtPayload } from "../types/auth.types";
 
 export class JwtUtil {
   private static readonly ACCESS_TOKEN_SECRET = (() => {
     const secret = process.env.JWT_ACCESS_SECRET;
     if (!secret) {
-      throw new Error('JWT_ACCESS_SECRET environment variable is required but not set');
+      throw new Error(
+        "JWT_ACCESS_SECRET environment variable is required but not set",
+      );
     }
     return secret;
   })();
-  
+
   private static readonly REFRESH_TOKEN_SECRET = (() => {
     const secret = process.env.JWT_REFRESH_SECRET;
     if (!secret) {
-      throw new Error('JWT_REFRESH_SECRET environment variable is required but not set');
+      throw new Error(
+        "JWT_REFRESH_SECRET environment variable is required but not set",
+      );
     }
     return secret;
   })();
-  
-  private static readonly ACCESS_TOKEN_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
-  private static readonly REFRESH_TOKEN_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
-  static generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  private static readonly ACCESS_TOKEN_EXPIRY =
+    process.env.JWT_ACCESS_EXPIRY || "15m";
+  private static readonly REFRESH_TOKEN_EXPIRY =
+    process.env.JWT_REFRESH_EXPIRY || "7d";
+
+  static generateAccessToken(payload: Omit<JwtPayload, "iat" | "exp">): string {
     return jwt.sign(payload, this.ACCESS_TOKEN_SECRET, {
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
     } as SignOptions);
   }
 
-  static generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+  static generateRefreshToken(
+    payload: Omit<JwtPayload, "iat" | "exp">,
+  ): string {
     return jwt.sign(payload, this.REFRESH_TOKEN_SECRET, {
       expiresIn: this.REFRESH_TOKEN_EXPIRY,
     } as SignOptions);
@@ -37,7 +45,7 @@ export class JwtUtil {
     try {
       return jwt.verify(token, this.ACCESS_TOKEN_SECRET) as JwtPayload;
     } catch (error) {
-      throw new Error('Invalid access token');
+      throw new Error("Invalid access token");
     }
   }
 
@@ -45,11 +53,11 @@ export class JwtUtil {
     try {
       return jwt.verify(token, this.REFRESH_TOKEN_SECRET) as JwtPayload;
     } catch (error) {
-      throw new Error('Invalid refresh token');
+      throw new Error("Invalid refresh token");
     }
   }
 
-  static generateTokenPair(payload: Omit<JwtPayload, 'iat' | 'exp'>) {
+  static generateTokenPair(payload: Omit<JwtPayload, "iat" | "exp">) {
     return {
       accessToken: this.generateAccessToken(payload),
       refreshToken: this.generateRefreshToken(payload),
