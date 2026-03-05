@@ -8,7 +8,7 @@ import {
 import { UserModel } from "../../authModule/models/user.model";
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
-import { NotificationType } from "../../notificationModule/models/Notification";
+import { NotificationType, NotificationRecipientType } from "../../notificationModule/models/Notification";
 import { BookingModel } from "../../bookingModule/booking.model";
 
 export interface CreateTicketDTO {
@@ -78,6 +78,28 @@ export class TicketService {
       NotificationType.INFO,
       { ticketId: ticket._id },
     );
+
+    // Notify Partner if this ticket is linked to one of their bookings
+    if (data.bookingId) {
+      try {
+        const booking = await BookingModel.findById(data.bookingId)
+          .select("partner")
+          .lean();
+        const partnerId = (booking as any)?.partner?.toString();
+        if (partnerId) {
+          NotificationService.send({
+            recipient: partnerId,
+            recipientType: NotificationRecipientType.PARTNER,
+            type: NotificationType.INFO,
+            title: `New Client Query: ${ticketNumber}`,
+            message: `A client raised a query: "${data.subject}"`,
+            metadata: { ticketId: ticket._id },
+          });
+        }
+      } catch (err) {
+        console.warn("[TicketService] Could not notify partner for new ticket:", err);
+      }
+    }
 
     return populatedTicket;
   }
@@ -166,7 +188,7 @@ export class TicketService {
 
     await ticket.save();
 
-    // Notify Admins if user relied
+    // Notify Admins if user replied
     if (data.sender === "user") {
       NotificationService.notifyAdmin(
         `New Reply on Ticket: ${ticket.ticketNumber}`,
@@ -174,6 +196,28 @@ export class TicketService {
         NotificationType.TICKET_UPDATE,
         { ticketId: ticket._id },
       );
+
+      // Also notify the partner if this ticket is linked to their booking
+      if (ticket.bookingId) {
+        try {
+          const booking = await BookingModel.findById(ticket.bookingId)
+            .select("partner")
+            .lean();
+          const partnerId = (booking as any)?.partner?.toString();
+          if (partnerId) {
+            NotificationService.send({
+              recipient: partnerId,
+              recipientType: NotificationRecipientType.PARTNER,
+              type: NotificationType.TICKET_UPDATE,
+              title: `Client Reply on Query: ${ticket.ticketNumber}`,
+              message: `Client replied: ${data.message.substring(0, 60)}...`,
+              metadata: { ticketId: ticket._id },
+            });
+          }
+        } catch (err) {
+          console.warn("[TicketService] Could not notify partner for user reply:", err);
+        }
+      }
     }
 
     // Return populated ticket
@@ -343,6 +387,28 @@ export class TicketService {
       NotificationType.TICKET_UPDATE,
       { ticketId: ticket._id },
     );
+
+    // Notify Partner if this ticket belongs to their booking
+    if (ticket.bookingId) {
+      try {
+        const booking = await BookingModel.findById(ticket.bookingId)
+          .select("partner")
+          .lean();
+        const partnerId = (booking as any)?.partner?.toString();
+        if (partnerId) {
+          NotificationService.send({
+            recipient: partnerId,
+            recipientType: NotificationRecipientType.PARTNER,
+            type: NotificationType.TICKET_UPDATE,
+            title: `Admin replied on Query: ${ticket.ticketNumber}`,
+            message: `Admin replied: ${message.substring(0, 60)}...`,
+            metadata: { ticketId: ticket._id },
+          });
+        }
+      } catch (err) {
+        console.warn("[TicketService] Could not notify partner for admin reply:", err);
+      }
+    }
 
     // Return populated ticket
     return await TicketModel.findById(ticket._id)
