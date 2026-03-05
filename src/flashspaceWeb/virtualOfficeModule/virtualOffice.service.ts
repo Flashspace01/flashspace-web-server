@@ -73,6 +73,11 @@ export class VirtualOfficeService {
 
     // Handle queries on property fields (like city)
     if (filter.city || filter.name || filter.area) {
+      const legacyFieldFilter: any = {};
+      if (filter.city) legacyFieldFilter.city = filter.city;
+      if (filter.name) legacyFieldFilter.name = filter.name;
+      if (filter.area) legacyFieldFilter.area = filter.area;
+
       const propertyQuery: any = {};
       if (filter.city) propertyQuery.city = filter.city;
       if (filter.name) propertyQuery.name = filter.name;
@@ -86,7 +91,14 @@ export class VirtualOfficeService {
       delete filter.name;
       delete filter.area;
 
-      filter.property = { $in: propertyIds };
+      if (propertyIds.length > 0) {
+        filter.$or = [
+          { property: { $in: propertyIds } },
+          legacyFieldFilter,
+        ];
+      } else {
+        Object.assign(filter, legacyFieldFilter);
+      }
     }
 
     const offices = await VirtualOfficeModel.find(filter)
