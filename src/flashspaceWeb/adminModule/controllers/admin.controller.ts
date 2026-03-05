@@ -32,7 +32,13 @@ export class AdminController {
     const deleted = String(req.query.deleted) === "true";
     const role = req.query.role as string;
 
-    const result = await adminService.getUsers(page, limit, search, deleted, role);
+    const result = await adminService.getUsers(
+      page,
+      limit,
+      search,
+      deleted,
+      role,
+    );
     if (result.success) {
       res.status(200).json(result);
     } else {
@@ -84,7 +90,13 @@ export class AdminController {
     const search = req.query.search as string;
     const status = req.query.status as string;
 
-    const result = await adminService.getClients(req.user, page, limit, search, status);
+    const result = await adminService.getClients(
+      req.user,
+      page,
+      limit,
+      search,
+      status,
+    );
     if (result.success) {
       res.status(200).json(result);
     } else {
@@ -117,10 +129,14 @@ export class AdminController {
   // GET /api/admin/kyc/:id
   static async getKYCDetails(req: Request, res: Response) {
     const id = req.params.id as string;
+    console.log(`[AdminController] getKYCDetails called with ID: ${id}`);
     const result = await adminService.getKYCDetails(id);
     if (result.success) {
       res.status(200).json(result);
     } else {
+      console.log(
+        `[AdminController] getKYCDetails failed for ID ${id}: ${result.message}`,
+      );
       const statusCode =
         result.message === "KYC document not found" ? 404 : 500;
       res.status(statusCode).json(result);
@@ -311,6 +327,48 @@ export class AdminController {
     } else {
       const statusCode =
         result.message === "Business info not found" ? 404 : 500;
+      res.status(statusCode).json(result);
+    }
+  }
+
+  // GET /api/admin/invoices
+  static async getInvoices(req: Request, res: Response) {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const { type, search, startDate, endDate, status } = req.query;
+
+    const result = await adminService.getAllInvoices(req.user, page, limit, {
+      type: type as string,
+      search: search as string,
+      startDate: startDate as string,
+      endDate: endDate as string,
+      status: status as string,
+    });
+  }
+
+  // --- B2B2C Space Onboarding ---
+
+  // GET /api/admin/spaces/pending
+  static async getPendingSpaces(req: Request, res: Response) {
+    const result = await adminService.getPendingSpaces();
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
+  // PUT /api/admin/spaces/:spaceType/:id/approve
+  static async approveSpace(req: Request, res: Response) {
+    const spaceType = req.params.spaceType as string;
+    const id = req.params.id as string;
+    const adminMarkups = req.body;
+
+    const result = await adminService.approveSpace(spaceType, id, adminMarkups);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      const statusCode = result.message.includes("not found") ? 404 : 400;
       res.status(statusCode).json(result);
     }
   }

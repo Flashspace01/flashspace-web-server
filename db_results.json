@@ -1,0 +1,99 @@
+[
+  {
+    "dbName": "admin-panel",
+    "usersCount": 1,
+    "latestUsers": [
+      {
+        "email": "dhruvgoel@gmail.com",
+        "hasPassword": true,
+        "role": "user"
+      }
+    ]
+  },
+  {
+    "dbName": "markify",
+    "usersCount": 3,
+    "latestUsers": [
+      {
+        "email": "dhruvgoel335@gmail.com",
+        "hasPassword": false
+      },
+      {
+        "email": "dhruvgoel165@gmail.com",
+        "hasPassword": false
+      },
+      {
+        "email": "rahul@gmail.com",
+        "hasPassword": true
+      }
+    ]
+  },
+  {
+    "dbName": "myapp",
+    "usersCount": 7,
+    "latestUsers": [
+      {
+        "email": "partner_test@flashspace.com",
+        "isEmailVerified": true,
+        "hasPassword": true,
+        "role": "partner",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "partner@flashspace.co",
+        "isEmailVerified": true,
+        "hasPassword": false,
+        "role": "partner",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "affiliate@flashspace.co",
+        "isEmailVerified": true,
+        "hasPassword": true,
+        "role": "affiliate",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "spaceportal.admin@flashspace.ai",
+        "isEmailVerified": true,
+        "hasPassword": false,
+        "role": "admin",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "partner@flashspace.com",
+        "isEmailVerified": true,
+        "hasPassword": true,
+        "role": "partner",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "test@example.com",
+        "isEmailVerified": true,
+        "hasPassword": true,
+        "role": "admin",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      },
+      {
+        "email": "admin@flashspace.co",
+        "isEmailVerified": true,
+        "hasPassword": true,
+        "role": "partner",
+        "authProvider": "local",
+        "isDeleted": false,
+        "isActive": true
+      }
+    ]
+  }
+]

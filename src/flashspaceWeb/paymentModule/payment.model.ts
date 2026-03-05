@@ -1,5 +1,13 @@
-import { prop, getModelForClass, modelOptions, index, Ref } from "@typegoose/typegoose";
+import {
+  prop,
+  getModelForClass,
+  modelOptions,
+  index,
+  Ref,
+} from "@typegoose/typegoose";
 import { Types } from "mongoose";
+import { User } from "../authModule/models/user.model";
+import { SeatBooking } from "../seatingModule/seating.model";
 
 export enum PaymentStatus {
   PENDING = "pending",
@@ -7,26 +15,27 @@ export enum PaymentStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   REFUNDED = "refunded",
-  CANCELLED = "cancelled"
+  CANCELLED = "cancelled",
 }
 export enum PaymentType {
   VIRTUAL_OFFICE = "virtual_office",
   COWORKING_SPACE = "coworking_space",
-  MEETING_ROOM = "meeting_room"
+  MEETING_ROOM = "meeting_room",
+  SEAT_BOOKING = "seat_booking",
 }
 
 @modelOptions({
   schemaOptions: {
-    timestamps: true
-  }
+    timestamps: true,
+  },
 })
 @index({ razorpayPaymentId: 1 })
 @index({ userId: 1 })
 @index({ status: 1 })
 @index({ createdAt: -1 })
 export class Payment {
-  @prop({ required: true })
-  public userId!: Types.ObjectId;
+  @prop({ ref: () => User, required: true })
+  public user!: Ref<User>;
 
   @prop({ required: true })
   public userEmail!: string;
@@ -54,15 +63,26 @@ export class Payment {
   @prop({ required: true, default: "INR" })
   public currency!: string;
 
-  @prop({ required: true, enum: PaymentStatus, default: PaymentStatus.PENDING })
+  @prop({
+    type: () => String,
+    required: true,
+    enum: PaymentStatus,
+    default: PaymentStatus.PENDING,
+  })
   public status!: PaymentStatus;
 
   // Booking Details
-  @prop({ required: true, enum: PaymentType })
+  @prop({ type: () => String, required: true, enum: PaymentType })
   public paymentType!: PaymentType;
 
   @prop({ required: true })
-  public spaceId!: Types.ObjectId;
+  public spaceModel!: string;
+
+  @prop({
+    required: true,
+    refPath: "spaceModel",
+  })
+  public space!: Types.ObjectId;
 
   @prop({ required: true })
   public spaceName!: string;
@@ -101,6 +121,12 @@ export class Payment {
 
   @prop()
   public notes?: string;
+
+  @prop({ ref: () => SeatBooking })
+  public seatBooking?: Ref<SeatBooking>;
+
+  @prop({ default: 0 })
+  public creditsUsed?: number;
 
   @prop()
   public errorMessage?: string;

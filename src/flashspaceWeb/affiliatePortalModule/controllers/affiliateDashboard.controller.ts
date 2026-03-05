@@ -1,7 +1,10 @@
 import { Request, Response } from "express";
 import { AffiliateLeadModel, LeadStatus } from "../models/affiliateLead.model";
-import { AffiliatePayoutModel, PayoutStatus } from "../models/affiliatePayout.model";
-import { BookingModel } from "../../userDashboardModule/models/booking.model";
+import {
+  AffiliatePayoutModel,
+  PayoutStatus,
+} from "../models/affiliatePayout.model";
+import { BookingModel } from "../../bookingModule/booking.model";
 import mongoose from "mongoose";
 
 const COMMISSION_RATE = 0.15;
@@ -15,8 +18,20 @@ const monthsAgo = (n: number): Date => {
   return d;
 };
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
@@ -31,28 +46,37 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const allBookings = await BookingModel.find({
       affiliateId: affObjectId,
       isDeleted: false,
-      status: { $in: ["pending_kyc", "pending_documents", "active", "completed"] },
-    }).select("plan.price createdAt status").lean();
+      status: {
+        $in: ["pending_kyc", "pending_documents", "active", "completed"],
+      },
+    })
+      .select("plan.price createdAt status")
+      .lean();
 
     const totalClients = allBookings.length;
     const totalEarnings = allBookings.reduce(
-      (sum, b) => sum + ((b.plan?.price || 0) * COMMISSION_RATE),
-      0
+      (sum, b) => sum + (b.plan?.price || 0) * COMMISSION_RATE,
+      0,
     );
 
     // ── 2. Pending payout from AffiliatePayout collection ────────────────────
     const pendingPayouts = await AffiliatePayoutModel.find({
       affiliateId: affObjectId,
       status: PayoutStatus.PENDING,
-    }).select("amount").lean();
+    })
+      .select("amount")
+      .lean();
 
-    const pendingPayout = pendingPayouts.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const pendingPayout = pendingPayouts.reduce(
+      (sum, p) => sum + (p.amount || 0),
+      0,
+    );
 
     // ── 3. Monthly earnings — last 6 months ───────────────────────────────────
     const sixMonthsAgo = monthsAgo(5); // inclusive: 6 months total
 
     const monthlyBookings = allBookings.filter(
-      (b) => new Date(b.createdAt as Date) >= sixMonthsAgo
+      (b) => new Date(b.createdAt as Date) >= sixMonthsAgo,
     );
 
     // Build a map keyed by "YYYY-MM"
@@ -88,7 +112,9 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     // ── 4. Lead status breakdown ──────────────────────────────────────────────
     const leads = await AffiliateLeadModel.find({
       affiliateId: affObjectId,
-    }).select("status").lean();
+    })
+      .select("status")
+      .lean();
 
     const leadsByStatus = {
       Hot: 0,
@@ -114,7 +140,10 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     let momGrowth = 0;
     if (prevMonthEarnings > 0) {
       momGrowth = parseFloat(
-        (((currentMonthEarnings - prevMonthEarnings) / prevMonthEarnings) * 100).toFixed(1)
+        (
+          ((currentMonthEarnings - prevMonthEarnings) / prevMonthEarnings) *
+          100
+        ).toFixed(1),
       );
     }
 
@@ -123,7 +152,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       convertedClients: totalClients,
       pendingPayout: parseFloat(pendingPayout.toFixed(2)),
       totalLeads: leads.length,
-      commissionRate: COMMISSION_RATE * 100,   // → 15
+      commissionRate: COMMISSION_RATE * 100, // → 15
       monthlyEarnings,
       leadsByStatus,
       momGrowth,
@@ -144,7 +173,9 @@ export const getAIInsights = async (req: Request, res: Response) => {
     const affObjectId = new mongoose.Types.ObjectId(affiliateId);
 
     // Count leads for recommendation
-    const totalLeads = await AffiliateLeadModel.countDocuments({ affiliateId: affObjectId });
+    const totalLeads = await AffiliateLeadModel.countDocuments({
+      affiliateId: affObjectId,
+    });
     const hotLeads = await AffiliateLeadModel.countDocuments({
       affiliateId: affObjectId,
       status: LeadStatus.HOT,

@@ -1,56 +1,29 @@
-import { prop, getModelForClass } from "@typegoose/typegoose";
+import {
+  getModelForClass,
+  prop,
+  modelOptions,
+  Severity,
+} from "@typegoose/typegoose";
 
-
-
+@modelOptions({
+  schemaOptions: { timestamps: true },
+  options: { allowMixed: Severity.ALLOW },
+})
 export class Feedback {
+  @prop({ required: true })
+  public company!: string;
 
   @prop({ required: true })
+  public rating!: number;
 
-  company!: string;
-
-
-
-  @prop({ required: true, min: 1, max: 5 })
-
-  rating!: number;
-
-
-
-  // ⭐ NPS score (0–10) → optional
-
-  @prop({ min: 0, max: 10 })
-
-  npsScore?: number;
-
-
+  @prop()
+  public npsScore?: number;
 
   @prop({ required: true })
-
-  location!: string;
-
-
+  public location!: string;
 
   @prop({ required: true })
-
-  review!: string;
-
-
-
-  @prop({ default: Date.now })
-
-  createdAt!: Date;
-
+  public review!: string;
 }
 
-
-
-export const FeedbackModel = getModelForClass(Feedback, {
-
-  schemaOptions: {
-
-    timestamps: true,
-
-  },
-
-});
-
+export const FeedbackModel = getModelForClass(Feedback);

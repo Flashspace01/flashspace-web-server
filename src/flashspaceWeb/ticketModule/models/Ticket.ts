@@ -8,7 +8,7 @@ import {
 import { TimeStamps } from "@typegoose/typegoose/lib/defaultClasses";
 import { Types } from "mongoose";
 import { User } from "../../authModule/models/user.model";
-import { Booking } from "../../userDashboardModule/models/booking.model";
+import { Booking } from "../../bookingModule/booking.model";
 
 export enum TicketStatus {
   OPEN = "open",

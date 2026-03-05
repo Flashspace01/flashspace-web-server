@@ -7,75 +7,46 @@ import {
   Severity,
 } from "@typegoose/typegoose";
 import { User } from "../authModule/models/user.model";
-import { GeoLocation } from "../shared/geolocation.schema";
+import { Property } from "../propertyModule/property.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { OperatingHours } from "../shared/schemas/operatingHours.schema";
 
-export enum InventoryType {
-  PRIVATE_CABIN = "PRIVATE_CABIN",
-  OPEN_DESK = "OPEN_DESK",
-  OTHER = "OTHER",
+export class Seat {
+  @prop({ required: true })
+  public seatNumber!: string;
+
+  @prop({ default: true })
+  public isActive!: boolean;
 }
 
-class InventoryItem {
-  @prop({ required: true, enum: InventoryType })
-  public type!: InventoryType;
+export class Table {
+  @prop({ required: true })
+  public tableNumber!: string;
 
-  // Required only if type is "OTHER"
-  @prop({ required: false, trim: true })
-  public customName?: string;
-
-  @prop({ required: true, default: 0 })
-  public totalUnits!: number;
-
-  // --- Long-Term Pricing ---
-  @prop({ required: false, default: 0 })
-  public pricePerMonth?: number;
-
-  @prop({ required: false, default: 0 })
-  public pricePerYear?: number;
-
-  // --- Short-Term "Day Pass" Pricing ---
-  @prop({ required: false })
-  public pricePerDay?: number;
-
-  @prop({ required: false })
-  public pricePerHour?: number;
+  @prop({ type: () => [Seat] })
+  public seats!: Seat[];
 }
 
-class OperatingHours {
-  @prop({ required: true, trim: true })
-  public openTime!: string; // e.g., "09:00"
+export class Floor {
+  @prop({ required: true })
+  public floorNumber!: number;
 
-  @prop({ required: true, trim: true })
-  public closeTime!: string; // e.g., "18:00"
+  @prop()
+  public name?: string;
 
-  @prop({ type: () => [String], required: true })
-  public daysOpen!: string[]; // e.g., ["Monday", "Tuesday", "Wednesday"]
+  @prop({ type: () => [Table] })
+  public tables!: Table[];
 }
 
 @modelOptions({
   schemaOptions: { timestamps: true },
   options: { allowMixed: Severity.ALLOW },
 })
-@index({ city: 1, area: 1 })
-@index({ "inventory.type": 1 })
 @index({ popular: 1 })
 @index({ avgRating: -1 })
-@index({ location: "2dsphere" })
 export class CoworkingSpace {
-  @prop({ required: true, trim: true })
-  public name!: string;
-
-  @prop({ required: true })
-  public address!: string;
-
-  @prop({ required: true, index: true })
-  public city!: string;
-
-  @prop({ required: true, index: true })
-  public area!: string;
-
-  @prop({ type: () => GeoLocation, _id: false })
-  public location?: GeoLocation;
+  @prop({ ref: () => Property, required: true })
+  public property!: Ref<Property>;
 
   @prop({ required: true })
   public capacity!: number;
@@ -86,16 +57,28 @@ export class CoworkingSpace {
   @prop({ default: false })
   public popular!: boolean;
 
-  // The restructured inventory
-  @prop({ type: () => [InventoryItem], _id: false })
-  public inventory!: InventoryItem[];
+  @prop({
+    type: () => String,
+    enum: SpaceApprovalStatus,
+    default: SpaceApprovalStatus.DRAFT,
+  })
+  public approvalStatus!: SpaceApprovalStatus;
 
-  // Added Operating Hours for Day Pass logic
-  @prop({ type: () => OperatingHours, _id: false })
-  public operatingHours?: OperatingHours;
+  // --- Long-Term Pricing (Monthly Desk) ---
+  @prop({ required: true })
+  public partnerPricePerMonth!: number;
 
-  @prop({ type: () => [String] })
-  public amenities!: string[];
+  @prop({ required: false, default: 0 })
+  public adminMarkupPerMonth!: number;
+
+  @prop({ required: false, default: 0 })
+  public finalPricePerMonth!: number;
+
+  @prop({ type: () => [Floor] })
+  public floors!: Floor[];
+
+  @prop({ type: () => OperatingHours, _id: false, required: true })
+  public operatingHours!: OperatingHours;
 
   @prop({ default: 0 })
   public avgRating!: number;
@@ -103,10 +86,13 @@ export class CoworkingSpace {
   @prop({ default: 0 })
   public totalReviews!: number;
 
-  @prop({ type: () => [String], required: true })
-  public images!: string[];
+  @prop({ type: () => [String], default: [] })
+  public amenities?: string[];
 
-  @prop({ default: true })
+  @prop({ type: () => [String], default: [] })
+  public images?: string[];
+
+  @prop({ default: false })
   public isActive!: boolean;
 
   @prop({ default: false })

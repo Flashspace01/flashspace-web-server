@@ -14,14 +14,25 @@ export class AuthMiddleware {
     next: NextFunction,
   ): Promise<void> {
     try {
+      console.log("[AuthMiddleware.authenticate] Incoming request:", {
+        path: req.path,
+        method: req.method,
+      });
+
       // Extract token from cookies (primary method)
       let token = req.cookies?.accessToken;
+
+      if (token) {
+        console.log("[AuthMiddleware.authenticate] Found accessToken cookie, length:", token.length);
+      }
 
       // Fallback to Authorization header for backward compatibility (optional)
       if (!token) {
         const authHeader = req.headers.authorization;
+        console.log("[AuthMiddleware.authenticate] Authorization header:", authHeader || "<none>");
         if (authHeader && authHeader.startsWith("Bearer ")) {
           token = authHeader.substring(7);
+          console.log("[AuthMiddleware.authenticate] Using Bearer token, length:", token.length);
         }
       }
 
@@ -34,7 +45,9 @@ export class AuthMiddleware {
       }
 
       try {
+        console.log("[AuthMiddleware.authenticate] Verifying access token...");
         const decoded = JwtUtil.verifyAccessToken(token);
+        console.log("[AuthMiddleware.authenticate] Token decoded:", decoded);
 
         // Verify user still exists and is active
         const user = await AuthMiddleware.userRepository.findById(
@@ -58,6 +71,7 @@ export class AuthMiddleware {
 
         next();
       } catch (tokenError) {
+        console.error("[AuthMiddleware.authenticate] Token verification error:", (tokenError as any)?.message || tokenError);
         res.status(401).json({
           success: false,
           message: "Invalid or expired token",

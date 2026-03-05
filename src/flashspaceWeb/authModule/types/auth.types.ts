@@ -22,6 +22,7 @@ export interface AuthResponse {
     role: string;
     isEmailVerified: boolean;
     kycVerified: boolean;
+    credits?: number;
   };
   tokens?: {
     accessToken: string;
@@ -101,6 +102,7 @@ export interface AuthUser {
   email: string;
   role: string;
   fullName?: string;
+  credits?: number;
 }
 
 // Extend Express Request globally

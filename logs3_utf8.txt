@@ -1,0 +1,106 @@
+﻿[dotenv@17.3.1] injecting env (21) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+node.exe : Setting 
+"Mixed" for property "S
+paceSnapshot.coordinate
+s"
+At C:\Program Files\nod
+ejs\npx.ps1:29 char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Setting "Mixe   
+ d"...ot.coordinate    
+s":String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property "SpaceSnapshot
+.coordinates"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+DEBUG: userDashboard.controller.ts loaded
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.attachments"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Admin Routes Loaded
+TEST: app.ts is loaded and running latest code
+≡ƒôº Email service disabled - emails will be logged only
+Γ£à Google OAuth client initialized successfully
+CORS enabled for origin: http://localhost:5173 with credentials support
+Attempting to connect to MongoDB at: mongodb://localhost:27017/myapp
+(node:22920) 
+[MONGOOSE] Warning: 
+Duplicate schema index 
+on {"ticketNumber":1} 
+found. This is often 
+due to declaring an 
+index using both 
+"index: true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+(node:22920) 
+[MONGOOSE] Warning: 
+Duplicate schema index 
+on {"code":1} found. 
+This is often due to 
+declaring an index 
+using both "index: 
+true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+Connected to Database!
+Database connection established successfully.
+Failed to start HTTP 
+server: listen 
+EADDRINUSE: address 
+already in use 
+0.0.0.0:5000
+Socket.io Adapter connected to Redis at localhost:6379

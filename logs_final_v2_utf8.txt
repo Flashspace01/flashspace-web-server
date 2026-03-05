@@ -1,0 +1,106 @@
+﻿[dotenv@17.3.1] injecting env (21) from .env -- tip: ΓÜí∩╕Å secrets for agents: https://dotenvx.com/as2
+node.exe : Setting 
+"Mixed" for property "S
+paceSnapshot.coordinate
+s"
+At C:\Program Files\nod
+ejs\npx.ps1:29 char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Setting "Mixe   
+ d"...ot.coordinate    
+s":String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property "SpaceSnapshot
+.coordinates"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.messages"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Setting "Mixed" for 
+property 
+"Ticket.attachments"
+Look here for how to 
+disable this message: h
+ttps://typegoose.github
+.io/typegoose/docs/api/
+decorators/model-option
+s/#allowmixed
+Admin Routes Loaded
+≡ƒôº Email service disabled - emails will be logged only
+Γ£à Google OAuth client initialized successfully
+CORS enabled for origin: http://localhost:5173 with credentials support
+Attempting to connect to MongoDB at: mongodb://localhost:27017/myapp
+(node:2372) [MONGOOSE] 
+Warning: Duplicate 
+schema index on 
+{"ticketNumber":1} 
+found. This is often 
+due to declaring an 
+index using both 
+"index: true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+(Use `node 
+--trace-warnings ...` 
+to show where the 
+warning was created)
+(node:2372) [MONGOOSE] 
+Warning: Duplicate 
+schema index on 
+{"code":1} found. This 
+is often due to 
+declaring an index 
+using both "index: 
+true" and 
+"schema.index()". 
+Please remove the 
+duplicate index 
+definition.
+Connected to Database!
+Database connection established successfully.
+API server started at http://localhost:5000
+Socket.io Adapter connected to Redis at localhost:6379
+New client connected aK8UKDH12iBobHRsAAAB
+New client connected pngtsdNIFz13p_vLAAAD
+New client connected WIynBAAN-vXFNcebAAAG
+New client connected 93JIlKCpL8pBvyz8AAAH
+New client connected CTHu2h1h3pet97zNAAAK
+New client connected j-QoMPGvjyke_mzgAAAL

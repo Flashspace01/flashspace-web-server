@@ -9,6 +9,7 @@ import {
   updateCoworkingSpace,
   deleteCoworkingSpace,
   getPartnerSpaces,
+  seedDummy,
 } from "./coworkingSpace.controller";
 import multer from "multer";
 
@@ -22,6 +23,9 @@ coworkingSpaceRoutes.post(
   AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
   createCoworkingSpace,
 );
+
+// POST /api/coworkingSpace/seed-dummy
+coworkingSpaceRoutes.post("/seed-dummy", seedDummy);
 
 // GET /api/coworkingSpace/getAll
 coworkingSpaceRoutes.get("/getAll", getAllCoworkingSpaces);
