@@ -194,13 +194,14 @@ const runSeed = async () => {
     // Virtual Office Payment & Booking
     const voOrderMockId = `order_vo_${Date.now()}`;
     const voPayment = await PaymentModel.create({
-      userId: standardUser._id,
+      user: standardUser._id,
       userEmail: standardUser.email,
       userName: standardUser.fullName,
       razorpayOrderId: voOrderMockId,
       razorpayPaymentId: `pay_vo_${Date.now()}`,
       razorpaySignature: "mock_signature",
-      spaceId: virtualOffice._id,
+      space: virtualOffice._id,
+      spaceModel: "VirtualOffice",
       spaceName: property.name + " (Virtual Office)",
       planName: "Business Address",
       planKey: "business_address_12_months",
@@ -215,8 +216,8 @@ const runSeed = async () => {
     const voBooking = await BookingModel.create({
       bookingNumber: `FS-VO-${Date.now()}`,
       user: standardUser._id,
-      partnerId: partnerUser._id,
-      type: "virtual_office",
+      partner: partnerUser._id,
+      type: "VirtualOffice",
       status: "active",
       startDate: new Date(),
       endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
@@ -240,13 +241,14 @@ const runSeed = async () => {
     console.log("🔨 Seeding Coworking Bookings...");
     const cwOrderMockId = `order_cw_${Date.now()}`;
     const cwPayment = await PaymentModel.create({
-      userId: standardUser._id,
+      user: standardUser._id,
       userEmail: standardUser.email,
       userName: standardUser.fullName,
       razorpayOrderId: cwOrderMockId,
       razorpayPaymentId: `pay_cw_${Date.now()}`,
       razorpaySignature: "mock_signature",
-      spaceId: coworkingSpace._id,
+      space: coworkingSpace._id,
+      spaceModel: "CoworkingSpace",
       spaceName: property.name + " (Coworking)",
       planName: "Monthly Hot Desk",
       planKey: "monthly_hot_desk",
@@ -261,8 +263,8 @@ const runSeed = async () => {
     const cwBooking = await BookingModel.create({
       bookingNumber: `FS-CW-${Date.now()}`,
       user: standardUser._id,
-      partnerId: partnerUser._id,
-      type: "coworking_space",
+      partner: partnerUser._id,
+      type: "CoworkingSpace",
       status: "active",
       startDate: new Date(),
       endDate: new Date(new Date().setDate(new Date().getDate() + 30)),
@@ -284,7 +286,7 @@ const runSeed = async () => {
     await InvoiceModel.create({
       invoiceNumber: `INV-CW-${Date.now()}`,
       user: standardUser._id,
-      partnerId: partnerUser._id,
+      partner: partnerUser._id,
       bookingId: cwBooking._id,
       paymentId: cwPayment._id,
       description: "Coworking Space Booking Invoice",
@@ -296,13 +298,14 @@ const runSeed = async () => {
     console.log("🔨 Seeding Meeting Room Bookings...");
     const mrOrderMockId = `order_mr_${Date.now()}`;
     const mrPayment = await PaymentModel.create({
-      userId: standardUser._id,
+      user: standardUser._id,
       userEmail: standardUser.email,
       userName: standardUser.fullName,
       razorpayOrderId: mrOrderMockId,
       razorpayPaymentId: `pay_mr_${Date.now()}`,
       razorpaySignature: "mock_signature",
-      spaceId: meetingRoom._id,
+      space: meetingRoom._id,
+      spaceModel: "MeetingRoom",
       spaceName: property.name + " (Meeting Room)",
       planName: "Hourly Booking",
       planKey: "hourly_2_hours",
@@ -317,8 +320,8 @@ const runSeed = async () => {
     const mrBooking = await BookingModel.create({
       bookingNumber: `FS-MR-${Date.now()}`,
       user: standardUser._id,
-      partnerId: partnerUser._id,
-      type: "meeting_room",
+      partner: partnerUser._id,
+      type: "MeetingRoom",
       status: "active",
       startDate: new Date(),
       endDate: new Date(new Date().setHours(new Date().getHours() + 2)),
@@ -340,7 +343,7 @@ const runSeed = async () => {
     await InvoiceModel.create({
       invoiceNumber: `INV-MR-${Date.now()}`,
       user: standardUser._id,
-      partnerId: partnerUser._id,
+      partner: partnerUser._id,
       bookingId: mrBooking._id,
       paymentId: mrPayment._id,
       description: "Meeting Room Booking Invoice",

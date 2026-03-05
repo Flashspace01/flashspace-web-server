@@ -257,3 +257,17 @@ export const deleteVirtualOffice = async (req: Request, res: Response) => {
     sendError(res, 500, "Failed to delete virtual office", err);
   }
 };
+
+export const getAvailableCities = async (req: Request, res: Response) => {
+  try {
+    const cities = await VirtualOfficeService.getAvailableCities();
+    res.status(200).json({
+      success: true,
+      message: "Available cities retrieved successfully",
+      data: cities,
+    });
+  } catch (err) {
+    console.error("GetAvailableCities Error:", err);
+    sendError(res, 500, "Failed to retrieve available cities", err);
+  }
+};

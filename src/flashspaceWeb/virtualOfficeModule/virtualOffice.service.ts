@@ -1,4 +1,5 @@
 import { VirtualOfficeModel } from "./virtualOffice.model";
+import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { UserRole } from "../authModule/models/user.model";
 import { PropertyModel } from "../propertyModule/property.model";
 import { PropertyService } from "../propertyModule/property.service";
@@ -136,5 +137,32 @@ export class VirtualOfficeService {
 
     if (!office) throw new Error("Virtual office not found or unauthorized");
     return office;
+  }
+
+  static async getAvailableCities() {
+    // 1. Get all property IDs from active Virtual Offices
+    const voProperties = await VirtualOfficeModel.find({
+      isDeleted: false,
+      isActive: true,
+    }).distinct("property");
+
+    // 2. Get all property IDs from active Coworking Spaces
+    const cwProperties = await CoworkingSpaceModel.find({
+      isDeleted: false,
+      isActive: true,
+    }).distinct("property");
+
+    // 3. Combine and find unique property IDs
+    const allPropertyIds = [
+      ...new Set([...voProperties, ...cwProperties].map((id) => id.toString())),
+    ];
+
+    // 4. Find distinct cities from these properties
+    const cities = await PropertyModel.find({
+      _id: { $in: allPropertyIds },
+      isDeleted: false,
+    }).distinct("city");
+
+    return cities.sort();
   }
 }

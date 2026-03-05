@@ -6,7 +6,7 @@ import path from "path";
 const envPath = path.resolve(__dirname, "../.env");
 dotenv.config({ path: envPath });
 
-import express, { Application } from "express";
+import express, { Application, Request, Response, NextFunction } from "express";
 import http from "http"; // Import http module
 import cors from "cors";
 import helmet from "helmet";
@@ -23,7 +23,7 @@ const app: Application = express();
 const server = http.createServer(app); // Create HTTP server
 
 // Required behind reverse proxies (Render/Nginx) for secure cookies and protocol detection
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 // Initialize email service
 EmailUtil.initialize();
@@ -33,18 +33,6 @@ GoogleUtil.initialize();
 
 // Initialize Socket.IO
 initSocket(server);
-
-// CORS configuration with credentials support (MUST be FIRST)
-// Updated to fix wildcard CORS issue
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-  exposedHeaders: ["Set-Cookie"],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
 
 const allowedOrigins = [
   "https://flash-space-web-client.vercel.app",
@@ -61,27 +49,51 @@ const allowedOrigins = [
   "http://72.60.219.115",
 ];
 
-app.use(
-  cors({
-    ...corsOptions,
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) {
-        return callback(null, true);
-      }
+// Manual CORS/COOP and Preflight handling
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  const isAllowed = origin && allowedOrigins.includes(origin);
 
-      if (allowedOrigins.includes(origin)) {
-        callback(null, origin);
-      } else {
-        console.error("CORS blocked origin:", origin);
-        callback(new Error("CORS not allowed"), false);
-      }
-    },
-  }),
-);
-console.log(
-  `CORS enabled for origin: ${corsOptions.origin} with credentials support`,
-);
+  console.log(
+    `[CORS-DEBUG] Method: ${req.method}, Path: ${req.path}, Origin: ${origin}, Allowed: ${isAllowed}`,
+  );
+
+  if (isAllowed) {
+    res.setHeader("Access-Control-Allow-Origin", origin!);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  } else if (process.env.NODE_ENV === "development" || !process.env.NODE_ENV) {
+    // In dev, if origin is missing, still allow headers for testing
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      origin || "http://localhost:5173",
+    );
+    // NEVER USE '*' with credentials
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type,Authorization,Cookie,X-Requested-With",
+  );
+  res.setHeader("Access-Control-Expose-Headers", "Set-Cookie");
+
+  // Set COOP header for Google Auth
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    console.log(`[CORS-DEBUG] Responding to OPTIONS preflight for ${req.path}`);
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
+console.log(`CORS enabled for allowed origins with credentials support`);
 
 // Middleware
 app.use(express.json());
@@ -91,7 +103,7 @@ app.use(
   helmet({
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     xFrameOptions: false,
     contentSecurityPolicy: false,
   }),
@@ -130,3 +142,25 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Main API routes
 app.use("/api", mainRoutes);
+
+// Catch-all route for unknown API endpoints (must be after all other routes)
+app.use("/api", (req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.originalUrl} not found`,
+  });
+});
+
+// Global Error Handler
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error(`[ERROR] ${req.method} ${req.url}:`, err.message || err);
+
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+
+  res.status(status).json({
+    success: false,
+    message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+});

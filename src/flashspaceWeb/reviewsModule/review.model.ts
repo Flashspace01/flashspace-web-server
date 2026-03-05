@@ -103,16 +103,15 @@ export class Review {
       },
     ]);
 
-    const updateData =
-      stats.length > 0
-        ? {
-            totalReviews: stats[0].nRating,
-            avgRating: Math.round(stats[0].avgRating * 10) / 10,
-          }
-        : {
-            totalReviews: 0,
-            avgRating: 0,
-          };
+    const totalReviews = stats.length > 0 ? stats[0].nRating : 0;
+    const avgRating =
+      stats.length > 0 ? Math.round(stats[0].avgRating * 10) / 10 : 0;
+
+    const updateData = {
+      totalReviews,
+      avgRating,
+      popular: totalReviews >= 50 && avgRating > 4.5,
+    };
 
     // Fixed: Route update directly to the specific model
     switch (spaceModelName) {

@@ -9,12 +9,14 @@ import {
   updateVirtualOffice,
   deleteVirtualOffice,
   getPartnerVirtualOffices,
+  getAvailableCities,
 } from "./virtualOffice.controller";
 
 export const virtualOfficeRoutes = Router();
 
 // Public Routes
 virtualOfficeRoutes.get("/getAll", getAllVirtualOffices);
+virtualOfficeRoutes.get("/available-cities", getAvailableCities);
 virtualOfficeRoutes.get("/getByCity/:city", getVirtualOfficesByCity);
 virtualOfficeRoutes.get("/getById/:virtualOfficeId", getVirtualOfficeById);
 
