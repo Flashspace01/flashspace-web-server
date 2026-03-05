@@ -19,6 +19,7 @@ const meetingScheduler_routes_1 = require("./flashspaceWeb/meetingSchedulerModul
 const affiliate_routes_1 = require("./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes");
 const spacePartner_routes_1 = require("./flashspaceWeb/spacePartnerModule/routes/spacePartner.routes");
 const coupon_routes_1 = require("./flashspaceWeb/couponModule/coupon.routes");
+const chatRoutes_1 = __importDefault(require("./flashspaceWeb/chatModule/routes/chatRoutes"));
 const meetingRoom_routes_1 = require("./flashspaceWeb/meetingRoomModule/meetingRoom.routes");
 // Importing seat booking routes
 const seating_routes_1 = require("./flashspaceWeb/seatingModule/seating.routes");
@@ -84,4 +85,6 @@ const notification_routes_1 = require("./flashspaceWeb/notificationModule/routes
 exports.mainRoutes.use("/notifications", notification_routes_1.notificationRoutes);
 // /api/visit
 const visit_routes_1 = __importDefault(require("./flashspaceWeb/visitModule/routes/visit.routes"));
-exports.mainRoutes.use("/visit", visit_routes_1.default);
+exports.mainRoutes.use('/visit', visit_routes_1.default);
+// /api/chat
+exports.mainRoutes.use('/chat', chatRoutes_1.default);

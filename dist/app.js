@@ -22,6 +22,8 @@ const socket_1 = require("./socket"); // Import socket init
 const PORT = process.env.PORT || 5000;
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app); // Create HTTP server
+// Required behind reverse proxies (Render/Nginx) for secure cookies and protocol detection
+app.set('trust proxy', 1);
 // Initialize email service
 email_util_1.EmailUtil.initialize();
 // Initialize Google OAuth

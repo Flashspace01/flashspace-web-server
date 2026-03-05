@@ -74,6 +74,11 @@ async function addCoordinates() {
     await mongoose.connect(dbUri, dbName ? { dbName } : undefined);
     console.log("Connected to database successfully!\n");
 
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error("MongoDB database handle is undefined after connection.");
+    }
+
     let updatedCount = 0;
     let skippedCount = 0;
     let rawUpdatedCount = 0;
@@ -182,9 +187,9 @@ async function addCoordinates() {
     // Raw fallback for legacy records (fields not present in current schema)
     console.log("\nRunning legacy raw collection coordinate backfill...");
 
-    const propertiesCollection = mongoose.connection.db.collection("properties");
-    const coworkingCollection = mongoose.connection.db.collection("coworkingspaces");
-    const virtualOfficeCollection = mongoose.connection.db.collection("virtualoffices");
+    const propertiesCollection = db.collection("properties");
+    const coworkingCollection = db.collection("coworkingspaces");
+    const virtualOfficeCollection = db.collection("virtualoffices");
 
     const properties = await propertiesCollection.find({}).toArray();
     const propertyById = new Map<string, any>();
