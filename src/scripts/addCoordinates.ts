@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import path from "path";
 import { CoworkingSpaceModel } from "../flashspaceWeb/coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../flashspaceWeb/virtualOfficeModule/virtualOffice.model";
+import { PropertyModel } from "../flashspaceWeb/propertyModule/property.model";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 // Accurate coordinates for each location based on Google Maps
 // Format: Search the exact address on Google Maps, right-click on location, copy coordinates
@@ -49,15 +51,82 @@ const coordinatesMap: Record<string, { lat: number; lng: number }> = {
   // Jammu
   "Qubicle Coworking": { lat: 32.7156, lng: 74.8578 }, // Trikuta Nagar
   "Kaytech Solutions": { lat: 32.6899, lng: 74.8378 }, // Civil Airport, Satwari
+
+  // Additional seeded names
+  "Baner Tech Park": { lat: 18.559, lng: 73.7868 },
+  "Cyber City Hub": { lat: 28.494, lng: 77.0895 },
+  "Andheri Hub": { lat: 19.1136, lng: 72.8697 },
+  "Koramangala Workspace": { lat: 12.9352, lng: 77.6245 },
+  "Salt Lake Coworks": { lat: 22.5764, lng: 88.4333 },
+  "BKC Business Center": { lat: 19.0607, lng: 72.8656 },
+  "Hi-Tech City Address": { lat: 17.4506, lng: 78.3822 },
+  "Indiranagar Prestige": { lat: 12.9719, lng: 77.6412 },
+  "Premium Pune Address": { lat: 18.5204, lng: 73.8567 },
 };
 
 async function addCoordinates() {
   try {
     console.log("Connecting to database...");
-    await mongoose.connect(process.env.DB_URI as string);
+    const dbUri = process.env.DB_URI;
+    const dbName = process.env.DB_NAME;
+    if (!dbUri) throw new Error("DB_URI missing in .env");
+
+    await mongoose.connect(dbUri, dbName ? { dbName } : undefined);
     console.log("Connected to database successfully!\n");
 
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error("MongoDB database handle is undefined after connection.");
+    }
+
     let updatedCount = 0;
+    let skippedCount = 0;
+    let rawUpdatedCount = 0;
+    let propertyLocationUpdatedCount = 0;
+
+    const isValidCoordinates = (coords: any) =>
+      coords &&
+      typeof coords.lat === "number" &&
+      typeof coords.lng === "number" &&
+      !Number.isNaN(coords.lat) &&
+      !Number.isNaN(coords.lng);
+
+    const getBestMatchCoordinates = (spaceDoc: any, propertyDoc?: any) => {
+      const candidateNames = [
+        propertyDoc?.name,
+        spaceDoc?.name,
+      ].filter(Boolean) as string[];
+
+      for (const name of candidateNames) {
+        if (coordinatesMap[name]) return coordinatesMap[name];
+      }
+
+      return undefined;
+    };
+
+    const getCoordsFromGeoLocation = (location: any) => {
+      if (!Array.isArray(location?.coordinates) || location.coordinates.length !== 2) return undefined;
+      const [lng, lat] = location.coordinates;
+      if (typeof lat !== "number" || typeof lng !== "number") return undefined;
+      return { lat, lng };
+    };
+
+    const upsertPropertyLocation = async (propertyDoc: any, coords: { lat: number; lng: number }) => {
+      if (!propertyDoc?._id) return;
+      const hasValidLocation =
+        Array.isArray(propertyDoc.location?.coordinates) &&
+        propertyDoc.location.coordinates.length === 2;
+
+      if (!hasValidLocation) {
+        await PropertyModel.findByIdAndUpdate(propertyDoc._id, {
+          location: {
+            type: "Point",
+            coordinates: [coords.lng, coords.lat],
+          },
+        });
+        propertyLocationUpdatedCount++;
+      }
+    };
 
     // Update CoworkingSpaces
     console.log("Updating Coworking Spaces coordinates...");
@@ -66,19 +135,24 @@ async function addCoordinates() {
     );
 
     for (const space of coworkingSpaces) {
-      const coords = coordinatesMap[(space.property as any).name];
-      if (coords) {
-        await CoworkingSpaceModel.findByIdAndUpdate(space._id, {
-          coordinates: coords,
-        });
-        console.log(
-          `✓ Updated: ${(space.property as any).name} - ${(space.property as any).city}`,
-        );
+      const propertyDoc = (space as any).property;
+      const existingCoords = (space as any).coordinates;
+
+      if (isValidCoordinates(existingCoords)) {
+        await upsertPropertyLocation(propertyDoc, existingCoords);
+        skippedCount++;
+        continue;
+      }
+
+      const coords = getBestMatchCoordinates(space, propertyDoc);
+      if (coords && isValidCoordinates(coords)) {
+        await CoworkingSpaceModel.findByIdAndUpdate(space._id, { coordinates: coords });
+        await upsertPropertyLocation(propertyDoc, coords);
+
+        console.log(`✓ Updated: ${propertyDoc?.name || (space as any).name || space._id}`);
         updatedCount++;
       } else {
-        console.log(
-          `⚠ No coordinates found for: ${(space.property as any).name}`,
-        );
+        console.log(`⚠ No coordinates found for: ${propertyDoc?.name || (space as any).name || space._id}`);
       }
     }
 
@@ -89,24 +163,97 @@ async function addCoordinates() {
     );
 
     for (const office of virtualOffices) {
-      const coords = coordinatesMap[(office.property as any).name];
-      if (coords) {
-        await VirtualOfficeModel.findByIdAndUpdate(office._id, {
-          coordinates: coords,
-        });
-        console.log(
-          `✓ Updated: ${(office.property as any).name} - ${(office.property as any).city}`,
-        );
+      const propertyDoc = (office as any).property;
+      const existingCoords = (office as any).coordinates;
+
+      if (isValidCoordinates(existingCoords)) {
+        await upsertPropertyLocation(propertyDoc, existingCoords);
+        skippedCount++;
+        continue;
+      }
+
+      const coords = getBestMatchCoordinates(office, propertyDoc);
+      if (coords && isValidCoordinates(coords)) {
+        await VirtualOfficeModel.findByIdAndUpdate(office._id, { coordinates: coords });
+        await upsertPropertyLocation(propertyDoc, coords);
+
+        console.log(`✓ Updated: ${propertyDoc?.name || (office as any).name || office._id}`);
         updatedCount++;
       } else {
-        console.log(
-          `⚠ No coordinates found for: ${(office.property as any).name}`,
-        );
+        console.log(`⚠ No coordinates found for: ${propertyDoc?.name || (office as any).name || office._id}`);
       }
     }
 
+    // Raw fallback for legacy records (fields not present in current schema)
+    console.log("\nRunning legacy raw collection coordinate backfill...");
+
+    const propertiesCollection = db.collection("properties");
+    const coworkingCollection = db.collection("coworkingspaces");
+    const virtualOfficeCollection = db.collection("virtualoffices");
+
+    const properties = await propertiesCollection.find({}).toArray();
+    const propertyById = new Map<string, any>();
+    for (const property of properties) {
+      propertyById.set(String(property._id), property);
+    }
+
+    const processLegacyCollection = async (collection: any, label: string) => {
+      const docs = await collection.find({}).toArray();
+      for (const doc of docs) {
+        const existing =
+          doc.coordinates ||
+          getCoordsFromGeoLocation(doc.location) ||
+          getCoordsFromGeoLocation(propertyById.get(String(doc.property))?.location);
+
+        if (isValidCoordinates(existing)) {
+          skippedCount++;
+          continue;
+        }
+
+        const linkedProperty = propertyById.get(String(doc.property));
+        const candidateName = doc.name || linkedProperty?.name;
+        const coords = candidateName ? coordinatesMap[candidateName] : undefined;
+
+        if (coords && isValidCoordinates(coords)) {
+          await collection.updateOne(
+            { _id: doc._id },
+            {
+              $set: {
+                coordinates: coords,
+                location: { type: "Point", coordinates: [coords.lng, coords.lat] },
+              },
+            },
+          );
+
+          if (linkedProperty?._id) {
+            await propertiesCollection.updateOne(
+              { _id: linkedProperty._id },
+              {
+                $set: {
+                  location: {
+                    type: "Point",
+                    coordinates: [coords.lng, coords.lat],
+                  },
+                },
+              },
+            );
+            propertyLocationUpdatedCount++;
+          }
+
+          rawUpdatedCount++;
+          updatedCount++;
+          console.log(`✓ [${label}] Updated: ${candidateName || doc._id}`);
+        } else {
+          console.log(`⚠ [${label}] No coordinates found for: ${candidateName || doc._id}`);
+        }
+      }
+    };
+
+    await processLegacyCollection(coworkingCollection, "Coworking");
+    await processLegacyCollection(virtualOfficeCollection, "VirtualOffice");
+
     console.log(
-      `\n✅ Successfully updated ${updatedCount} records with coordinates!`,
+      `\n✅ Coordinates update complete. Updated: ${updatedCount} (legacy raw updates: ${rawUpdatedCount}), Already had coordinates: ${skippedCount}, Property locations synced: ${propertyLocationUpdatedCount}`,
     );
 
     process.exit(0);

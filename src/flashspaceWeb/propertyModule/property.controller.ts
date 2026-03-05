@@ -350,3 +350,39 @@ export const deletePropertyDocument = async (req: Request, res: Response) => {
     sendError(res, 500, "Failed to delete document", err);
   }
 };
+
+export const getAvailableCities = async (req: Request, res: Response) => {
+  try {
+    // 1. Get properties that have at least one active space
+    const [coworkingProps, virtualProps, meetingProps] = await Promise.all([
+      CoworkingSpaceModel.distinct("property", { isDeleted: false }),
+      VirtualOfficeModel.distinct("property", { isDeleted: false }),
+      MeetingRoomModel.distinct("property", { isDeleted: false }),
+    ]);
+
+    // 2. Combine and deduplicate property IDs
+    const activePropertyIds = [
+      ...new Set([
+        ...coworkingProps.map((id) => id.toString()),
+        ...virtualProps.map((id) => id.toString()),
+        ...meetingProps.map((id) => id.toString()),
+      ]),
+    ];
+
+    // 3. Query these properties for their cities
+    const cities = await PropertyModel.distinct("city", {
+      _id: { $in: activePropertyIds },
+    });
+
+    const filteredCities = cities.filter((city) => city && city.trim() !== "");
+
+    res.status(200).json({
+      success: true,
+      message: "Available cities retrieved successfully",
+      data: filteredCities,
+    });
+  } catch (err) {
+    console.error("GetAvailableCities Error:", err);
+    sendError(res, 500, "Failed to retrieve available cities", err);
+  }
+};

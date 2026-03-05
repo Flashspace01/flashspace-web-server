@@ -66,6 +66,16 @@ export const flattenProperty = (spaceDoc: any) => {
 
   if (docObj.property && typeof docObj.property === "object") {
     const { property, ...rest } = docObj;
+    const derivedCoordinates =
+      rest.coordinates ||
+      (Array.isArray(property.location?.coordinates) &&
+      property.location.coordinates.length === 2
+        ? {
+            lat: property.location.coordinates[1],
+            lng: property.location.coordinates[0],
+          }
+        : undefined);
+
     return {
       ...rest,
       name: property.name,
@@ -73,6 +83,7 @@ export const flattenProperty = (spaceDoc: any) => {
       city: property.city,
       area: property.area,
       location: property.location,
+      coordinates: derivedCoordinates,
       images: property.images,
       features: property.features,
       amenities: property.features, // Send as amenities for backwards compatibility if needed
