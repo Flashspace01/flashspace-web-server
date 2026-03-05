@@ -18,7 +18,8 @@ import {
   closeTicket,
   getPartnerTickets,
   addPartnerReply,
-  partnerCloseTicket
+  partnerCloseTicket,
+  createTicketForClient,
 } from '../controllers/ticket.controller';
 
 const router = Router();
@@ -148,6 +149,14 @@ router.post(
   AuthMiddleware.authenticate,
   requireSpacePartner,
   partnerCloseTicket
+);
+
+// Partner sends a message to a client (creates a ticket owned by the client)
+router.post(
+  '/partner/message-client',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  createTicketForClient
 );
 
 export { router as ticketRoutes };

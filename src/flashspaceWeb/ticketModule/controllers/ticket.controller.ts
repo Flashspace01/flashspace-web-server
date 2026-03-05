@@ -587,3 +587,59 @@ export const partnerCloseTicket = async (
     });
   }
 };
+
+/**
+ * Partner creates a message/ticket for a specific client.
+ * The ticket is owned by the client (appears in their My Tickets),
+ * with the partner's message as the first entry.
+ */
+export const createTicketForClient = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const partnerId = req.user?._id || req.user?.id;
+    if (!partnerId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Authentication required" });
+    }
+
+    const { clientUserId, bookingId, subject, message } = req.body;
+
+    if (!clientUserId || !bookingId || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "clientUserId, bookingId, subject and message are required",
+      });
+    }
+
+    if (message.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Message must be at least 5 characters",
+      });
+    }
+
+    const ticket = await TicketService.createTicketForClient(
+      partnerId,
+      clientUserId,
+      bookingId,
+      { subject, message },
+    );
+
+    // Emit real-time event to the client's room so their portal updates immediately
+    getIO().to(clientUserId).emit("partner_new_ticket", { ticket });
+
+    res.status(201).json({
+      success: true,
+      message: "Message sent to client successfully",
+      data: ticket,
+    });
+  } catch (error: any) {
+    console.error("Error creating ticket for client:", error);
+    res
+      .status(error.message.includes("access denied") ? 403 : 500)
+      .json({ success: false, message: error.message || "Failed to send message" });
+  }
+};
