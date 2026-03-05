@@ -239,6 +239,26 @@ async function createBookingAndInvoice(payment: any) {
           "GST Registration Support",
         ],
       });
+
+      // Notify partner that a new booking was made on their space
+      if (partnerId) {
+        try {
+          NotificationService.send({
+            recipient: partnerId.toString(),
+            recipientType: NotificationRecipientType.PARTNER,
+            type: NotificationType.SUCCESS,
+            title: "New Booking on Your Space! 🎉",
+            message: `${payment.userName || "A client"} just booked ${payment.spaceName} — ${payment.planName}.`,
+            metadata: {
+              bookingId: booking._id,
+              bookingNumber,
+              type: "new_booking",
+            },
+          });
+        } catch (notifErr) {
+          console.warn("[Payment] Could not notify partner for new booking:", notifErr);
+        }
+      }
     } // End of BookingModel creation
 
     // Generate invoice number
