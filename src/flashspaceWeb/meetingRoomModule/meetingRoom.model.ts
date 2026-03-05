@@ -67,6 +67,9 @@ export class MeetingRoom {
   @prop({ required: true })
   public capacity!: number;
 
+  @prop({ required: true, default: 1 })
+  public count!: number;
+
   @prop({ type: () => String, required: true, enum: MeetingRoomType })
   public type!: MeetingRoomType;
 

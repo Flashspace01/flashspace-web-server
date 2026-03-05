@@ -220,6 +220,43 @@ export const deleteProperty = async (req: Request, res: Response) => {
   }
 };
 
+export const uploadPropertyImage = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { propertyId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return sendError(res, 400, "Image file is required");
+    }
+
+    const property = await PropertyModel.findOne({
+      _id: propertyId,
+      partner: userId,
+    });
+    if (!property) {
+      return sendError(res, 404, "Property not found or unauthorized");
+    }
+
+    const fileUrl = getMulterFileUrl(file.filename, "property_image");
+
+    if (!property.images) {
+      property.images = [];
+    }
+
+    property.images.push(fileUrl);
+    await property.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Image uploaded successfully",
+      data: { url: fileUrl },
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to upload image", err);
+  }
+};
+
 export const uploadPropertyDocument = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;

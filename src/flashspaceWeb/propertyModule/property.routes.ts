@@ -38,6 +38,13 @@ propertyRoutes.delete(
 );
 
 propertyRoutes.post(
+  "/:propertyId/upload-image",
+  AuthMiddleware.authenticate,
+  uploadKYCFile.single("file"),
+  PropertyController.uploadPropertyImage,
+);
+
+propertyRoutes.post(
   "/:propertyId/upload-document",
   AuthMiddleware.authenticate,
   uploadKYCFile.single("file"),

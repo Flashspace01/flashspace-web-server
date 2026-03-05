@@ -25,14 +25,14 @@ router.post("/:bookingId/link-profile", linkBookingToProfile);
 
 // --- Partner Booking Routes (SECURED) ---
 router.get(
-  "/partner/overview", 
+  "/partner/overview",
   AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN), // Added RBAC
-  getPartnerDashboardOverview
+  getPartnerDashboardOverview,
 );
 router.get(
-  "/partner/space/:spaceId", 
+  "/partner/space/:spaceId",
   AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN), // Added RBAC
-  getPartnerSpaceBookings
+  getPartnerSpaceBookings,
 );
 
 export default router;
