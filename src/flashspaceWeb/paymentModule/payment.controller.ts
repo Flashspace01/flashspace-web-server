@@ -221,6 +221,11 @@ async function createBookingAndInvoice(payment: any) {
         razorpayPaymentId: payment.razorpayPaymentId,
         status: "pending_kyc",
         kycStatus: "not_started",
+        // ── Affiliate attribution ─────────────────────────────────
+        affiliateId: payment.affiliateId || undefined,
+        couponCode: payment.couponCode || undefined,
+        discountAmount: payment.discountAmount || 0,
+        // ─────────────────────────────────────────────────────────
         timeline: [
           {
             status: "payment_received",
@@ -239,6 +244,7 @@ async function createBookingAndInvoice(payment: any) {
           "GST Registration Support",
         ],
       });
+
 
       // Notify partner that a new booking was made on their space
       if (partnerId) {

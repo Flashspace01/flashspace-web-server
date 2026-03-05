@@ -163,8 +163,12 @@ export class Booking {
   @prop()
   couponCode?: string; // Coupon code applied at booking time
 
+  @prop({ default: 0 })
+  discountAmount?: number; // Discount amount applied at booking time
+
   @prop()
   affiliateId?: mongoose.Types.ObjectId; // Affiliate who referred this booking
+
 
   @prop({ type: () => [String], default: [] })
   features?: string[];

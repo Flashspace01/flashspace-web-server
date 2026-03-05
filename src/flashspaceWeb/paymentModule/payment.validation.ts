@@ -31,6 +31,8 @@ export const createOrderSchema = z.object({
       .optional(),
     holdId: objectIdSchema.optional(),
     creditsToUse: z.number().int().nonnegative().optional().default(0),
+    couponCode: z.string().optional(), // Coupon code applied at checkout
+    affiliateId: z.string().optional(), // Affiliate user ID if coupon is affiliate-type
   }),
 });
 

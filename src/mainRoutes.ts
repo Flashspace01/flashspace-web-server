@@ -67,8 +67,9 @@ mainRoutes.use("/admin", adminRoutes);
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
-// /api/coupon
+// /api/coupon  AND  /api/coupons (alias — frontend uses plural)
 mainRoutes.use("/coupon", couponRoutes);
+mainRoutes.use("/coupons", couponRoutes);
 // /api/mail
 mainRoutes.use("/mail", mailRoutes);
 // /api/meetingRoom
