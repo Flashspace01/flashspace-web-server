@@ -100,6 +100,11 @@ export class CoworkingSpaceService {
   static async getSpaces(query: FilterQuery<any>) {
     // If the query targets a property field (like city), we need to resolve it via the PropertyModel first
     if (query.city || query.name || query.area) {
+      const legacyFieldQuery: any = {};
+      if (query.city) legacyFieldQuery.city = query.city;
+      if (query.name) legacyFieldQuery.name = query.name;
+      if (query.area) legacyFieldQuery.area = query.area;
+
       const propertyQuery: any = {};
       if (query.city) propertyQuery.city = query.city;
       if (query.name) propertyQuery.name = query.name;
@@ -114,7 +119,14 @@ export class CoworkingSpaceService {
       delete query.name;
       delete query.area;
 
-      query.property = { $in: propertyIds };
+      if (propertyIds.length > 0) {
+        query.$or = [
+          { property: { $in: propertyIds } },
+          legacyFieldQuery,
+        ];
+      } else {
+        Object.assign(query, legacyFieldQuery);
+      }
     }
 
     return await CoworkingSpaceModel.find({
