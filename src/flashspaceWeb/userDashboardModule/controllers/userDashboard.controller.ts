@@ -343,10 +343,10 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
         type: b.type,
         date: b.createdAt
           ? new Date(b.createdAt).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
           : "Unknown",
         kycStatus: b.kycStatus || "pending",
         status: b.status,
@@ -614,6 +614,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
 
       const clientData = {
         id: booking.bookingNumber,
+        bookingId: booking._id.toString(), // raw ObjectId — needed for ticket API calls
         userId: userIdStr,
         companyName: business?.companyName || user?.fullName || "N/A",
         contactName: user?.fullName || "N/A",
@@ -843,10 +844,10 @@ export const getAllBookings = async (req: Request, res: Response) => {
       BookingModel.countDocuments(filter),
       seatFilter
         ? SeatBookingModel.find(seatFilter)
-            .populate("space")
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(Number(limit))
+          .populate("space")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(Number(limit))
         : Promise.resolve([]),
       seatFilter
         ? SeatBookingModel.countDocuments(seatFilter)

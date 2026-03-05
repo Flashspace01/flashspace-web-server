@@ -104,6 +104,75 @@ export class TicketService {
     return populatedTicket;
   }
 
+  /**
+   * Partner creates a ticket on behalf of a client.
+   * The ticket is owned by `clientUserId` so it appears in the client's My Tickets.
+   * The first message is from the partner.
+   */
+  static async createTicketForClient(
+    partnerId: string,
+    clientUserId: string,
+    bookingId: string,
+    data: { subject: string; message: string },
+  ): Promise<any> {
+    // Verify the booking belongs to this partner and the client
+    const booking = await BookingModel.findOne({
+      _id: new Types.ObjectId(bookingId),
+      partner: new Types.ObjectId(partnerId),
+      user: new Types.ObjectId(clientUserId),
+      isDeleted: false,
+    });
+
+    if (!booking) {
+      throw new Error("Booking not found or access denied");
+    }
+
+    const ticketNumber = Ticket.generateTicketNumber();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const ticket = await TicketModel.create({
+      ticketNumber,
+      subject: data.subject,
+      description: data.message,
+      user: new Types.ObjectId(clientUserId),
+      category: TicketCategory.OTHER,
+      priority: TicketPriority.MEDIUM,
+      status: TicketStatus.IN_PROGRESS,
+      bookingId: new Types.ObjectId(bookingId),
+      messages: [
+        {
+          sender: "partner",
+          message: data.message,
+          createdAt: new Date(),
+        },
+      ],
+      expiresAt,
+    });
+
+    const populatedTicket = await TicketModel.findById(ticket._id)
+      .populate("user", "fullName email phoneNumber")
+      .lean();
+
+    // Notify the client
+    NotificationService.notifyUser(
+      clientUserId,
+      `Message from your Space Partner`,
+      `Your space partner sent you a message: "${data.message.substring(0, 60)}..."`,
+      NotificationType.INFO,
+      { ticketId: ticket._id },
+    );
+
+    // Notify admins
+    NotificationService.notifyAdmin(
+      `Partner Message: ${ticketNumber}`,
+      `Space partner sent a message to client for ticket "${data.subject}".`,
+      NotificationType.INFO,
+      { ticketId: ticket._id },
+    );
+
+    return populatedTicket;
+  }
+
   static async getUserTickets(
     userId: string,
     page: number = 1,
