@@ -30,7 +30,7 @@ export interface UpdateTicketDTO {
 
 export interface ReplyDTO {
   userId: string;
-  sender: "user" | "admin";
+  sender: "user" | "admin" | "partner" | "affiliate";
   message: string;
   attachments?: string[];
 }
@@ -42,7 +42,21 @@ export class TicketService {
     data: CreateTicketDTO,
   ): Promise<any> {
     const ticketNumber = Ticket.generateTicketNumber();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    // Derive chatType + affiliateId from the linked booking
+    let chatType: "user_admin" | "user_partner" = "user_admin";
+    let affiliateId: Types.ObjectId | undefined = undefined;
+
+    if (data.bookingId) {
+      const booking = await BookingModel.findById(data.bookingId).lean() as any;
+      if (booking) {
+        chatType = "user_partner";
+        if (booking.affiliateId) {
+          affiliateId = new Types.ObjectId(booking.affiliateId.toString());
+        }
+      }
+    }
 
     const ticket = await TicketModel.create({
       ticketNumber,
@@ -53,25 +67,18 @@ export class TicketService {
       priority: data.priority || TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
       attachments: data.attachments || [],
-      bookingId: data.bookingId
-        ? new Types.ObjectId(data.bookingId)
-        : undefined,
-      messages: [
-        {
-          sender: "user",
-          message: data.description,
-          createdAt: new Date(),
-        },
-      ],
+      bookingId: data.bookingId ? new Types.ObjectId(data.bookingId) : undefined,
+      chatType,
+      affiliateId,
+      tappedIn: [],
+      messages: [{ sender: "user", message: data.description, createdAt: new Date() }],
       expiresAt,
     });
 
-    // Populate user data
     const populatedTicket = await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
       .lean();
 
-    // Notify Admins
     NotificationService.notifyAdmin(
       `New Ticket: ${ticketNumber}`,
       `A new ticket "${data.subject}" has been created.`,
@@ -583,6 +590,114 @@ export class TicketService {
       `Query Closed: ${ticket.ticketNumber}`,
       `Your query has been closed by the partner.`,
       NotificationType.INFO,
+      { ticketId: ticket._id },
+    );
+
+    return TicketModel.findById(ticket._id)
+      .populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "bookingNumber spaceSnapshot type")
+      .lean();
+  }
+
+  // ============ AFFILIATE METHODS ============
+
+  /**
+   * Get all user_partner tickets where affiliateId === affiliateUserId.
+   * These are the chats an affiliate can see/tap-in to.
+   */
+  static async getAffiliateTickets(
+    affiliateUserId: string,
+    page: number = 1,
+    limit: number = 50,
+  ) {
+    const skip = (page - 1) * limit;
+    const query = {
+      affiliateId: new Types.ObjectId(affiliateUserId),
+      chatType: "user_partner" as const,
+    };
+
+    const [tickets, total] = await Promise.all([
+      TicketModel.find(query)
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "fullName email phoneNumber")
+        .populate("bookingId", "bookingNumber spaceSnapshot type")
+        .lean(),
+      TicketModel.countDocuments(query),
+    ]);
+
+    return { tickets, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
+  /**
+   * Tap in to a ticket.
+   * - Affiliates can only tap in if ticket.affiliateId === their userId
+   * - Admins can always tap in
+   */
+  static async tapInToTicket(
+    ticketId: string,
+    userId: string,
+    role: string,
+  ): Promise<any> {
+    const ticket = await TicketModel.findById(ticketId);
+    if (!ticket) throw new Error("Ticket not found");
+
+    const isAdmin = ["admin", "super_admin", "support"].includes(role);
+    const isAffiliate = ticket.affiliateId?.toString() === userId;
+
+    if (!isAdmin && !isAffiliate) {
+      throw new Error("Access denied: you are not the affiliate for this ticket");
+    }
+
+    // Add to tappedIn if not already present
+    if (!ticket.tappedIn.includes(userId)) {
+      ticket.tappedIn.push(userId);
+      await ticket.save();
+    }
+
+    // Add a system message announcing the tap-in
+    const tapRole = isAdmin ? "Admin" : "Affiliate";
+    ticket.messages.push({
+      sender: isAdmin ? "admin" : "affiliate",
+      message: `[${tapRole} joined the conversation]`,
+      createdAt: new Date(),
+    });
+    ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await ticket.save();
+
+    return TicketModel.findById(ticket._id)
+      .populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "bookingNumber spaceSnapshot type")
+      .lean();
+  }
+
+  /**
+   * Affiliate sends a reply — only allowed if they're in tappedIn[].
+   */
+  static async addAffiliateReply(
+    ticketId: string,
+    affiliateId: string,
+    message: string,
+  ): Promise<any> {
+    const ticket = await TicketModel.findById(ticketId);
+    if (!ticket) throw new Error("Ticket not found");
+
+    const isTappedIn = ticket.tappedIn.includes(affiliateId);
+    if (!isTappedIn) {
+      throw new Error("You must tap in before you can send messages");
+    }
+
+    ticket.messages.push({ sender: "affiliate", message, createdAt: new Date() });
+    ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await ticket.save();
+
+    // Notify user
+    NotificationService.notifyUser(
+      ticket.user.toString(),
+      `New message in your query: ${ticket.ticketNumber}`,
+      `Affiliate replied: ${message.substring(0, 50)}...`,
+      NotificationType.TICKET_UPDATE,
       { ticketId: ticket._id },
     );
 

@@ -78,6 +78,15 @@ export const initSocket = (httpServer: HttpServer) => {
       console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
+    // Join affiliate personal feed for notifications
+    socket.on("join_affiliate_feed", (affiliateId: string) => {
+      if (affiliateId) {
+        const room = `affiliate_${affiliateId}`;
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined affiliate_feed: ${room}`);
+      }
+    });
+
 
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.id);

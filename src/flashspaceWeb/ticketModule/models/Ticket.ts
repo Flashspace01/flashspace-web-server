@@ -37,8 +37,11 @@ export enum TicketCategory {
   OTHER = "other",
 }
 
+/** All valid message senders */
+export type MessageSender = "user" | "support" | "admin" | "partner" | "affiliate";
+
 export interface Message {
-  sender: "user" | "support" | "admin" | "partner";
+  sender: MessageSender;
   message: string;
   attachments?: string[];
   createdAt: Date;
@@ -65,6 +68,7 @@ export interface Message {
 @index({ assignee: 1 })
 @index({ updatedAt: -1 })
 @index({ bookingId: 1 })
+@index({ affiliateId: 1 })
 export class Ticket extends TimeStamps {
   public _id!: Types.ObjectId;
 
@@ -86,6 +90,32 @@ export class Ticket extends TimeStamps {
   // Optional: links the ticket to a specific booking (for partner queries)
   @prop({ ref: () => Booking, default: null })
   public bookingId?: Ref<Booking>;
+
+  // ── Tap-In / Multi-party chat fields ─────────────────────────────
+  /**
+   * chatType controls who can see and reply.
+   * 'user_admin'   = user ↔ admin only (private)
+   * 'user_partner' = user ↔ space partner; admin always sees; affiliate can tap in
+   */
+  @prop({ enum: ["user_admin", "user_partner"], default: "user_admin" })
+  public chatType!: "user_admin" | "user_partner";
+
+  /**
+   * Affiliate linked to this ticket (copied from the booking's affiliateId at creation).
+   * Only set when chatType === 'user_partner' and the booking had an affiliate.
+   */
+  @prop({ ref: () => User, default: null })
+  public affiliateId?: Ref<User>;
+
+  /**
+   * List of user IDs who have "tapped in" to the conversation.
+   * Affiliate can only tap in when ticket.affiliateId === their user id.
+   * Admin tap-in is always allowed.
+   * Tapping in never ends the conversation — it becomes a group chat.
+   */
+  @prop({ type: () => [String], default: [] })
+  public tappedIn!: string[];
+  // ─────────────────────────────────────────────────────────────────
 
   @prop({ enum: TicketCategory, required: true })
   public category!: TicketCategory;
@@ -115,40 +145,24 @@ export class Ticket extends TimeStamps {
   @prop()
   public expiresAt?: Date;
 
-  // Helper method to generate ticket number
   static generateTicketNumber(): string {
     const prefix = "TKT";
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    // Generate 4-digit random number
     const random = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}${year}${month}${random}`;
   }
 
-  // Add message to ticket
-  addMessage(
-    sender: "user" | "support" | "admin" | "partner",
-    message: string,
-    attachments?: string[],
-  ) {
-    this.messages.push({
-      sender,
-      message,
-      attachments,
-      createdAt: new Date(),
-    });
-    this.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // Reset expiry on new activity
+  addMessage(sender: MessageSender, message: string, attachments?: string[]) {
+    this.messages.push({ sender, message, attachments, createdAt: new Date() });
+    this.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   }
 
-  // Update status
   updateStatus(newStatus: TicketStatus) {
     this.status = newStatus;
-    if (newStatus === TicketStatus.RESOLVED) {
-      this.resolvedAt = new Date();
-    } else if (newStatus === TicketStatus.CLOSED) {
-      this.closedAt = new Date();
-    }
+    if (newStatus === TicketStatus.RESOLVED) this.resolvedAt = new Date();
+    else if (newStatus === TicketStatus.CLOSED) this.closedAt = new Date();
   }
 }
 
