@@ -96,15 +96,6 @@ export class VirtualOfficeService {
       delete filter.city;
       delete filter.name;
       delete filter.area;
-
-      if (propertyIds.length > 0) {
-        filter.$or = [
-          { property: { $in: propertyIds } },
-          legacyFieldFilter,
-        ];
-      } else {
-        Object.assign(filter, legacyFieldFilter);
-      }
     }
 
     const offices = await VirtualOfficeModel.find(filter)

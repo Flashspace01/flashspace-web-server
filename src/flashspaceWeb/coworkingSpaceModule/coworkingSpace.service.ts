@@ -116,19 +116,21 @@ export class CoworkingSpaceService {
       if (query.name) propertyQuery.name = query.name;
       if (query.area) propertyQuery.area = query.area;
 
+      const legacyFieldQuery: any = {};
+      if (query.city) legacyFieldQuery.city = query.city;
+      if (query.name) legacyFieldQuery.name = query.name;
+      if (query.area) legacyFieldQuery.area = query.area;
+
       const matchedProperties =
         await PropertyModel.find(propertyQuery).select("_id");
-      query.property = { $in: matchedProperties.map((p) => p._id) };
+      const propertyIds = matchedProperties.map((p) => p._id);
 
       delete query.city;
       delete query.name;
       delete query.area;
 
       if (propertyIds.length > 0) {
-        query.$or = [
-          { property: { $in: propertyIds } },
-          legacyFieldQuery,
-        ];
+        query.$or = [{ property: { $in: propertyIds } }, legacyFieldQuery];
       } else {
         Object.assign(query, legacyFieldQuery);
       }

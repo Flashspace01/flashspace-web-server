@@ -243,9 +243,9 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
     ]);
 
     const allSpaceIds = [
-      ...coworkingIds.map((id) => new mongoose.Types.ObjectId(id.toString())),
-      ...virtualIds.map((id) => new mongoose.Types.ObjectId(id.toString())),
-      ...meetingIds.map((id) => new mongoose.Types.ObjectId(id.toString())),
+      ...coworkingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+      ...virtualIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+      ...meetingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
     ];
 
     if (allSpaceIds.length === 0) {
@@ -369,10 +369,10 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
     const avgRating =
       allReviews.length > 0
         ? Math.round(
-            (allReviews.reduce((acc, r) => acc + r.rating, 0) /
-              allReviews.length) *
-              10,
-          ) / 10
+          (allReviews.reduce((acc, r) => acc + r.rating, 0) /
+            allReviews.length) *
+          10,
+        ) / 10
         : 0;
 
     res.status(200).json({

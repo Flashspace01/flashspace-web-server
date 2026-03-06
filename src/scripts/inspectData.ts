@@ -12,9 +12,9 @@ async function inspectData() {
       .limit(5)
       .select("name property");
     console.log("Sample Rooms:");
-    rooms.forEach((r) => {
+    rooms.forEach((r: any) => {
       console.log(
-        `Room: ${r.name}, Property: ${r.property} (Type: ${typeof r.property})`,
+        `Room: ${r.type}, Property: ${r.property} (Type: ${typeof r.property})`,
       );
     });
 

@@ -8,8 +8,8 @@ async function listAllProperties() {
     );
     const rooms = await MeetingRoomModel.find({}).select("property name");
     console.log(`Total Rooms: ${rooms.length}`);
-    rooms.forEach((r) => {
-      console.log(`Room: ${r.name}, PropertyID: ${r.property}`);
+    rooms.forEach((r: any) => {
+      console.log(`Room: ${r.type}, PropertyID: ${r.property}`);
     });
     await mongoose.disconnect();
   } catch (err: any) {
