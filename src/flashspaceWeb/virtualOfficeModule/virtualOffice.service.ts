@@ -1,8 +1,9 @@
 import { VirtualOfficeModel } from "./virtualOffice.model";
 import { UserRole } from "../authModule/models/user.model";
-import { PropertyModel } from "../propertyModule/property.model";
-import { PropertyService } from "../propertyModule/property.service";
-import { Types } from "mongoose";
+
+export class VirtualOfficeService {
+  static async createOffice(data: any, partnerId: string) {
+    const office = new VirtualOfficeMoimport { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class VirtualOfficeService {
@@ -96,54 +97,3 @@ export class VirtualOfficeService {
       delete filter.city;
       delete filter.name;
       delete filter.area;
-    }
-
-    const offices = await VirtualOfficeModel.find(filter)
-      .populate("property")
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip((page - 1) * limit);
-
-    const total = await VirtualOfficeModel.countDocuments(filter);
-
-    return {
-      offices,
-      total,
-      limit,
-      page,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  static async getOfficeById(officeId: string) {
-    return await VirtualOfficeModel.findOne({ _id: officeId, isDeleted: false })
-      .populate("property")
-      .populate("partner", "firstName lastName email");
-  }
-
-  static async deleteOffice(
-    officeId: string,
-    userId: string,
-    userRole?: string,
-    restore: boolean = false,
-  ) {
-    const query: any = { _id: officeId };
-
-    // SECURED
-    if (userRole !== UserRole.ADMIN) {
-      query.partner = userId;
-    }
-
-    const office = await VirtualOfficeModel.findOneAndUpdate(
-      query,
-      {
-        isDeleted: !restore,
-        isActive: restore,
-      },
-      { new: true },
-    );
-
-    if (!office) throw new Error("Virtual office not found or unauthorized");
-    return office;
-  }
-}
