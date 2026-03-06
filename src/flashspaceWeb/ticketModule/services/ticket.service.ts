@@ -9,7 +9,6 @@ import { UserModel } from "../../authModule/models/user.model";
 import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
-import { Space } from "../../spacePartnerModule/models/space.model";
 import { BookingModel } from "../../bookingModule/booking.model";
 
 export interface CreateTicketDTO {
@@ -446,29 +445,24 @@ export class TicketService {
   // ============ PARTNER METHODS ============
 
   /**
-   * Helper: get all bookingIds for a partner's spaces.
+   * Helper: get all bookingIds for a partner.
+   * Uses the `partner` field directly on BookingModel, which is set during payment.
    */
   private static async getPartnerBookingIds(
     partnerId: string,
   ): Promise<Types.ObjectId[]> {
-    // 1. Find all spaces owned by this partner
-    const spaces = await Space.find({
-      partnerId: new Types.ObjectId(partnerId),
+    const bookings = await BookingModel.find({
+      partner: new Types.ObjectId(partnerId),
+      isDeleted: false,
     })
-      .select("_id")
-      .lean();
-    const spaceIds = spaces.map((s) => s._id);
-    if (spaceIds.length === 0) return [];
-
-    // 2. Find all bookings for those spaces
-    const bookings = await BookingModel.find({ spaceId: { $in: spaceIds } })
       .select("_id")
       .lean();
     return bookings.map((b) => b._id as Types.ObjectId);
   }
 
   /**
-   * Helper: validate that a ticket belongs to one of partner's spaces.
+  * Helper: validate that a ticket belongs to one of partner's bookings.
+  * Falls back to allowing access if ticket has no bookingId (open visibility).
    */
   private static async validatePartnerOwnership(
     ticketId: string,
