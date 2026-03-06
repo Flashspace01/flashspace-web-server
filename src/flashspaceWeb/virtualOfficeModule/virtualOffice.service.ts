@@ -89,13 +89,24 @@ export class VirtualOfficeService {
       if (filter.name) propertyQuery.name = filter.name;
       if (filter.area) propertyQuery.area = filter.area;
 
+      const legacyFieldQuery: any = {};
+      if (filter.city) legacyFieldQuery.city = filter.city;
+      if (filter.name) legacyFieldQuery.name = filter.name;
+      if (filter.area) legacyFieldQuery.area = filter.area;
+
       const matchedProperties =
         await PropertyModel.find(propertyQuery).select("_id");
-      filter.property = { $in: matchedProperties.map((p) => p._id) };
+      const propertyIds = matchedProperties.map((p) => p._id);
 
       delete filter.city;
       delete filter.name;
       delete filter.area;
+
+      if (propertyIds.length > 0) {
+        filter.$or = [{ property: { $in: propertyIds } }, legacyFieldQuery];
+      } else {
+        Object.assign(filter, legacyFieldQuery);
+      }
     }
 
     const offices = await VirtualOfficeModel.find(filter)
