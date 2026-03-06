@@ -20,11 +20,14 @@ export const initSocket = (httpServer: HttpServer) => {
 
   const redisHost = process.env.REDIS_HOST || "localhost";
   const redisPort = parseInt(process.env.REDIS_PORT || "6379");
-  const redisUrl = (process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`).trim();
+  const redisUrl = (
+    process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`
+  ).trim();
   const forceTls = (process.env.REDIS_TLS || "").toLowerCase() === "true";
-  const normalizedRedisUrl = forceTls && redisUrl.startsWith("redis://")
-    ? redisUrl.replace(/^redis:\/\//, "rediss://")
-    : redisUrl;
+  const normalizedRedisUrl =
+    forceTls && redisUrl.startsWith("redis://")
+      ? redisUrl.replace(/^redis:\/\//, "rediss://")
+      : redisUrl;
 
   // Create Redis client (TLS via rediss:// protocol)
   const pubClient = createClient({ url: normalizedRedisUrl });
@@ -38,15 +41,6 @@ export const initSocket = (httpServer: HttpServer) => {
     console.error("Redis Sub Client Error:", err.message);
   });
 
-  Promise.all([pubClient.connect(), subClient.connect()])
-    .then(() => {
-      io.adapter(createAdapter(pubClient, subClient));
-      console.log(`Socket.io Adapter connected to Redis at ${normalizedRedisUrl}`);
-    })
-    .catch((err) => {
-      console.error("Failed to connect Socket.io Redis adapter (falling back to memory adapter):", err.message);
-    });
-
   io = new Server(httpServer, {
     cors: {
       origin: allowedOrigins,
@@ -54,6 +48,20 @@ export const initSocket = (httpServer: HttpServer) => {
       credentials: true,
     },
   });
+
+  Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log(
+        `Socket.io Adapter connected to Redis at ${normalizedRedisUrl}`,
+      );
+    })
+    .catch((err) => {
+      console.error(
+        "Failed to connect Socket.io Redis adapter (falling back to memory adapter):",
+        err.message,
+      );
+    });
 
   io.on("connection", (socket: Socket) => {
     console.log("New client connected", socket.id);
@@ -77,7 +85,6 @@ export const initSocket = (httpServer: HttpServer) => {
       socket.join("admin_feed");
       console.log(`Socket ${socket.id} joined admin_feed`);
     });
-
 
     socket.on("disconnect", () => {
       console.log("Client disconnected", socket.id);

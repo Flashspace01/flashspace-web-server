@@ -2,6 +2,7 @@ import { VirtualOfficeModel } from "./virtualOffice.model";
 import { UserRole } from "../authModule/models/user.model";
 import { PropertyModel } from "../propertyModule/property.model";
 import { PropertyService } from "../propertyModule/property.service";
+import { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class VirtualOfficeService {
@@ -71,13 +72,18 @@ export class VirtualOfficeService {
       filter.isDeleted = false;
     }
 
-    // Handle queries on property fields (like city)
-    if (filter.city || filter.name || filter.area) {
-      const legacyFieldFilter: any = {};
-      if (filter.city) legacyFieldFilter.city = filter.city;
-      if (filter.name) legacyFieldFilter.name = filter.name;
-      if (filter.area) legacyFieldFilter.area = filter.area;
+    // Strict property filtering if provided
+    if (filter.property) {
+      filter.property =
+        typeof filter.property === "string"
+          ? new Types.ObjectId(filter.property)
+          : filter.property;
 
+      // Remove other property-derived filters to ensure they don't conflict
+      delete filter.city;
+      delete filter.name;
+      delete filter.area;
+    } else if (filter.city || filter.name || filter.area) {
       const propertyQuery: any = {};
       if (filter.city) propertyQuery.city = filter.city;
       if (filter.name) propertyQuery.name = filter.name;
@@ -85,20 +91,11 @@ export class VirtualOfficeService {
 
       const matchedProperties =
         await PropertyModel.find(propertyQuery).select("_id");
-      const propertyIds = matchedProperties.map((p) => p._id);
+      filter.property = { $in: matchedProperties.map((p) => p._id) };
 
       delete filter.city;
       delete filter.name;
       delete filter.area;
-
-      if (propertyIds.length > 0) {
-        filter.$or = [
-          { property: { $in: propertyIds } },
-          legacyFieldFilter,
-        ];
-      } else {
-        Object.assign(filter, legacyFieldFilter);
-      }
     }
 
     const offices = await VirtualOfficeModel.find(filter)

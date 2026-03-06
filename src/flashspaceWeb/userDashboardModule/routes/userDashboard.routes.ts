@@ -31,6 +31,7 @@ import {
   getAllPartnerSpaces,
   getUserMails,
   getUserVisits,
+  getPartnerSpaceBookingAnalytics,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
@@ -56,6 +57,7 @@ router.get("/partner/dashboard", getPartnerDashboardOverview);
 router.get("/partner/active-requests", getPartnerActiveRequests);
 router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
+router.get("/partner/analytics", getPartnerSpaceBookingAnalytics);
 router.get("/partner/clients", getPartnerClients);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
 
