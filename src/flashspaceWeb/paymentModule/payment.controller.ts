@@ -472,17 +472,19 @@ export const createOrder = async (req: Request, res: Response) => {
     // Verify Space isActive Status before proceeding
     let spaceData: any = null;
     if (paymentType === PaymentType.VIRTUAL_OFFICE) {
-      spaceData = await VirtualOfficeModel.findById(spaceId).lean();
+      spaceData =
+        await VirtualOfficeModel.findById(spaceId).populate("property");
     } else if (
       paymentType === PaymentType.COWORKING_SPACE ||
       paymentType === PaymentType.SEAT_BOOKING
     ) {
-      spaceData = await CoworkingSpaceModel.findById(spaceId).lean();
+      spaceData =
+        await CoworkingSpaceModel.findById(spaceId).populate("property");
     } else if (paymentType === PaymentType.MEETING_ROOM) {
-      spaceData = await MeetingRoomModel.findById(spaceId).lean();
+      spaceData = await MeetingRoomModel.findById(spaceId).populate("property");
     }
 
-    if (!spaceData) {
+    if (!spaceData || spaceData.isDeleted) {
       return res.status(404).json({
         success: false,
         message: "Space not found",
@@ -493,6 +495,15 @@ export const createOrder = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: "This space is currently inactive and cannot be booked.",
+      });
+    }
+
+    // Also check if parent property is active
+    if (spaceData.property && !spaceData.property.isActive) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This property is currently inactive and its spaces cannot be booked.",
       });
     }
 

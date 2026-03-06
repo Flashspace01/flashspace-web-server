@@ -135,6 +135,28 @@ export const getPropertyById = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserPropertyById = async (req: Request, res: Response) => {
+  try {
+    const { propertyId } = req.params;
+    const property = await PropertyModel.findOne({
+      _id: propertyId,
+      isActive: true,
+    });
+
+    if (!property) {
+      return sendError(res, 404, "Property not found or inactive");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Property retrieved successfully",
+      data: property,
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve property", err);
+  }
+};
+
 export const getPropertySpaces = async (req: Request, res: Response) => {
   try {
     const { propertyId } = req.params;
@@ -178,6 +200,62 @@ export const getPropertySpaces = async (req: Request, res: Response) => {
       CoworkingSpaceModel.find({ property: propertyId, isDeleted: false }),
       VirtualOfficeModel.find({ property: propertyId, isDeleted: false }),
       MeetingRoomModel.find({ property: propertyId, isDeleted: false }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Property spaces retrieved successfully",
+      data: {
+        coworkingSpaces,
+        virtualOffices,
+        meetingRooms,
+      },
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve property spaces", err);
+  }
+};
+
+export const getUserPropertySpaces = async (req: Request, res: Response) => {
+  try {
+    const { propertyId } = req.params;
+    const { type } = req.query;
+
+    const baseQuery = {
+      property: propertyId,
+      isDeleted: false,
+      isActive: true,
+    };
+
+    if (type === "coworking") {
+      const spaces = await CoworkingSpaceModel.find(baseQuery);
+      return res.status(200).json({
+        success: true,
+        message: "Coworking spaces retrieved",
+        data: spaces,
+      });
+    }
+    if (type === "virtual") {
+      const spaces = await VirtualOfficeModel.find(baseQuery);
+      return res.status(200).json({
+        success: true,
+        message: "Virtual offices retrieved",
+        data: spaces,
+      });
+    }
+    if (type === "meeting") {
+      const spaces = await MeetingRoomModel.find(baseQuery);
+      return res.status(200).json({
+        success: true,
+        message: "Meeting rooms retrieved",
+        data: spaces,
+      });
+    }
+
+    const [coworkingSpaces, virtualOffices, meetingRooms] = await Promise.all([
+      CoworkingSpaceModel.find({ ...baseQuery }),
+      VirtualOfficeModel.find({ ...baseQuery }),
+      MeetingRoomModel.find({ ...baseQuery }),
     ]);
 
     res.status(200).json({
@@ -420,6 +498,52 @@ export const getAvailableCities = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("GetAvailableCities Error:", err);
+    sendError(res, 500, "Failed to retrieve available cities", err);
+  }
+};
+
+export const getUserAvailableCities = async (req: Request, res: Response) => {
+  try {
+    // 1. Get properties that have at least one ACTIVE space
+    const [coworkingProps, virtualProps, meetingProps] = await Promise.all([
+      CoworkingSpaceModel.distinct("property", {
+        isDeleted: false,
+        isActive: true,
+      }),
+      VirtualOfficeModel.distinct("property", {
+        isDeleted: false,
+        isActive: true,
+      }),
+      MeetingRoomModel.distinct("property", {
+        isDeleted: false,
+        isActive: true,
+      }),
+    ]);
+
+    // 2. Combine and deduplicate property IDs
+    const activePropertyIds = [
+      ...new Set([
+        ...coworkingProps.map((id) => id.toString()),
+        ...virtualProps.map((id) => id.toString()),
+        ...meetingProps.map((id) => id.toString()),
+      ]),
+    ];
+
+    // 3. Query these properties for their cities (Only ACTIVE properties)
+    const cities = await PropertyModel.distinct("city", {
+      _id: { $in: activePropertyIds },
+      isActive: true, // Also ensure property itself is active
+    });
+
+    const filteredCities = cities.filter((city) => city && city.trim() !== "");
+
+    res.status(200).json({
+      success: true,
+      message: "Available cities retrieved successfully",
+      data: filteredCities,
+    });
+  } catch (err) {
+    console.error("GetUserAvailableCities Error:", err);
     sendError(res, 500, "Failed to retrieve available cities", err);
   }
 };

@@ -10,6 +10,9 @@ import {
   deleteCoworkingSpace,
   getPartnerSpaces,
   seedDummy,
+  getUserCoworkingSpaces,
+  getUserCoworkingSpacesByCity,
+  getUserCoworkingSpaceById,
 } from "./coworkingSpace.controller";
 import multer from "multer";
 
@@ -35,6 +38,14 @@ coworkingSpaceRoutes.get("/getByCity/:city", getCoworkingSpacesByCity);
 
 // GET /api/coworkingSpace/getById/:coworkingSpaceId
 coworkingSpaceRoutes.get("/getById/:coworkingSpaceId", getCoworkingSpaceById);
+
+// --- User-Facing Routes (Active Only) ---
+coworkingSpaceRoutes.get("/user/all", getUserCoworkingSpaces);
+coworkingSpaceRoutes.get("/user/city/:city", getUserCoworkingSpacesByCity);
+coworkingSpaceRoutes.get(
+  "/user/id/:coworkingSpaceId",
+  getUserCoworkingSpaceById,
+);
 
 // PUT /api/coworkingSpace/update/:coworkingSpaceId
 coworkingSpaceRoutes.put(

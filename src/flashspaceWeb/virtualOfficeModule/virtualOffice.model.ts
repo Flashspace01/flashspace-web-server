@@ -27,30 +27,30 @@ export class VirtualOffice {
   @prop({ required: false })
   public partnerGstPricePerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public adminMarkupGstPerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public finalGstPricePerYear?: number; // Calculated virtual field equivalent
 
   // --- Split Pricing: Mailing Plan ---
   @prop({ required: false })
   public partnerMailingPricePerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public adminMarkupMailingPerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public finalMailingPricePerYear?: number;
 
   // --- Split Pricing: Business Registration Plan ---
   @prop({ required: false })
   public partnerBrPricePerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public adminMarkupBrPerYear?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public finalBrPricePerYear?: number;
 
   @prop({ required: true, default: 0 })

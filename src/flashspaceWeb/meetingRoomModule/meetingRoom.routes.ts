@@ -8,6 +8,9 @@ import {
   deleteMeetingRoom,
   getPartnerMeetingRooms,
   bulkSaveMeetingRooms,
+  getUserMeetingRooms,
+  getUserMeetingRoomById,
+  getUserMeetingRoomsByCity,
 } from "./meetingRoom.controller";
 import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 import { UserRole } from "../authModule/models/user.model";
@@ -18,6 +21,11 @@ const router = Router();
 router.get("/getAll", getAllMeetingRooms);
 router.get("/getById/:meetingRoomId", getMeetingRoomById);
 router.get("/getByCity/:city", getMeetingRoomsByCity);
+
+// --- User-Facing Routes (Active Only) ---
+router.get("/user/all", getUserMeetingRooms);
+router.get("/user/id/:meetingRoomId", getUserMeetingRoomById);
+router.get("/user/city/:city", getUserMeetingRoomsByCity);
 
 router.post(
   "/create",

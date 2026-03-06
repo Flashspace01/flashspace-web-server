@@ -145,7 +145,12 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
     }
 
     const { deleted, property } = validation.data.query;
-    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const query: any =
+      deleted === "all"
+        ? { isDeleted: "all" }
+        : String(deleted) === "true"
+          ? { isDeleted: true }
+          : { isDeleted: false };
 
     if (property) {
       query.property = property;
@@ -164,6 +169,35 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Coworking spaces retrieved successfully",
+      data: spaces.map(flattenProperty),
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to retrieve spaces", err);
+  }
+};
+
+export const getUserCoworkingSpaces = async (req: Request, res: Response) => {
+  try {
+    const validation = getCoworkingSpacesSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { property } = validation.data.query;
+    const query: any = { isActive: true };
+
+    if (property) {
+      query.property = property;
+    }
+
+    const spaces = await CoworkingSpaceService.getSpaces(query);
+
+    res.status(200).json({
+      success: true,
+      message:
+        spaces.length === 0
+          ? "No coworking spaces found"
+          : "Coworking spaces retrieved successfully",
       data: spaces.map(flattenProperty),
     });
   } catch (err: any) {
@@ -204,6 +238,31 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserCoworkingSpaceById = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { coworkingSpaceId } = req.params;
+    const space = await CoworkingSpaceService.getSpaceById(
+      coworkingSpaceId as string,
+    );
+    if (!space || !space.isActive) {
+      return sendError(res, 404, "Coworking space not found or inactive");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Coworking space retrieved successfully",
+      data: flattenProperty(space),
+    });
+  } catch (err: any) {
+    if (err.message === "Invalid ID format")
+      return sendError(res, 400, err.message);
+    sendError(res, 500, "Failed to retrieve space", err);
+  }
+};
+
 export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
   try {
     const { city } = req.params;
@@ -222,6 +281,30 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: `Coworking spaces in ${city} retrieved successfully`,
+      data: spaces.map(flattenProperty),
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to retrieve spaces by city", err);
+  }
+};
+
+export const getUserCoworkingSpacesByCity = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { city } = req.params;
+    const spaces = await CoworkingSpaceService.getSpaces({
+      city: new RegExp(`^${city}$`, "i"),
+      isActive: true,
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        spaces.length === 0
+          ? `No coworking spaces found in ${city}`
+          : `Coworking spaces in ${city} retrieved successfully`,
       data: spaces.map(flattenProperty),
     });
   } catch (err: any) {

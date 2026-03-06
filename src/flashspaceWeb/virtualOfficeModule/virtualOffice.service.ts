@@ -6,6 +6,23 @@ import { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class VirtualOfficeService {
+  private static calculateFinalPrices(data: any) {
+    if (data.partnerGstPricePerYear !== undefined) {
+      data.finalGstPricePerYear =
+        (data.partnerGstPricePerYear || 0) + (data.adminMarkupGstPerYear || 0);
+    }
+    if (data.partnerMailingPricePerYear !== undefined) {
+      data.finalMailingPricePerYear =
+        (data.partnerMailingPricePerYear || 0) +
+        (data.adminMarkupMailingPerYear || 0);
+    }
+    if (data.partnerBrPricePerYear !== undefined) {
+      data.finalBrPricePerYear =
+        (data.partnerBrPricePerYear || 0) + (data.adminMarkupBrPerYear || 0);
+    }
+    return data;
+  }
+
   static async createOffice(data: any, partnerId: string) {
     let property;
     if (data.propertyId) {
@@ -15,8 +32,10 @@ export class VirtualOfficeService {
       property = await PropertyService.createProperty(data, partnerId);
     }
 
+    const processedData = this.calculateFinalPrices(data);
+
     const office = new VirtualOfficeModel({
-      ...data,
+      ...processedData,
       property: property._id,
       partner: partnerId,
       approvalStatus: SpaceApprovalStatus.PENDING_KYC,
@@ -54,9 +73,11 @@ export class VirtualOfficeService {
       data,
     );
 
+    const processedData = this.calculateFinalPrices(data);
+
     const office = await VirtualOfficeModel.findOneAndUpdate(
       query,
-      { $set: data },
+      { $set: processedData },
       { new: true, runValidators: true },
     ).populate("property");
 
@@ -68,7 +89,9 @@ export class VirtualOfficeService {
     limit: number = 100,
     page: number = 1,
   ) {
-    if (filter.isDeleted === undefined) {
+    if (filter.isDeleted === "all") {
+      delete filter.isDeleted;
+    } else if (filter.isDeleted === undefined) {
       filter.isDeleted = false;
     }
 

@@ -89,7 +89,7 @@ export const updateCoworkingSpaceSchema = z.object({
 
 export const getCoworkingSpacesSchema = z.object({
   query: z.object({
-    deleted: z.enum(["true", "false"]).optional(),
+    deleted: z.enum(["true", "false", "all"]).optional(),
     property: z
       .string()
       .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")

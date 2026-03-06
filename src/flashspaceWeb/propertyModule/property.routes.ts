@@ -15,6 +15,15 @@ propertyRoutes.get(
 
 // Public routes
 propertyRoutes.get("/available-cities", PropertyController.getAvailableCities);
+propertyRoutes.get(
+  "/user/available-cities",
+  PropertyController.getUserAvailableCities,
+);
+propertyRoutes.get("/user/:propertyId", PropertyController.getUserPropertyById);
+propertyRoutes.get(
+  "/user/:propertyId/spaces",
+  PropertyController.getUserPropertySpaces,
+);
 propertyRoutes.get("/:propertyId", PropertyController.getPropertyById);
 propertyRoutes.get("/:propertyId/spaces", PropertyController.getPropertySpaces);
 

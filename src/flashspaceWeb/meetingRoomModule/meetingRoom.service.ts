@@ -6,6 +6,18 @@ import { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 export class MeetingRoomService {
+  private static calculateFinalPrices(data: any) {
+    if (data.partnerPricePerHour !== undefined) {
+      data.finalPricePerHour =
+        (data.partnerPricePerHour || 0) + (data.adminMarkupPerHour || 0);
+    }
+    if (data.partnerPricePerDay !== undefined) {
+      data.finalPricePerDay =
+        (data.partnerPricePerDay || 0) + (data.adminMarkupPerDay || 0);
+    }
+    return data;
+  }
+
   static async createRoom(data: any, partnerId: string) {
     let property;
     if (data.propertyId) {
@@ -15,8 +27,10 @@ export class MeetingRoomService {
       property = await PropertyService.createProperty(data, partnerId);
     }
 
+    const processedData = this.calculateFinalPrices(data);
+
     const meetingRoom = new MeetingRoomModel({
-      ...data,
+      ...processedData,
       property: property._id,
       partner: partnerId,
       approvalStatus: SpaceApprovalStatus.PENDING_KYC,
@@ -54,9 +68,11 @@ export class MeetingRoomService {
       data,
     );
 
+    const processedData = this.calculateFinalPrices(data);
+
     const room = await MeetingRoomModel.findOneAndUpdate(
       query,
-      { $set: data },
+      { $set: processedData },
       { new: true, runValidators: true },
     ).populate("property");
 
@@ -64,7 +80,9 @@ export class MeetingRoomService {
   }
 
   static async getRooms(filter: any = {}, limit: number) {
-    if (filter.isDeleted === undefined) {
+    if (filter.isDeleted === "all") {
+      delete filter.isDeleted;
+    } else if (filter.isDeleted === undefined) {
       filter.isDeleted = false;
     }
 
@@ -175,11 +193,13 @@ export class MeetingRoomService {
         operatingHours: roomData.operatingHours || defaultOperatingHours,
       };
 
+      const processedPayload = this.calculateFinalPrices(roomPayload);
+
       if (roomData._id) {
         // Update existing (preserve existing isActive status)
         const updated = await MeetingRoomModel.findOneAndUpdate(
           { _id: roomData._id, partner: partnerId, property: propertyId },
-          { $set: roomPayload },
+          { $set: processedPayload },
           { new: true, runValidators: true },
         );
         if (updated) {
@@ -188,8 +208,8 @@ export class MeetingRoomService {
         }
       } else {
         // Create new (inactive until KYC approval)
-        roomPayload.isActive = false;
-        const newRoom = new MeetingRoomModel(roomPayload);
+        processedPayload.isActive = false;
+        const newRoom = new MeetingRoomModel(processedPayload);
         const saved = await newRoom.save();
         await PropertyModel.findByIdAndUpdate(propertyId, {
           $push: { meetingRooms: saved._id },

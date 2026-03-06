@@ -162,7 +162,12 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
 
     const { deleted, type, minPrice, maxPrice, limit, property } =
       validation.data.query;
-    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const query: any =
+      deleted === "all"
+        ? { isDeleted: "all" }
+        : String(deleted) === "true"
+          ? { isDeleted: true }
+          : { isDeleted: false };
 
     if (property) {
       query.property = property;
@@ -195,6 +200,44 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserMeetingRooms = async (req: Request, res: Response) => {
+  try {
+    const validation = getMeetingRoomsSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error);
+    }
+
+    const { type, minPrice, maxPrice, limit, property } = validation.data.query;
+    const query: any = { isActive: true };
+
+    if (property) {
+      query.property = property;
+    }
+
+    if (type) query.type = type;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.pricePerHour = {};
+      if (minPrice !== undefined) query.pricePerHour.$gte = minPrice;
+      if (maxPrice !== undefined) query.pricePerHour.$lte = maxPrice;
+    }
+
+    const _limit = limit ? Math.min(limit, 100) : 100;
+    const rooms = await MeetingRoomService.getRooms(query, _limit);
+
+    res.status(200).json({
+      success: true,
+      message:
+        rooms.length === 0
+          ? "No meeting rooms found"
+          : "Meeting rooms retrieved successfully",
+      data: rooms.map(flattenProperty),
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve meeting rooms", err);
+  }
+};
+
 export const getMeetingRoomById = async (req: Request, res: Response) => {
   try {
     const validation = getMeetingRoomByIdSchema.safeParse(req);
@@ -206,6 +249,30 @@ export const getMeetingRoomById = async (req: Request, res: Response) => {
     const room = await MeetingRoomService.getRoomById(meetingRoomId);
 
     if (!room) return sendError(res, 404, "Meeting room not found");
+
+    res.status(200).json({
+      success: true,
+      message: "Meeting room retrieved successfully",
+      data: flattenProperty(room),
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to retrieve meeting room", err);
+  }
+};
+
+export const getUserMeetingRoomById = async (req: Request, res: Response) => {
+  try {
+    const validation = getMeetingRoomByIdSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error);
+    }
+
+    const { meetingRoomId } = validation.data.params;
+    const room = await MeetingRoomService.getRoomById(meetingRoomId);
+
+    if (!room || !room.isActive) {
+      return sendError(res, 404, "Meeting room not found or inactive");
+    }
 
     res.status(200).json({
       success: true,
@@ -251,6 +318,48 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: `Meeting rooms in ${city} retrieved successfully`,
+      data: rooms.map(flattenProperty),
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve rooms by city", err);
+  }
+};
+
+export const getUserMeetingRoomsByCity = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const validation = getMeetingRoomsByCitySchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error);
+    }
+
+    const { city } = validation.data.params;
+    const { type, minPrice, maxPrice, limit } = validation.data.query;
+
+    const query: any = {
+      city: new RegExp(`^${city}$`, "i"),
+      isActive: true,
+    };
+
+    if (type) query.type = type;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      query.pricePerHour = {};
+      if (minPrice !== undefined) query.pricePerHour.$gte = minPrice;
+      if (maxPrice !== undefined) query.pricePerHour.$lte = maxPrice;
+    }
+
+    const _limit = limit ? Math.min(limit, 100) : 100;
+    const rooms = await MeetingRoomService.getRooms(query, _limit);
+
+    res.status(200).json({
+      success: true,
+      message:
+        rooms.length === 0
+          ? `No meeting rooms found in ${city}`
+          : `Meeting rooms in ${city} retrieved successfully`,
       data: rooms.map(flattenProperty),
     });
   } catch (err) {

@@ -111,7 +111,44 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
     const _limit = limit ? Math.min(limit, 100) : 10;
     const _page = page ? Math.max(page, 1) : 1;
 
-    const query: any = deleted === "true" ? { isDeleted: true } : {};
+    const query: any =
+      deleted === "all"
+        ? { isDeleted: "all" }
+        : deleted === "true"
+          ? { isDeleted: true }
+          : { isDeleted: false };
+
+    if (property) {
+      query.property = property;
+    }
+
+    const result = await VirtualOfficeService.getOffices(query, _limit, _page);
+
+    res.status(200).json({
+      success: true,
+      message:
+        result.offices.length === 0
+          ? "No virtual offices found"
+          : "Virtual offices retrieved successfully",
+      data: result.offices.map(flattenProperty),
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve virtual offices", err);
+  }
+};
+
+export const getUserVirtualOffices = async (req: Request, res: Response) => {
+  try {
+    const validation = getVirtualOfficesSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { limit, page, property } = validation.data.query;
+    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _page = page ? Math.max(page, 1) : 1;
+
+    const query: any = { isActive: true };
 
     if (property) {
       query.property = property;
@@ -154,6 +191,30 @@ export const getVirtualOfficeById = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserVirtualOfficeById = async (req: Request, res: Response) => {
+  try {
+    const validation = getVirtualOfficeByIdSchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { virtualOfficeId } = validation.data.params;
+    const office = await VirtualOfficeService.getOfficeById(virtualOfficeId);
+
+    if (!office || !office.isActive) {
+      return sendError(res, 404, "Virtual office not found or inactive");
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Virtual office retrieved successfully",
+      data: flattenProperty(office),
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to retrieve virtual office", err);
+  }
+};
+
 export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
   try {
     const validation = getVirtualOfficesByCitySchema.safeParse(req);
@@ -169,6 +230,46 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     const result = await VirtualOfficeService.getOffices(
       {
         city: new RegExp(`^${city}$`, "i"),
+      },
+      _limit,
+      _page,
+    );
+
+    res.status(200).json({
+      success: true,
+      message:
+        result.offices.length === 0
+          ? `No virtual offices found in ${city}`
+          : `Virtual offices in ${city} retrieved successfully`,
+      data: {
+        ...result,
+        offices: result.offices.map(flattenProperty),
+      },
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to retrieve offices by city", err);
+  }
+};
+
+export const getUserVirtualOfficesByCity = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const validation = getVirtualOfficesByCitySchema.safeParse(req);
+    if (!validation.success) {
+      return sendError(res, 400, "Validation Error", validation.error.issues);
+    }
+
+    const { city } = validation.data.params;
+    const { limit, page } = validation.data.query;
+    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _page = page ? Math.max(page, 1) : 1;
+
+    const result = await VirtualOfficeService.getOffices(
+      {
+        city: new RegExp(`^${city}$`, "i"),
+        isActive: true,
       },
       _limit,
       _page,

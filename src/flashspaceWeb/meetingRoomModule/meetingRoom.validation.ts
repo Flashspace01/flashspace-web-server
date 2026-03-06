@@ -98,7 +98,7 @@ export const updateMeetingRoomSchema = z.object({
 
 export const getMeetingRoomsSchema = z.object({
   query: z.object({
-    deleted: z.enum(["true", "false"]).optional(),
+    deleted: z.enum(["true", "false", "all"]).optional(),
     type: meetingRoomTypeEnum.optional(),
     minPrice: z
       .string()

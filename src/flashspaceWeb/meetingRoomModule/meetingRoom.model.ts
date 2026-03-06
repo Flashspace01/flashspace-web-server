@@ -40,20 +40,20 @@ export class MeetingRoom {
   @prop({ required: true })
   public partnerPricePerHour!: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public adminMarkupPerHour!: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public finalPricePerHour!: number;
 
   // --- Split Pricing (Per Day) ---
   @prop({ required: false })
   public partnerPricePerDay?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public adminMarkupPerDay?: number;
 
-  @prop({ required: false })
+  @prop({ required: false, default: 0 })
   public finalPricePerDay?: number;
 
   // --- ADDED: Timing & Booking Rules ---

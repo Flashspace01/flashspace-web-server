@@ -78,15 +78,23 @@ export const flattenProperty = (spaceDoc: any) => {
 
     return {
       ...rest,
-      name: property.name,
-      address: property.address,
-      city: property.city,
-      area: property.area,
-      location: property.location,
+      property, // Include full property object for management portals
+      name: rest.name || property.name,
+      address: rest.address || property.address,
+      city: rest.city || property.city,
+      area: rest.area || property.area,
+      location: rest.location || property.location,
       coordinates: derivedCoordinates,
-      images: property.images,
-      features: property.features,
-      amenities: property.features, // Send as amenities for backwards compatibility if needed
+      images:
+        rest.images && rest.images.length > 0 ? rest.images : property.images,
+      features:
+        rest.features && rest.features.length > 0
+          ? rest.features
+          : property.features,
+      amenities:
+        rest.features && rest.features.length > 0
+          ? rest.features
+          : property.features,
     };
   }
   return docObj;

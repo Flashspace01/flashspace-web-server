@@ -18,16 +18,22 @@ export const initSocket = (httpServer: HttpServer) => {
     "https://www.flashspace.ai",
   ].filter(Boolean) as string[];
 
-  const redisHost = process.env.REDIS_HOST || "localhost";
-  const redisPort = parseInt(process.env.REDIS_PORT || "6379");
-  const redisUrl = (
-    process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`
-  ).trim();
-  const forceTls = (process.env.REDIS_TLS || "").toLowerCase() === "true";
-  const normalizedRedisUrl =
-    forceTls && redisUrl.startsWith("redis://")
-      ? redisUrl.replace(/^redis:\/\//, "rediss://")
-      : redisUrl;
+  // In development, always connect to local Docker Redis.
+  // In production, use the environment variables (Redis Cloud or managed Redis).
+  const isProduction = process.env.NODE_ENV === "production";
+  const normalizedRedisUrl = isProduction
+    ? (() => {
+        const redisHost = process.env.REDIS_HOST || "localhost";
+        const redisPort = parseInt(process.env.REDIS_PORT || "6379");
+        const redisUrl = (
+          process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`
+        ).trim();
+        const forceTls = (process.env.REDIS_TLS || "").toLowerCase() === "true";
+        return forceTls && redisUrl.startsWith("redis://")
+          ? redisUrl.replace(/^redis:\/\//, "rediss://")
+          : redisUrl;
+      })()
+    : "redis://localhost:6379";
 
   // Create Redis client (TLS via rediss:// protocol)
   const pubClient = createClient({ url: normalizedRedisUrl });

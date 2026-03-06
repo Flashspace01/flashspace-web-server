@@ -97,7 +97,7 @@ const objectIdSchema = z
 
 export const getVirtualOfficesSchema = z.object({
   query: z.object({
-    deleted: z.enum(["true", "false"]).optional(),
+    deleted: z.enum(["true", "false", "all"]).optional(),
     page: z.string().regex(/^\d+$/).transform(Number).optional(),
     limit: z
       .string()

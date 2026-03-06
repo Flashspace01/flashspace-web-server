@@ -9,6 +9,9 @@ import {
   updateVirtualOffice,
   deleteVirtualOffice,
   getPartnerVirtualOffices,
+  getUserVirtualOffices,
+  getUserVirtualOfficesByCity,
+  getUserVirtualOfficeById,
 } from "./virtualOffice.controller";
 
 export const virtualOfficeRoutes = Router();
@@ -17,6 +20,11 @@ export const virtualOfficeRoutes = Router();
 virtualOfficeRoutes.get("/getAll", getAllVirtualOffices);
 virtualOfficeRoutes.get("/getByCity/:city", getVirtualOfficesByCity);
 virtualOfficeRoutes.get("/getById/:virtualOfficeId", getVirtualOfficeById);
+
+// --- User-Facing Routes (Active Only) ---
+virtualOfficeRoutes.get("/user/all", getUserVirtualOffices);
+virtualOfficeRoutes.get("/user/city/:city", getUserVirtualOfficesByCity);
+virtualOfficeRoutes.get("/user/id/:virtualOfficeId", getUserVirtualOfficeById);
 
 // Protected Routes (Partners & Admins)
 virtualOfficeRoutes.post(
