@@ -17,6 +17,11 @@ import {
   getSpacePartnerPropertiesByUserId,
 } from "../../spacePartnerModule/controllers/spacekyc.controller";
 import { AffiliateAdminController } from "../../affiliatePortalModule/controllers/affiliateAdmin.controller";
+import { getAdminLeaderboard } from "../controllers/leaderboard.controller";
+import {
+  getFinanceSummary,
+  getBalanceSheet,
+} from "../controllers/finance.controller";
 console.log("Admin Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
@@ -318,3 +323,36 @@ adminRoutes.get(
 // GET /api/admin/tickets/admin/stats
 // PUT /api/admin/tickets/admin/:ticketId
 // etc.
+
+// 9. Leaderboard
+adminRoutes.get(
+  "/leaderboard",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  getAdminLeaderboard,
+);
+
+// 10. Finance (Receivable / Payable)
+adminRoutes.get(
+  "/finance/summary",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  getFinanceSummary,
+);
+
+// 11. Balance Sheet
+adminRoutes.get(
+  "/finance/balance-sheet",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  getBalanceSheet,
+);

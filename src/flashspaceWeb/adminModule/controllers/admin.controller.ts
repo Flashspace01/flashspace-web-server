@@ -344,6 +344,12 @@ export class AdminController {
       endDate: endDate as string,
       status: status as string,
     });
+
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
   }
 
   // --- B2B2C Space Onboarding ---

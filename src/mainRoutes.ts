@@ -68,7 +68,7 @@ mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupon
-mainRoutes.use("/coupon", couponRoutes);
+mainRoutes.use("/coupons", couponRoutes);
 // /api/mail
 mainRoutes.use("/mail", mailRoutes);
 // /api/meetingRoom
@@ -87,7 +87,7 @@ mainRoutes.use("/notifications", notificationRoutes);
 
 // /api/visit
 import visitRoutes from "./flashspaceWeb/visitModule/routes/visit.routes";
-mainRoutes.use('/visit', visitRoutes);
+mainRoutes.use("/visit", visitRoutes);
 
 // /api/chat
-mainRoutes.use('/chat', chatRoutes);
+mainRoutes.use("/chat", chatRoutes);
