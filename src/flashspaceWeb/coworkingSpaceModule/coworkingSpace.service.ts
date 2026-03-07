@@ -99,31 +99,38 @@ export class CoworkingSpaceService {
 
   static async getSpaces(query: FilterQuery<any>) {
     // If the query targets a property field (like city), we need to resolve it via the PropertyModel first
-    if (query.city || query.name || query.area) {
-      const legacyFieldQuery: any = {};
-      if (query.city) legacyFieldQuery.city = query.city;
-      if (query.name) legacyFieldQuery.name = query.name;
-      if (query.area) legacyFieldQuery.area = query.area;
+    // Strict property filtering if provided
+    if (query.property) {
+      query.property =
+        typeof query.property === "string"
+          ? new Types.ObjectId(query.property)
+          : query.property;
 
+      // Remove other property-derived filters to ensure they don't conflict
+      delete query.city;
+      delete query.name;
+      delete query.area;
+    } else if (query.city || query.name || query.area) {
       const propertyQuery: any = {};
       if (query.city) propertyQuery.city = query.city;
       if (query.name) propertyQuery.name = query.name;
       if (query.area) propertyQuery.area = query.area;
 
+      const legacyFieldQuery: any = {};
+      if (query.city) legacyFieldQuery.city = query.city;
+      if (query.name) legacyFieldQuery.name = query.name;
+      if (query.area) legacyFieldQuery.area = query.area;
+
       const matchedProperties =
         await PropertyModel.find(propertyQuery).select("_id");
       const propertyIds = matchedProperties.map((p) => p._id);
 
-      // Remove them from the main query to avoid errors on the CoworkingSpace schema
       delete query.city;
       delete query.name;
       delete query.area;
 
       if (propertyIds.length > 0) {
-        query.$or = [
-          { property: { $in: propertyIds } },
-          legacyFieldQuery,
-        ];
+        query.$or = [{ property: { $in: propertyIds } }, legacyFieldQuery];
       } else {
         Object.assign(query, legacyFieldQuery);
       }

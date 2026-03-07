@@ -255,9 +255,119 @@ export class BookingService {
         endDate: b.endDate
           ? new Date(b.endDate).toISOString().split("T")[0]
           : "N/A",
-        status: status,
+        status:
+          b.status === "active"
+            ? b.endDate &&
+              new Date(b.endDate).getTime() - new Date().getTime() <=
+                7 * 24 * 60 * 60 * 1000
+              ? "EXPIRING_SOON"
+              : "ACTIVE"
+            : "INACTIVE",
         kycStatus: b.kycStatus === "approved" ? "VERIFIED" : "PENDING",
       };
     });
+  }
+
+  static async getPartnerSpaceBookingAnalytics(partnerId: string) {
+    const partnerBookings = await BookingModel.find({
+      partner: partnerId,
+      isDeleted: false,
+    });
+
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      0,
+      23,
+      59,
+      59,
+    );
+
+    let totalBookings = 0;
+    let cancelledBookings = 0;
+    let pendingRequests = 0;
+    const activeClientsSet = new Set();
+
+    let revenueThisMonth = 0;
+    let revenueLastMonth = 0;
+
+    const planData: Record<string, { bookings: number; revenue: number }> = {};
+    const spaceData: Record<string, { bookings: number; revenue: number }> = {};
+    const trendData: Record<string, number> = {};
+
+    // Initialize last 6 months for trend
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthLabel = d.toLocaleString("default", { month: "short" });
+      trendData[monthLabel] = 0;
+    }
+
+    partnerBookings.forEach((b: any) => {
+      totalBookings++;
+      if (b.status === "cancelled") cancelledBookings++;
+      if (b.status === "pending_payment" || b.status === "pending_kyc")
+        pendingRequests++;
+
+      if (b.status === "active") {
+        activeClientsSet.add(b.user.toString());
+      }
+
+      const revenue = b.plan?.finalPrice || b.plan?.price || 0;
+      const createdAt = new Date(b.createdAt);
+
+      // Revenue compare
+      if (createdAt >= currentMonthStart) {
+        revenueThisMonth += revenue;
+      } else if (createdAt >= lastMonthStart && createdAt <= lastMonthEnd) {
+        revenueLastMonth += revenue;
+      }
+
+      // Trend
+      const monthLabel = createdAt.toLocaleString("default", {
+        month: "short",
+      });
+      if (trendData[monthLabel] !== undefined) {
+        trendData[monthLabel] += revenue;
+      }
+
+      // Plan Division
+      const planName = b.plan?.name || "Standard";
+      if (!planData[planName]) planData[planName] = { bookings: 0, revenue: 0 };
+      planData[planName].bookings++;
+      planData[planName].revenue += revenue;
+
+      // Space Division
+      const spaceName = b.spaceSnapshot?.name || "Unknown Space";
+      if (!spaceData[spaceName])
+        spaceData[spaceName] = { bookings: 0, revenue: 0 };
+      spaceData[spaceName].bookings++;
+      spaceData[spaceName].revenue += revenue;
+    });
+
+    return {
+      summary: {
+        totalBookings,
+        activeClients: activeClientsSet.size,
+        cancelledBookings,
+        pendingRequests,
+        revenueThisMonth,
+        revenueLastMonth,
+      },
+      revenueTrend: Object.keys(trendData).map((month) => ({
+        month,
+        revenue: trendData[month],
+      })),
+      planDivision: Object.keys(planData).map((plan) => ({
+        plan,
+        ...planData[plan],
+      })),
+      spaceDivision: Object.keys(spaceData).map((space) => ({
+        space,
+        ...spaceData[space],
+      })),
+    };
   }
 }

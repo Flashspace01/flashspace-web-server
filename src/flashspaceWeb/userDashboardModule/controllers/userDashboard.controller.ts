@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
 import { BookingModel } from "../../bookingModule/booking.model";
+import { BookingService } from "../../bookingModule/booking.service";
 import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
 import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
@@ -796,6 +797,26 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch client details" });
+  }
+};
+
+export const getPartnerSpaceBookingAnalytics = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+    const analytics = await BookingService.getPartnerSpaceBookingAnalytics(
+      userId as string,
+    );
+
+    res.status(200).json({ success: true, data: analytics });
+  } catch (error) {
+    console.error("Partner Analytics error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch booking analytics",
+    });
   }
 };
 

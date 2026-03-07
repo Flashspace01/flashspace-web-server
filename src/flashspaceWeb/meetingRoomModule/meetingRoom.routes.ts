@@ -7,6 +7,7 @@ import {
   getMeetingRoomsByCity,
   deleteMeetingRoom,
   getPartnerMeetingRooms,
+  bulkSaveMeetingRooms,
 } from "./meetingRoom.controller";
 import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 import { UserRole } from "../authModule/models/user.model";
@@ -18,12 +19,17 @@ router.get("/getAll", getAllMeetingRooms);
 router.get("/getById/:meetingRoomId", getMeetingRoomById);
 router.get("/getByCity/:city", getMeetingRoomsByCity);
 
-// Partner Routes (Protected)
 router.post(
   "/create",
   AuthMiddleware.authenticate,
   AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
   createMeetingRoom,
+);
+router.post(
+  "/bulk-save",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
+  bulkSaveMeetingRooms,
 );
 router.put(
   "/update/:meetingRoomId",

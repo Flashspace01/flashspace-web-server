@@ -2,6 +2,11 @@ import { Request, Response } from "express";
 import { ReviewService } from "./review.service";
 import { createReviewSchema, getReviewsSchema } from "./review.validation";
 import { ReviewModel } from "./review.model";
+import { PropertyModel } from "../propertyModule/property.model";
+import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import mongoose from "mongoose";
 
 const sendError = (
   res: Response,
@@ -190,5 +195,200 @@ export const getAiInsight = async (_req: Request, res: Response) => {
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to generate AI insight", err);
+  }
+};
+
+/**
+ * GET /api/v1/reviews/partner
+ * Returns reviews for all spaces owned by the authenticated partner.
+ */
+export const getPartnerReviews = async (req: Request, res: Response) => {
+  try {
+    const partnerId = (req as any).user?.id;
+    if (!partnerId) return sendError(res, 401, "Unauthorized");
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const ratingFilter = req.query.rating
+      ? parseInt(req.query.rating as string)
+      : null;
+    const spaceTypeFilter = req.query.spaceType as string; // 'CoworkingSpace', 'VirtualOffice', 'MeetingRoom'
+
+    // 1. Get this partner's property IDs
+    const partnerProperties = await PropertyModel.find(
+      { partner: partnerId },
+      { _id: 1 },
+    );
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    if (propertyIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No properties found for this partner",
+        data: [],
+      });
+    }
+
+    // 2. Get all space IDs across all types for those properties
+    const [coworkingIds, virtualIds, meetingIds] = await Promise.all([
+      CoworkingSpaceModel.distinct("_id", {
+        property: { $in: propertyIds },
+        isDeleted: false,
+      }),
+      VirtualOfficeModel.distinct("_id", {
+        property: { $in: propertyIds },
+        isDeleted: false,
+      }),
+      MeetingRoomModel.distinct("_id", { property: { $in: propertyIds } }),
+    ]);
+
+    const allSpaceIds = [
+      ...coworkingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+      ...virtualIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+      ...meetingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+    ];
+
+    if (allSpaceIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No spaces found for this partner",
+        data: {
+          reviews: [],
+          pagination: { total: 0, page, pages: 0, limit },
+        },
+      });
+    }
+
+    // 3. Prepare filters
+    const query: any = { space: { $in: allSpaceIds } };
+    if (ratingFilter) {
+      query.rating = ratingFilter;
+    }
+    if (spaceTypeFilter) {
+      query.spaceModel = spaceTypeFilter;
+    }
+
+    const skip = (page - 1) * limit;
+
+    // 4. Get paginated and filtered reviews
+    const [reviews, totalCount] = await Promise.all([
+      ReviewModel.find(query)
+        .populate("user", "fullName firstName lastName email profilePicture")
+        .populate({
+          path: "space",
+          populate: { path: "property", select: "name area city" },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ReviewModel.countDocuments(query),
+    ]);
+
+    const transformed = reviews.map((r: any) => ({
+      _id: r._id,
+      company:
+        r.user?.fullName ||
+        `${r.user?.firstName || ""} ${r.user?.lastName || ""}`.trim() ||
+        "Anonymous",
+      rating: r.rating,
+      npsScore: r.npsScore,
+      location:
+        r.space?.property?.area ||
+        r.space?.property?.city ||
+        r.space?.name ||
+        "Unknown",
+      spaceName: r.space?.name || r.space?.property?.name || "",
+      spaceType: r.spaceModel || "",
+      review: r.comment,
+      createdAt: r.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Partner reviews fetched successfully",
+      data: {
+        reviews: transformed,
+        pagination: {
+          total: totalCount,
+          page,
+          pages: Math.ceil(totalCount / limit),
+          limit,
+        },
+      },
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to fetch partner reviews", err);
+  }
+};
+
+/**
+ * GET /api/v1/reviews/partner/nps
+ * Returns NPS stats scoped to the authenticated partner's spaces.
+ */
+export const getPartnerNpsStats = async (req: Request, res: Response) => {
+  try {
+    const partnerId = (req as any).user?.id;
+    if (!partnerId) return sendError(res, 401, "Unauthorized");
+
+    const partnerProperties = await PropertyModel.find(
+      { partner: partnerId },
+      { _id: 1 },
+    );
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    const [coworkingIds, virtualIds, meetingIds] = await Promise.all([
+      CoworkingSpaceModel.distinct("_id", {
+        property: { $in: propertyIds },
+        isDeleted: false,
+      }),
+      VirtualOfficeModel.distinct("_id", {
+        property: { $in: propertyIds },
+        isDeleted: false,
+      }),
+      MeetingRoomModel.distinct("_id", { property: { $in: propertyIds } }),
+    ]);
+
+    const allSpaceIds = [...coworkingIds, ...virtualIds, ...meetingIds];
+
+    const reviews = await ReviewModel.find({
+      space: { $in: allSpaceIds },
+      npsScore: { $exists: true },
+    });
+
+    const total = reviews.length;
+    const promoters = reviews.filter((r) => (r.npsScore || 0) >= 9).length;
+    const detractors = reviews.filter((r) => (r.npsScore || 0) <= 6).length;
+    const passives = total - promoters - detractors;
+    const nps =
+      total > 0
+        ? Math.round((promoters / total) * 100 - (detractors / total) * 100)
+        : 0;
+
+    // Average rating across all reviews (with or without npsScore)
+    const allReviews = await ReviewModel.find({ space: { $in: allSpaceIds } });
+    const avgRating =
+      allReviews.length > 0
+        ? Math.round(
+          (allReviews.reduce((acc, r) => acc + r.rating, 0) /
+            allReviews.length) *
+          10,
+        ) / 10
+        : 0;
+
+    res.status(200).json({
+      success: true,
+      message: "Partner NPS stats calculated",
+      data: {
+        nps,
+        totalResponses: total,
+        promoters,
+        passives,
+        detractors,
+        avgRating,
+        totalReviews: allReviews.length,
+      },
+    });
+  } catch (err: any) {
+    sendError(res, 500, "Failed to calculate partner NPS", err);
   }
 };

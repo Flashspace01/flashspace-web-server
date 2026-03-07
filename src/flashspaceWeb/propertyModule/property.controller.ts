@@ -220,6 +220,43 @@ export const deleteProperty = async (req: Request, res: Response) => {
   }
 };
 
+export const uploadPropertyImage = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { propertyId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return sendError(res, 400, "Image file is required");
+    }
+
+    const property = await PropertyModel.findOne({
+      _id: propertyId,
+      partner: userId,
+    });
+    if (!property) {
+      return sendError(res, 404, "Property not found or unauthorized");
+    }
+
+    const fileUrl = getMulterFileUrl(file.filename, "property_image");
+
+    if (!property.images) {
+      property.images = [];
+    }
+
+    property.images.push(fileUrl);
+    await property.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Image uploaded successfully",
+      data: { url: fileUrl },
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to upload image", err);
+  }
+};
+
 export const uploadPropertyDocument = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -348,5 +385,54 @@ export const deletePropertyDocument = async (req: Request, res: Response) => {
     });
   } catch (err) {
     sendError(res, 500, "Failed to delete document", err);
+  }
+};
+
+export const getAvailableCities = async (req: Request, res: Response) => {
+  try {
+    // Get cities directly from space collections (legacy direct-field pattern)
+    // AND from properties linked to active spaces
+    const [cwCities, voCities, mrCities, coworkingProps, virtualProps, meetingProps] = await Promise.all([
+      CoworkingSpaceModel.distinct("city", { isDeleted: false }),
+      VirtualOfficeModel.distinct("city", { isDeleted: false }),
+      MeetingRoomModel.distinct("city", { isDeleted: false }),
+      CoworkingSpaceModel.distinct("property", { isDeleted: false }),
+      VirtualOfficeModel.distinct("property", { isDeleted: false }),
+      MeetingRoomModel.distinct("property", { isDeleted: false }),
+    ]);
+
+    // Also check properties for cities (for any spaces that use property references)
+    const activePropertyIds = [
+      ...new Set([
+        ...coworkingProps.filter(Boolean).map((id) => id.toString()),
+        ...virtualProps.filter(Boolean).map((id) => id.toString()),
+        ...meetingProps.filter(Boolean).map((id) => id.toString()),
+      ]),
+    ];
+
+    let propertyCities: string[] = [];
+    if (activePropertyIds.length > 0) {
+      propertyCities = await PropertyModel.distinct("city", {
+        _id: { $in: activePropertyIds },
+      });
+    }
+
+    // Merge and deduplicate all city sources
+    const allCities = [
+      ...new Set([...cwCities, ...voCities, ...mrCities, ...propertyCities]),
+    ];
+
+    const filteredCities = allCities
+      .filter((city): city is string => typeof city === "string" && city.trim() !== "")
+      .sort();
+
+    res.status(200).json({
+      success: true,
+      message: "Available cities retrieved successfully",
+      data: filteredCities,
+    });
+  } catch (err) {
+    console.error("GetAvailableCities Error:", err);
+    sendError(res, 500, "Failed to retrieve available cities", err);
   }
 };

@@ -71,6 +71,42 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
   }
 };
 
+export const bulkSaveMeetingRooms = async (req: Request, res: Response) => {
+  try {
+    const { propertyId, rooms } = req.body;
+    const partnerId = (req as any).user?.id;
+
+    if (!partnerId) {
+      return sendError(res, 401, "Unauthorized: No partner found");
+    }
+
+    if (!propertyId || !Array.isArray(rooms)) {
+      return sendError(
+        res,
+        400,
+        "Validation Error: propertyId and rooms array are required.",
+      );
+    }
+
+    const savedRooms = await MeetingRoomService.bulkSaveRooms(
+      propertyId,
+      rooms,
+      partnerId,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Meeting rooms bulk saved successfully",
+      data: savedRooms.map(flattenProperty),
+    });
+  } catch (err: any) {
+    if (err.message === "Property not found or unauthorized") {
+      return sendError(res, 404, err.message);
+    }
+    sendError(res, 500, "Failed to bulk save meeting rooms", err);
+  }
+};
+
 export const updateMeetingRoom = async (req: Request, res: Response) => {
   try {
     const validation = updateMeetingRoomSchema.safeParse(req);

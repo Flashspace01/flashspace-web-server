@@ -56,6 +56,7 @@ export const createMeetingRoomSchema = z.object({
     operatingHours: OperatingHoursSchema,
     minBookingHours: z.number().int().positive().optional(),
     capacity: z.number().int().positive("Capacity must be a positive integer"),
+    count: z.number().int().positive().optional(),
     type: meetingRoomTypeEnum,
     amenities: z.array(z.string()).optional(),
     images: z.array(z.string()).max(10, "Maximum 10 images allowed").optional(),
@@ -83,6 +84,7 @@ export const updateMeetingRoomSchema = z.object({
     operatingHours: OperatingHoursSchema.optional(), // ADDED
     minBookingHours: z.number().int().positive().optional(), // ADDED
     capacity: z.number().int().positive().optional(),
+    count: z.number().int().positive().optional(),
     type: meetingRoomTypeEnum.optional(), // FIXED
     amenities: z.array(z.string()).optional(),
     images: z.array(z.string()).max(10).optional(),

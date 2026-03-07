@@ -147,6 +147,22 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       );
     }
 
+    // ── 6. Revenue by Product ───────────────────────────────────────────────
+    const revenueByProductMap: Record<string, number> = {};
+    for (const b of allBookings) {
+      const type = b.type || "Other";
+      const earnings = (b.plan?.price || 0) * COMMISSION_RATE;
+      revenueByProductMap[type] = (revenueByProductMap[type] || 0) + earnings;
+    }
+
+    const revenueByProduct = Object.entries(revenueByProductMap).map(
+      ([label, value]) => ({
+        label: label.replace(/([A-Z])/g, " $1").trim(), // "VirtualOffice" -> "Virtual Office"
+        value: parseFloat(value.toFixed(2)),
+        percentage: totalEarnings > 0 ? (value / totalEarnings) * 100 : 0,
+      }),
+    );
+
     const stats = {
       totalEarnings: parseFloat(totalEarnings.toFixed(2)),
       convertedClients: totalClients,
@@ -156,6 +172,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       monthlyEarnings,
       leadsByStatus,
       momGrowth,
+      revenueByProduct,
     };
 
     res.status(200).json({ success: true, data: stats });

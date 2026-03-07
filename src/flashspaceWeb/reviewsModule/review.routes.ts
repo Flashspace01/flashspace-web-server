@@ -6,6 +6,8 @@ import {
   getAllReviews,
   getNpsStats,
   getAiInsight,
+  getPartnerReviews,
+  getPartnerNpsStats,
 } from "./review.controller";
 
 const reviewRoutes = Router({ mergeParams: true });
@@ -20,5 +22,13 @@ reviewRoutes.get("/space/:spaceId", getSpaceReviews);
 reviewRoutes.get("/getAll", getAllReviews);
 reviewRoutes.get("/nps", getNpsStats);
 reviewRoutes.get("/ai-insight", getAiInsight);
+
+// Partner-scoped routes (authenticated)
+reviewRoutes.get("/partner", AuthMiddleware.authenticate, getPartnerReviews);
+reviewRoutes.get(
+  "/partner/nps",
+  AuthMiddleware.authenticate,
+  getPartnerNpsStats,
+);
 
 export { reviewRoutes };

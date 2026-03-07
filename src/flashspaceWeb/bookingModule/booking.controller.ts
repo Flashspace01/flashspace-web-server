@@ -184,9 +184,8 @@ export const getPartnerDashboardOverview = async (
     const clients = await BookingService.getPartnerDashboardOverview(
       userId as string,
     );
-
     res.status(200).json({ success: true, data: { clients } });
-  } catch (error) {
-    sendError(res, 500, "Failed to fetch partner dashboard data", error);
+  } catch (err) {
+    sendError(res, 500, "Failed to fetch partner dashboard data", err);
   }
 };

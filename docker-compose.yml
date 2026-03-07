@@ -21,7 +21,7 @@ services:
       - PORT=5000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DB_URI=${DB_URI} # Connect to mongo container
+      - DB_URI=mongodb://mongo:27017/myapp # Use fixed mongo container URI inside docker network
 
       # Redis & DB URIs now come from .env (REDIS_URL, DB_URI)
 
@@ -35,55 +35,34 @@ services:
 
       - ./uploads:/app/uploads
 
-    # depends_on:
-
-    #   - redis
-
-    #   - mongo
+    depends_on:
+      - redis
+      - mongo
 
     networks:
-
       - flashspace-network
 
 
 
-  # redis:
+  redis:
+    image: redis:alpine
+    container_name: flashspace-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - flashspace-network
 
-  #   image: redis:alpine
-
-  #   container_name: flashspace-redis
-
-  #   restart: always
-
-  #   ports:
-
-  #     - "6379:6379"
-
-  #   networks:
-
-  #     - flashspace-network
-
-
-
-  # mongo:
-
-  #   image: mongo:latest
-
-  #   container_name: flashspace-mongo
-
-  #   restart: always
-
-  #   ports:
-
-  #     - "27018:27017" # Expose to host on 27018 to avoid conflict with local DB
-
-  #   volumes:
-
-  #     - mongo-data:/data/db # Persist data
-
-  #   networks:
-
-  #     - flashspace-network
+  mongo:
+    image: mongo:latest
+    container_name: flashspace-mongo
+    restart: always
+    ports:
+      - "27018:27017" # Expose to host on 27018
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - flashspace-network
 
 
 

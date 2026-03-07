@@ -14,6 +14,7 @@ propertyRoutes.get(
 );
 
 // Public routes
+propertyRoutes.get("/available-cities", PropertyController.getAvailableCities);
 propertyRoutes.get("/:propertyId", PropertyController.getPropertyById);
 propertyRoutes.get("/:propertyId/spaces", PropertyController.getPropertySpaces);
 
@@ -34,6 +35,13 @@ propertyRoutes.delete(
   "/delete/:propertyId",
   AuthMiddleware.authenticate,
   PropertyController.deleteProperty,
+);
+
+propertyRoutes.post(
+  "/:propertyId/upload-image",
+  AuthMiddleware.authenticate,
+  uploadKYCFile.single("file"),
+  PropertyController.uploadPropertyImage,
 );
 
 propertyRoutes.post(
