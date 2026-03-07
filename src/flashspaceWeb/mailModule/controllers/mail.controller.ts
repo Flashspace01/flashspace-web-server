@@ -1,11 +1,16 @@
 import { Request, Response } from "express";
 import Mail from "../models/mail.model";
+import { getMailDocumentUrl } from "../config/multer.config";
+
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const createMail = async (req: Request, res: Response) => {
   try {
-    const { client, email, sender, type, space } = req.body;
+    const { client, email, clientEmail, sender, type, space } = req.body;
+    const normalizedEmail = (email || clientEmail || "").toString().trim();
 
-    if (!client || !email || !sender || !type || !space) {
+    if (!client || !normalizedEmail || !sender || !type || !space) {
       return res
         .status(400)
         .json({ success: false, message: "Missing required fields" });
@@ -25,7 +30,10 @@ export const createMail = async (req: Request, res: Response) => {
       mailId,
       partnerId,
       client,
-      email: email.trim(), // Sanitize email
+      email: normalizedEmail,
+      documentUrl: req.file?.filename
+        ? getMailDocumentUrl(req.file.filename)
+        : undefined,
       sender,
       type,
       space,
@@ -50,7 +58,10 @@ export const getMails = async (req: Request, res: Response) => {
 
     // If a specific email is requested (e.g. from the client dashboard)
     if (email) {
-      const emailRegex = new RegExp("^" + email.toString().trim() + "$", "i");
+      const emailRegex = new RegExp(
+        "^" + escapeRegex(email.toString().trim()) + "$",
+        "i",
+      );
       filter.$or = [
         { email: { $regex: emailRegex } },
         { clientEmail: { $regex: emailRegex } },

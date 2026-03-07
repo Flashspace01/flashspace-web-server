@@ -5,6 +5,7 @@ export interface IMail extends Document {
     partnerId: mongoose.Types.ObjectId;
     client: string;
     email: string;
+    documentUrl?: string;
     sender: string;
     type: string;
     space: string;
@@ -19,6 +20,7 @@ const MailSchema: Schema = new Schema({
     partnerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     client: { type: String, required: true },
     email: { type: String, required: true },
+    documentUrl: { type: String },
     sender: { type: String, required: true },
     type: { type: String, required: true },
     space: { type: String, required: true },

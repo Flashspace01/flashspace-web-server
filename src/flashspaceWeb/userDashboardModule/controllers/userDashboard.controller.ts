@@ -29,6 +29,9 @@ import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SeatBookingModel } from "../../seatingModule/seating.model";
 import { PaymentModel, PaymentType } from "../../paymentModule/payment.model";
 
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ============ DASHBOARD ============
 
 export const getDashboardOverview = async (req: Request, res: Response) => {
@@ -2852,7 +2855,7 @@ export const getUserMails = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
+    const userEmailRegex = new RegExp(`^${escapeRegex(userEmail)}$`, "i");
     const mails = await Mail.find({
       $or: [
         { email: { $regex: userEmailRegex } },
@@ -2888,7 +2891,7 @@ export const getUserVisits = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
+    const userEmailRegex = new RegExp(`^${escapeRegex(userEmail)}$`, "i");
 
     const visits = await Visit.find({
       $or: [
