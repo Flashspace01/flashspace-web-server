@@ -27,6 +27,7 @@ import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.m
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SeatBookingModel } from "../../seatingModule/seating.model";
+import { PaymentModel, PaymentType } from "../../paymentModule/payment.model";
 
 // ============ DASHBOARD ============
 
@@ -832,7 +833,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
     else if (type === "coworking_space") normalizedType = "CoworkingSpace";
     else if (type === "meeting_room") normalizedType = "MeetingRoom";
 
-    const filter: any = { user: userId, isDeleted: false };
+    const filter: any = { user: userId, isDeleted: { $ne: true } };
     if (normalizedType) filter.type = normalizedType;
     if (status) filter.status = status;
 
@@ -850,12 +851,33 @@ export const getAllBookings = async (req: Request, res: Response) => {
       }
     }
 
+    // Completed payments with missing bookings (legacy failure recovery)
+    let paymentTypeFilter: string | undefined;
+    if (normalizedType === "VirtualOffice") paymentTypeFilter = PaymentType.VIRTUAL_OFFICE;
+    else if (normalizedType === "CoworkingSpace") paymentTypeFilter = PaymentType.COWORKING_SPACE;
+    else if (normalizedType === "MeetingRoom") paymentTypeFilter = PaymentType.MEETING_ROOM;
+
+    const shouldIncludePaymentFallback =
+      !status || status === "pending_kyc" || status === "active";
+
+    const paymentFallbackQuery: any = {
+      user: userId,
+      status: "completed",
+      isDeleted: { $ne: true },
+      paymentType: { $ne: PaymentType.SEAT_BOOKING },
+    };
+
+    if (paymentTypeFilter) {
+      paymentFallbackQuery.paymentType = paymentTypeFilter;
+    }
+
     // 1. Fetch data and counts
     const [
       bookingsRaw,
       totalBookingsMain,
       seatBookingsRaw,
       totalSeatBookingsCount,
+      completedPaymentsRaw,
     ] = await Promise.all([
       BookingModel.find(filter)
         .sort({ createdAt: -1 })
@@ -872,6 +894,11 @@ export const getAllBookings = async (req: Request, res: Response) => {
       seatFilter
         ? SeatBookingModel.countDocuments(seatFilter)
         : Promise.resolve(0),
+      shouldIncludePaymentFallback
+        ? PaymentModel.find(paymentFallbackQuery)
+            .sort({ createdAt: -1 })
+            .limit(limitNum)
+        : Promise.resolve([]),
     ]);
 
     // 2. Normalize seat bookings
@@ -913,11 +940,52 @@ export const getAllBookings = async (req: Request, res: Response) => {
       };
     });
 
+    // 3. Synthesize fallback bookings from completed payments when booking docs are missing
+    const existingPaymentIds = new Set(
+      (bookingsRaw as any[])
+        .map((b: any) => (b.payment ? String(b.payment) : null))
+        .filter(Boolean),
+    );
+
+    const fallbackBookingsFromPayments = (completedPaymentsRaw as any[])
+      .filter((p) => !existingPaymentIds.has(String(p._id)))
+      .map((p: any) => ({
+        _id: `payment-${p._id}`,
+        bookingNumber: `P-${String(p.razorpayOrderId || p._id).slice(-8).toUpperCase()}`,
+        type:
+          p.paymentType === PaymentType.VIRTUAL_OFFICE
+            ? "VirtualOffice"
+            : p.paymentType === PaymentType.MEETING_ROOM
+              ? "MeetingRoom"
+              : "CoworkingSpace",
+        spaceId: p.space,
+        user: p.user,
+        spaceSnapshot: {
+          _id: p.space,
+          name: p.spaceName,
+          address: "",
+          city: "",
+          image: "",
+        },
+        plan: {
+          name: p.planName || "Booked Plan",
+          price: p.totalAmount || 0,
+          tenure: p.tenure || 1,
+          tenureUnit: "months",
+        },
+        status: "pending_kyc",
+        startDate: p.startDate || p.createdAt,
+        endDate: p.startDate || p.createdAt,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+
     // 4. Combine and Re-sort
     // Note: This merging logic is simplified. For large datasets, a more robust paginated merge would be needed.
     const allBookings = [
       ...bookingsRaw.map((b) => b.toObject()),
       ...normalizedSeatBookings,
+      ...fallbackBookingsFromPayments,
     ]
       .sort(
         (a, b) =>
@@ -941,10 +1009,16 @@ export const getAllBookings = async (req: Request, res: Response) => {
       success: true,
       data: bookingsWithDays,
       pagination: {
-        total: totalBookingsMain + totalSeatBookingsCount,
+        total:
+          totalBookingsMain +
+          totalSeatBookingsCount +
+          fallbackBookingsFromPayments.length,
         page: Number(page),
         pages: Math.ceil(
-          (totalBookingsMain + totalSeatBookingsCount) / Number(limit),
+          (totalBookingsMain +
+            totalSeatBookingsCount +
+            fallbackBookingsFromPayments.length) /
+            Number(limit),
         ),
       },
     });

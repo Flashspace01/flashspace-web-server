@@ -10,7 +10,7 @@ const objectIdSchema = z
 
 export const createOrderSchema = z.object({
   body: z.object({
-    userId: objectIdSchema,
+    userId: objectIdSchema.optional(),
     userEmail: z.string().email(),
     userName: z.string().min(1, "Name is required"),
     userPhone: z.string().optional(),
