@@ -40,6 +40,24 @@ const razorpay = new Razorpay({
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
   try {
+    // Idempotency: if booking already exists for this payment, reuse it.
+    const existingBooking = await BookingModel.findOne({
+      payment: payment._id,
+      isDeleted: { $ne: true },
+    });
+
+    if (existingBooking) {
+      const existingInvoice = await InvoiceModel.findOne({
+        payment: payment._id,
+        isDeleted: { $ne: true },
+      }).select("invoiceNumber");
+
+      return {
+        booking: existingBooking,
+        invoiceNumber: existingInvoice?.invoiceNumber,
+      };
+    }
+
     // If it's a seat booking, confirm the hold first
     if (
       payment.paymentType === PaymentType.SEAT_BOOKING &&
@@ -61,8 +79,21 @@ async function createBookingAndInvoice(payment: any) {
     // For SEAT_BOOKING we might still want a booking number for the invoice,
     // but the SeatBooking model already has its own logic if needed?
     // Actually, simple FS number is fine for internal tracking.
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    let bookingNumber = "";
+    for (let i = 0; i < 5; i++) {
+      const candidate = `FS-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0")}`;
+      const exists = await BookingModel.exists({ bookingNumber: candidate });
+      if (!exists) {
+        bookingNumber = candidate;
+        break;
+      }
+    }
+
+    if (!bookingNumber) {
+      throw new Error("Unable to generate unique booking number");
+    }
 
     // Get space details for snapshot
     let spaceSnapshot: any = {
@@ -75,14 +106,15 @@ async function createBookingAndInvoice(payment: any) {
         "property",
       );
       if (space) {
+        const property = (space as any).property || {};
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
+          name: property.name || payment.spaceName,
+          address: property.address || "",
+          city: property.city || "",
+          area: property.area || "",
+          image: property.images?.[0] || "",
+          coordinates: property.location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
@@ -90,14 +122,15 @@ async function createBookingAndInvoice(payment: any) {
         "property",
       );
       if (space) {
+        const property = (space as any).property || {};
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
+          name: property.name || payment.spaceName,
+          address: property.address || "",
+          city: property.city || "",
+          area: property.area || "",
+          image: property.images?.[0] || "",
+          coordinates: property.location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
@@ -105,14 +138,15 @@ async function createBookingAndInvoice(payment: any) {
         "property",
       );
       if (space) {
+        const property = (space as any).property || {};
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
+          name: property.name || payment.spaceName,
+          address: property.address || "",
+          city: property.city || "",
+          area: property.area || "",
+          image: property.images?.[0] || "",
+          coordinates: property.location?.coordinates || [],
         };
       }
     } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
@@ -120,14 +154,15 @@ async function createBookingAndInvoice(payment: any) {
         "property",
       );
       if (space) {
+        const property = (space as any).property || {};
         spaceSnapshot = {
           _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
+          name: property.name || payment.spaceName,
+          address: property.address || "",
+          city: property.city || "",
+          area: property.area || "",
+          image: property.images?.[0] || "",
+          coordinates: property.location?.coordinates || [],
         };
       }
     }
@@ -258,17 +293,21 @@ async function createBookingAndInvoice(payment: any) {
 
     // Generate invoice number
     // Collision-safe invoice number (same approach as booking number)
-    const lastInvoice = await InvoiceModel.findOne({}, { invoiceNumber: 1 })
-      .sort({ createdAt: -1 })
-      .lean();
-    const invYear = new Date().getFullYear();
-    let nextInvSeq = 1;
-    if (lastInvoice?.invoiceNumber) {
-      const parts = lastInvoice.invoiceNumber.split("-");
-      const lastSeq = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastSeq)) nextInvSeq = lastSeq + 1;
+    let invoiceNumber = "";
+    for (let i = 0; i < 5; i++) {
+      const candidate = `INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0")}`;
+      const exists = await InvoiceModel.exists({ invoiceNumber: candidate });
+      if (!exists) {
+        invoiceNumber = candidate;
+        break;
+      }
     }
-    const invoiceNumber = `INV-${invYear}-${String(nextInvSeq).padStart(5, "0")}`;
+
+    if (!invoiceNumber) {
+      throw new Error("Unable to generate unique invoice number");
+    }
 
     // Calculate tax (18% GST)
     const subtotal = payment.totalAmount;
@@ -276,36 +315,44 @@ async function createBookingAndInvoice(payment: any) {
     const taxAmount = Math.round((subtotal * taxRate) / 118); // Extract GST from inclusive price
     const baseAmount = subtotal - taxAmount;
 
-    // Create invoice
-    await InvoiceModel.create({
-      invoiceNumber,
-      user: payment.user,
-      partner: partnerId, // <--- FIXED: Added missing partnerId
-      booking: booking ? booking._id : undefined,
-      bookingNumber,
-      payment: payment._id,
-      description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
-      lineItems: [
-        {
-          description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
-          quantity: 1,
-          rate: baseAmount,
-          amount: baseAmount,
+    let createdInvoiceNumber: string | undefined = undefined;
+    try {
+      await InvoiceModel.create({
+        invoiceNumber,
+        user: payment.user,
+        partner: partnerId || payment.user,
+        booking: booking ? booking._id : undefined,
+        bookingNumber,
+        payment: payment._id,
+        description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
+        lineItems: [
+          {
+            description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
+            quantity: 1,
+            rate: baseAmount,
+            amount: baseAmount,
+          },
+        ],
+        subtotal: baseAmount,
+        taxRate,
+        taxAmount,
+        total: subtotal,
+        status: "paid",
+        paidAt: new Date(),
+        billingAddress: {
+          name: payment.userName,
+          company: "",
+          address: "",
+          city: spaceSnapshot.city || "",
         },
-      ],
-      subtotal: baseAmount,
-      taxRate,
-      taxAmount,
-      total: subtotal,
-      status: "paid",
-      paidAt: new Date(),
-      billingAddress: {
-        name: payment.userName,
-        company: "",
-        address: "",
-        city: spaceSnapshot.city || "",
-      },
-    });
+      });
+      createdInvoiceNumber = invoiceNumber;
+    } catch (invoiceError) {
+      console.error(
+        "Invoice generation failed, continuing with booking success:",
+        invoiceError,
+      );
+    }
 
     // Create/update KYC record (skipping for seat_booking to simplify, or maybe keep it if needed)
     let kyc = await KYCDocumentModel.findOne({ user: payment.user });
@@ -397,7 +444,7 @@ async function createBookingAndInvoice(payment: any) {
       }
     }
 
-    return { booking, invoiceNumber };
+    return { booking, invoiceNumber: createdInvoiceNumber };
   } catch (error) {
     console.error("Error creating booking/invoice:", error);
     throw error;
@@ -441,6 +488,16 @@ export const createOrder = async (req: Request, res: Response) => {
       creditsToUse,
     } = validation.data.body as any; // Type override since we know these fields are present in the request schema
 
+    // Always trust authenticated user first. Body userId is kept as a fallback
+    // for backward compatibility in non-authenticated test flows.
+    const resolvedUserId = req.user?.id || userId;
+    if (!resolvedUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
     // Verify credits if being used
     let adjustedTotalAmount = totalAmount;
     if (creditsToUse > 0) {
@@ -451,7 +508,7 @@ export const createOrder = async (req: Request, res: Response) => {
         });
       }
 
-      const user = await UserModel.findById(userId);
+      const user = await UserModel.findById(resolvedUserId);
       if (!user || user.credits < creditsToUse) {
         return res.status(400).json({
           success: false,
@@ -525,7 +582,7 @@ export const createOrder = async (req: Request, res: Response) => {
             spaceName: spaceName.substring(0, 40), // Truncate to fit limits if needed
             planName: planName.substring(0, 40),
             tenure: tenure.toString(),
-            userId,
+            userId: resolvedUserId,
           },
         });
       } catch (rzpError: any) {
@@ -540,7 +597,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     // Save order to database
     const payment = await PaymentModel.create({
-      user: userId,
+      user: resolvedUserId,
       userEmail,
       userName: userName || "Guest",
       userPhone,
@@ -680,6 +737,12 @@ export const verifyPayment = async (req: Request, res: Response) => {
         // -------------------------------------
       } catch (err: any) {
         console.error("Failed to create booking:", err);
+        return res.status(500).json({
+          success: false,
+          message:
+            "Payment captured but booking creation failed. Please contact support.",
+          error: err?.message || "Booking creation failed",
+        });
       }
 
       // --- MARK COUPON AS USED (DEV MODE) ---
@@ -817,6 +880,12 @@ export const verifyPayment = async (req: Request, res: Response) => {
       // -------------------------------------
     } catch (err: any) {
       console.error("Failed to create booking:", err);
+      return res.status(500).json({
+        success: false,
+        message:
+          "Payment captured but booking creation failed. Please contact support.",
+        error: err?.message || "Booking creation failed",
+      });
     }
 
     // --- MARK COUPON AS USED (PROD MODE) ---
