@@ -21,7 +21,8 @@ import {
 import { NotificationService } from "../notificationModule/services/notification.service";
 import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
 import { getIO } from "../../socket";
-import { BookingService } from "../seatingModule/seating.service";
+import { BookingService as SeatingService } from "../seatingModule/seating.service";
+import { SeatBookingModel } from "../seatingModule/seating.model";
 import {
   createOrderSchema,
   verifyPaymentSchema,
@@ -40,224 +41,130 @@ const razorpay = new Razorpay({
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
   try {
-    // If it's a seat booking, confirm the hold first
-    if (
-      payment.paymentType === PaymentType.SEAT_BOOKING &&
-      payment.seatBooking
-    ) {
+    const spaceId = payment.space; // Standardized: Payment model uses 'space'
+    const paymentType = payment.paymentType;
+    const userId = payment.user;
+
+    // 1. If it's a seat booking, confirm the hold first
+    if (paymentType === PaymentType.SEAT_BOOKING && payment.seatBooking) {
       try {
-        await BookingService.confirmBooking(
+        await SeatingService.confirmBooking(
           payment.seatBooking.toString(),
-          payment.user.toString(),
+          userId.toString(),
           payment.razorpayPaymentId,
         );
       } catch (confirmError) {
         console.error("Error confirming seat booking hold:", confirmError);
-        // We continue anyway to generate invoice, but log the error
       }
     }
 
-    // Generate booking number (VIRTUAL_OFFICE, COWORKING_SPACE, MEETING_ROOM)
-    // For SEAT_BOOKING we might still want a booking number for the invoice,
-    // but the SeatBooking model already has its own logic if needed?
-    // Actually, simple FS number is fine for internal tracking.
-    const bookingCount = await BookingModel.countDocuments();
-    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
+    // 2. Fetch space data and resolve partner reliably
+    let spaceData: any = null;
+    let spaceModelName = "";
 
-    // Get space details for snapshot
-    let spaceSnapshot: any = {
-      _id: payment.space,
-      name: payment.spaceName,
-    };
-
-    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-      const space = await VirtualOfficeModel.findById(payment.space).populate(
-        "property",
-      );
-      if (space) {
-        spaceSnapshot = {
-          _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
-        };
-      }
-    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-      const space = await CoworkingSpaceModel.findById(payment.space).populate(
-        "property",
-      );
-      if (space) {
-        spaceSnapshot = {
-          _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
-        };
-      }
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.space).populate(
-        "property",
-      );
-      if (space) {
-        spaceSnapshot = {
-          _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
-        };
-      }
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.spaceId).populate(
-        "property",
-      );
-      if (space) {
-        spaceSnapshot = {
-          _id: space._id?.toString(),
-          name: (space.property as any).name,
-          address: (space.property as any).address,
-          city: (space.property as any).city,
-          area: (space.property as any).area,
-          image: (space.property as any).images?.[0] || "",
-          coordinates: (space.property as any).location?.coordinates || [],
-        };
-      }
+    if (paymentType === PaymentType.VIRTUAL_OFFICE) {
+      spaceData =
+        await VirtualOfficeModel.findById(spaceId).populate("property");
+      spaceModelName = "VirtualOffice";
+    } else if (
+      paymentType === PaymentType.COWORKING_SPACE ||
+      paymentType === PaymentType.SEAT_BOOKING
+    ) {
+      spaceData =
+        await CoworkingSpaceModel.findById(spaceId).populate("property");
+      spaceModelName = "CoworkingSpace";
+    } else if (paymentType === PaymentType.MEETING_ROOM) {
+      spaceData = await MeetingRoomModel.findById(spaceId).populate("property");
+      spaceModelName = "MeetingRoom";
     }
 
-    // Get partner ID from the space model directly (used for security & fast queries)
-    let foundPartnerId;
-    if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-      const space = await VirtualOfficeModel.findById(payment.spaceId);
-      foundPartnerId = space?.partner;
-    } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-      const space = await CoworkingSpaceModel.findById(payment.spaceId);
-      foundPartnerId = space?.partner;
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-      const space = await MeetingRoomModel.findById(payment.spaceId);
-      foundPartnerId = space?.partner;
-    }
-
-    // Fallback: If no partner is assigned to the space, find the first admin to assign as partner
-    // This prevents booking failure when space data is incomplete.
-    if (!foundPartnerId) {
+    if (!spaceData) {
       console.warn(
-        `Partner ID not found for space ${payment.spaceId}. Falling back to first admin.`,
+        `Space ${spaceId} not found during booking creation for payment ${payment._id}`,
       );
-      const adminUser = await UserModel.findOne({
+    }
+
+    // Resolve Partner ID (Robust fallback to space partner, then admin as last resort)
+    let partnerId = spaceData?.partner;
+    if (!partnerId) {
+      console.warn(
+        `No partner found for space ${spaceId}. Searching for admin...`,
+      );
+      const admin = await UserModel.findOne({
         role: UserRole.ADMIN,
         isDeleted: { $ne: true },
       });
-      if (adminUser) {
-        foundPartnerId = adminUser._id;
-      } else {
-        // Last resort: Use the user themselves or keep undefined if we really have no admins (unlikely)
-        console.error(
-          "No admin found for fallback. Booking might still fail validation.",
-        );
-      }
+      partnerId = admin?._id || userId; // Last fallback to user
     }
 
-    // 2. Resolve Partner ID from the space
-    let finalPartnerId: any = foundPartnerId || null;
-    if (!finalPartnerId) {
-      if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-        const spaceSet = await VirtualOfficeModel.findById(payment.space);
-        finalPartnerId = spaceSet?.partner || null;
-      } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-        const spaceSet = await CoworkingSpaceModel.findById(payment.space);
-        finalPartnerId = spaceSet?.partner || null;
-      } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
-        const spaceSet = await MeetingRoomModel.findById(payment.space);
-        finalPartnerId = spaceSet?.partner || null;
-      } else if (payment.paymentType === PaymentType.SEAT_BOOKING) {
-        const spaceSet = await CoworkingSpaceModel.findById(payment.space);
-        finalPartnerId = spaceSet?.partner || null;
-      }
-    }
+    // 3. Create Space Snapshot
+    const property = spaceData?.property as any;
+    const spaceSnapshot: any = {
+      _id: spaceId.toString(),
+      name: property?.name || spaceData?.name || payment.spaceName,
+      address: property?.address || "",
+      city: property?.city || "",
+      area: property?.area || "",
+      image: property?.images?.[0] || "",
+      coordinates: property?.location?.coordinates || { lat: 0, lng: 0 },
+    };
 
-    // Default to a system admin or seller if finalPartnerId is still missing to avoid validation failure
-    if (!finalPartnerId) {
-      console.warn(
-        `Partner ID not found for space ${payment.space}. Defaulting to seller...`,
-      );
-      finalPartnerId = payment.user;
-    }
+    // 4. Create Booking entry in BookingModel (Unified for all types)
+    const bookingCount = await BookingModel.countDocuments();
+    const bookingNumber = `FS-${new Date().getFullYear()}-${String(bookingCount + 1).padStart(5, "0")}`;
 
-    // Normalize to variable partnerId used below
-    const partnerId = finalPartnerId;
-
-    // Calculate dates
     const startDate = payment.startDate
       ? new Date(payment.startDate)
       : new Date();
     let endDate = new Date(startDate);
 
-    // For seat_booking, endDate is handled differently, but we'll set a fallback
-    // We assume tenure is 0 if it's a seat booking (or hour-based).
-    if (payment.paymentType !== "seat_booking") {
-      endDate.setMonth(endDate.getMonth() + payment.tenure * 12); // tenure in years
+    if (paymentType === PaymentType.SEAT_BOOKING && payment.seatBooking) {
+      const seatHold = await SeatBookingModel.findById(payment.seatBooking);
+      if (seatHold) endDate = new Date(seatHold.endTime);
+      else endDate.setMonth(endDate.getMonth() + 1);
     } else {
-      endDate.setHours(endDate.getHours() + payment.tenure); // tenure as hours
+      endDate.setMonth(endDate.getMonth() + payment.tenure * 12);
     }
 
-    // Create booking (Only if not seat_booking, or if we still want a BookingModel for invoices)
-    let booking: any = null;
-    if (payment.paymentType !== "seat_booking") {
-      booking = await BookingModel.create({
-        bookingNumber,
-        user: payment.user,
-        type:
-          payment.paymentType === PaymentType.VIRTUAL_OFFICE
-            ? "VirtualOffice"
-            : payment.paymentType === PaymentType.MEETING_ROOM
-              ? "MeetingRoom"
-              : "CoworkingSpace",
-        spaceId: payment.space,
-        partner: partnerId, // Explicitly set the partner!
-        spaceSnapshot,
-        plan: {
-          name: payment.planName,
-          price: payment.totalAmount,
-          originalPrice: payment.yearlyPrice * payment.tenure,
-          discount: payment.discountAmount || 0,
-          tenure: payment.tenure * 12,
-          tenureUnit: "months",
+    const booking = await BookingModel.create({
+      bookingNumber,
+      user: userId,
+      partner: partnerId,
+      type: spaceModelName,
+      spaceId: spaceId,
+      spaceSnapshot,
+      plan: {
+        name: payment.planName,
+        price: payment.totalAmount,
+        originalPrice: payment.yearlyPrice * (payment.tenure || 1),
+        discount: payment.discountAmount || 0,
+        tenure:
+          paymentType === PaymentType.SEAT_BOOKING ? 1 : payment.tenure * 12,
+        tenureUnit:
+          paymentType === PaymentType.SEAT_BOOKING ? "days" : "months",
+      },
+      payment: payment._id,
+      razorpayOrderId: payment.razorpayOrderId,
+      razorpayPaymentId: payment.razorpayPaymentId,
+      status: "pending_kyc",
+      kycStatus: "not_started",
+      timeline: [
+        {
+          status: "payment_received",
+          date: new Date(),
+          note: `Payment of ₹${payment.totalAmount} received`,
+          by: "System",
         },
-        payment: payment._id,
-        razorpayOrderId: payment.razorpayOrderId,
-        razorpayPaymentId: payment.razorpayPaymentId,
-        status: "pending_kyc",
-        kycStatus: "not_started",
-        timeline: [
-          {
-            status: "payment_received",
-            date: new Date(),
-            note: `Payment of ₹${payment.totalAmount} received`,
-            by: "System",
-          },
-        ],
-        documents: [],
-        startDate,
-        endDate,
-        autoRenew: false,
-        features: [
-          "Business Address",
-          "Mail Handling",
-          "GST Registration Support",
-        ],
-      });
-    } // End of BookingModel creation
+      ],
+      startDate,
+      endDate,
+      features:
+        paymentType === PaymentType.VIRTUAL_OFFICE
+          ? ["Business Address", "Mail Handling", "GST Support"]
+          : ["High Speed WiFi", "Unlimited Coffee", "Office Supplies"],
+    });
 
-    // Generate invoice number
-    // Collision-safe invoice number (same approach as booking number)
+    // 5. Create Invoice
     const lastInvoice = await InvoiceModel.findOne({}, { invoiceNumber: 1 })
       .sort({ createdAt: -1 })
       .lean();
@@ -270,24 +177,22 @@ async function createBookingAndInvoice(payment: any) {
     }
     const invoiceNumber = `INV-${invYear}-${String(nextInvSeq).padStart(5, "0")}`;
 
-    // Calculate tax (18% GST)
     const subtotal = payment.totalAmount;
     const taxRate = 18;
-    const taxAmount = Math.round((subtotal * taxRate) / 118); // Extract GST from inclusive price
+    const taxAmount = Math.round((subtotal * taxRate) / 118);
     const baseAmount = subtotal - taxAmount;
 
-    // Create invoice
     await InvoiceModel.create({
       invoiceNumber,
-      user: payment.user,
-      partner: partnerId, // <--- FIXED: Added missing partnerId
-      booking: booking ? booking._id : undefined,
+      user: userId,
+      partner: partnerId,
+      booking: booking._id,
       bookingNumber,
       payment: payment._id,
-      description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
+      description: `${payment.spaceName} - ${payment.planName}`,
       lineItems: [
         {
-          description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
+          description: `${payment.planName}`,
           quantity: 1,
           rate: baseAmount,
           amount: baseAmount,
@@ -307,11 +212,11 @@ async function createBookingAndInvoice(payment: any) {
       },
     });
 
-    // Create/update KYC record (skipping for seat_booking to simplify, or maybe keep it if needed)
-    let kyc = await KYCDocumentModel.findOne({ user: payment.user });
-    if (!kyc && booking) {
+    // 6. KYC & Credits
+    let kyc = await KYCDocumentModel.findOne({ user: userId });
+    if (!kyc) {
       kyc = await KYCDocumentModel.create({
-        user: payment.user,
+        user: userId,
         booking: booking._id,
         personalInfo: {
           fullName: payment.userName,
@@ -324,77 +229,41 @@ async function createBookingAndInvoice(payment: any) {
       });
     }
 
-    // Credits & Rewards Logic - Updated: 1% Earning on ALL spends
-    const earningsRate = 0.01;
-    const creditsEarned = Math.floor(payment.totalAmount * earningsRate);
-
+    // Credits (1% Earnings)
+    const creditsEarned = Math.floor(payment.totalAmount * 0.01);
     if (creditsEarned > 0) {
-      // Update User credits
-      await UserModel.findByIdAndUpdate(payment.user, {
-        $inc: { credits: creditsEarned },
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { $inc: { credits: creditsEarned } },
+        { new: true },
+      );
+      await CreditLedgerModel.create({
+        user: userId,
+        amount: creditsEarned,
+        type: CreditType.EARNED,
+        description: `Earned 1% credits for booking #${bookingNumber}`,
+        referenceId: booking._id.toString(),
+        booking: booking._id,
+        balanceAfter: updatedUser?.credits || 0,
       });
-
-      // Get updated user for ledger record
-      let updatedUser = await UserModel.findById(payment.user);
-
-      try {
-        // Create Ledger Entry for Earning
-        await CreditLedgerModel.create({
-          user: payment.user,
-          amount: creditsEarned,
-          type: CreditType.EARNED,
-          description: `Earned credits (1%) for booking #${bookingNumber}`,
-          referenceId: booking
-            ? booking._id?.toString()
-            : payment._id?.toString(),
-          booking: booking ? booking._id : undefined,
-          balanceAfter: updatedUser?.credits || 0,
-        });
-      } catch (ledgerError) {
-        // ROLLBACK: Manual Compensation if Ledger Document fails to save
-        console.error(
-          "Ledger creation failed! Rolling back user credits...",
-          ledgerError,
-        );
-        await UserModel.findByIdAndUpdate(payment.user, {
-          $inc: { credits: -creditsEarned },
-        });
-      }
     }
 
-    // Credits Deduction if used
+    // Credits Deduction
     if (payment.creditsUsed && payment.creditsUsed > 0) {
-      // Deduct Credits
-      await UserModel.findByIdAndUpdate(payment.user, {
-        $inc: { credits: -payment.creditsUsed },
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { $inc: { credits: -payment.creditsUsed } },
+        { new: true },
+      );
+      await CreditLedgerModel.create({
+        user: userId,
+        amount: -payment.creditsUsed,
+        type: CreditType.SPENT,
+        description: `Used credits for booking #${bookingNumber}`,
+        referenceId: booking._id.toString(),
+        booking: booking._id,
+        balanceAfter: updatedUser?.credits || 0,
       });
-
-      // Get updated user for ledger record
-      let updatedUser = await UserModel.findById(payment.user);
-
-      try {
-        // Create Ledger Entry for Spend
-        await CreditLedgerModel.create({
-          user: payment.user,
-          amount: -payment.creditsUsed,
-          type: CreditType.SPENT,
-          description: `Used credits for meeting room booking #${bookingNumber}`,
-          referenceId: booking
-            ? booking._id?.toString()
-            : payment._id?.toString(),
-          booking: booking ? booking._id : undefined,
-          balanceAfter: updatedUser?.credits || 0,
-        });
-      } catch (ledgerError) {
-        // ROLLBACK: Manual Compensation if Ledger Document fails to save
-        console.error(
-          "Ledger deduction failed! Rolling back user credits...",
-          ledgerError,
-        );
-        await UserModel.findByIdAndUpdate(payment.user, {
-          $inc: { credits: payment.creditsUsed },
-        });
-      }
     }
 
     return { booking, invoiceNumber };

@@ -572,11 +572,39 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
-    // 1. Fetch all bookings for this partner
-    const bookings = await BookingModel.find({
+    // 1. Fetch all properties owned by this partner
+    const partnerProperties = await PropertyModel.find({
       partner: userId,
       isDeleted: false,
+    });
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    // 2. Resolve all space IDs (VO, CS, MR) belonging to these properties
+    const [voSpaces, csSpaces, mrSpaces] = await Promise.all([
+      VirtualOfficeModel.find({ property: { $in: propertyIds } }).select("_id"),
+      CoworkingSpaceModel.find({ property: { $in: propertyIds } }).select(
+        "_id",
+      ),
+      MeetingRoomModel.find({ property: { $in: propertyIds } }).select("_id"),
+    ]);
+
+    const spaceIds = [
+      ...voSpaces.map((s) => s._id),
+      ...csSpaces.map((s) => s._id),
+      ...mrSpaces.map((s) => s._id),
+    ];
+
+    // 3. Fetch all bookings where either:
+    // a) The booking's partner field matches (legacy/direct)
+    // b) The booking's spaceId belongs to one of the partner's spaces
+    const bookings = await BookingModel.find({
+      $or: [{ partner: userId }, { spaceId: { $in: spaceIds } }],
+      isDeleted: false,
     }).populate("user", "fullName email");
+
+    console.log(
+      `[DEBUG] getPartnerClients - User ID: ${userId}, Properties: ${propertyIds.length}, Bookings found: ${bookings.length}`,
+    );
 
     // 2. Fetch business info for all users in these bookings to get company names
     const userIds = [
@@ -618,6 +646,8 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         userId: userIdStr,
         companyName: business?.companyName || user?.fullName || "N/A",
         contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phone || "N/A",
         plan: booking.plan?.name || "N/A",
         space: booking.spaceSnapshot?.name || "N/A",
         startDate: booking.startDate
@@ -2836,4 +2866,3 @@ export const getUserVisits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
-

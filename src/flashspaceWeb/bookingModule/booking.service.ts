@@ -1,5 +1,9 @@
 import { BookingModel } from "./booking.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
+import { PropertyModel } from "../propertyModule/property.model";
+import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
+import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
+import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
 import mongoose from "mongoose";
 
 export class BookingService {
@@ -219,8 +223,29 @@ export class BookingService {
   }
 
   static async getPartnerDashboardOverview(partnerId: string) {
-    const partnerBookings = await BookingModel.find({
+    // 1. Resolve all space IDs for this partner
+    const partnerProperties = await PropertyModel.find({
       partner: partnerId,
+      isDeleted: false,
+    });
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    const [voSpaces, csSpaces, mrSpaces] = await Promise.all([
+      VirtualOfficeModel.find({ property: { $in: propertyIds } }).select("_id"),
+      CoworkingSpaceModel.find({ property: { $in: propertyIds } }).select(
+        "_id",
+      ),
+      MeetingRoomModel.find({ property: { $in: propertyIds } }).select("_id"),
+    ]);
+
+    const spaceIds = [
+      ...voSpaces.map((s) => s._id),
+      ...csSpaces.map((s) => s._id),
+      ...mrSpaces.map((s) => s._id),
+    ];
+
+    const partnerBookings = await BookingModel.find({
+      $or: [{ partner: partnerId }, { spaceId: { $in: spaceIds } }],
       isDeleted: false,
     }).populate("user", "fullName email phone company");
 
@@ -269,8 +294,29 @@ export class BookingService {
   }
 
   static async getPartnerSpaceBookingAnalytics(partnerId: string) {
-    const partnerBookings = await BookingModel.find({
+    // 1. Resolve all space IDs for this partner
+    const partnerProperties = await PropertyModel.find({
       partner: partnerId,
+      isDeleted: false,
+    });
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    const [voSpaces, csSpaces, mrSpaces] = await Promise.all([
+      VirtualOfficeModel.find({ property: { $in: propertyIds } }).select("_id"),
+      CoworkingSpaceModel.find({ property: { $in: propertyIds } }).select(
+        "_id",
+      ),
+      MeetingRoomModel.find({ property: { $in: propertyIds } }).select("_id"),
+    ]);
+
+    const spaceIds = [
+      ...voSpaces.map((s) => s._id),
+      ...csSpaces.map((s) => s._id),
+      ...mrSpaces.map((s) => s._id),
+    ];
+
+    const partnerBookings = await BookingModel.find({
+      $or: [{ partner: partnerId }, { spaceId: { $in: spaceIds } }],
       isDeleted: false,
     });
 
