@@ -1,0 +1,5 @@
+Unused dependencies
+* @sendgrid/mail
+Missing dependencies
+* axios: ./src/scripts/test-api.ts
+* node-cron: ./src/flashspaceWeb/creditLedgerModule/creditExpiration.cron.ts

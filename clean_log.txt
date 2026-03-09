@@ -1,0 +1,57 @@
+🌱 Connecting to Database...
+✅ Connected to Database.
+Directly calling VirtualOfficeService...
+Direct Service Create Success!
+
+--- TESTING VIRTUAL OFFICE ---
+
+🚀 POST /virtualOffice/create
+✅ Success
+
+🚀 GET /virtualOffice/getById/69999f562de51819ddab8c9a
+✅ Success
+
+🚀 PUT /virtualOffice/update/69999f562de51819ddab8c9a
+✅ Success
+
+🚀 GET /virtualOffice/getByCity/UpdatedCity
+✅ Success
+
+🚀 DELETE /virtualOffice/delete/69999f562de51819ddab8c9a
+✅ Success
+
+--- TESTING COWORKING SPACE ---
+
+🚀 POST /coworkingSpace/create
+✅ Success
+
+🚀 GET /coworkingSpace/getById/69999f562de51819ddab8cac
+✅ Success
+
+🚀 PUT /coworkingSpace/update/69999f562de51819ddab8cac
+✅ Success
+
+🚀 GET /coworkingSpace/getByCity/UpdatedCity2
+✅ Success
+
+🚀 DELETE /coworkingSpace/delete/69999f562de51819ddab8cac
+✅ Success
+
+--- TESTING MEETING ROOM ---
+
+🚀 POST /meetingRoom/create
+✅ Success
+
+🚀 GET /meetingRoom/getById/69999f562de51819ddab8cbd
+✅ Success
+
+🚀 PUT /meetingRoom/update/69999f562de51819ddab8cbd
+✅ Success
+
+🚀 GET /meetingRoom/getByCity/UpdatedCity3
+✅ Success
+
+🚀 DELETE /meetingRoom/delete/69999f562de51819ddab8cbd
+✅ Success
+
+✨ All API tests completed.

@@ -1,0 +1,153 @@
+import { Router } from 'express';
+import { AuthMiddleware } from '../../authModule/middleware/auth.middleware';
+import { RoleMiddleware } from '../../authModule/middleware/role.middleware';
+import { requireSpacePartner } from '../../spacePartnerModule/middleware/spacePartner.middleware';
+import { TicketValidation } from '../middleware/validation.middleware';
+import {
+  createTicket,
+  getUserTickets,
+  getTicketById,
+  replyToTicket,
+  getAllTickets,
+  getTicketStats,
+  updateTicket,
+  assignTicket,
+  addAdminReply,
+  escalateTicket,
+  resolveTicket,
+  closeTicket,
+  getPartnerTickets,
+  addPartnerReply,
+  partnerCloseTicket
+} from '../controllers/ticket.controller';
+
+const router = Router();
+
+// ============ USER ROUTES ============
+// Create a new ticket (both users and admins can create tickets)
+router.post(
+  '/',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireClientRole,
+  TicketValidation.validateCreateTicket,
+  createTicket
+);
+
+// Get user's own tickets (both users and admins can view their own tickets)
+router.get(
+  '/my-tickets',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireClientRole,
+  getUserTickets
+);
+
+// Get specific ticket (user can only see their own)
+router.get(
+  '/:ticketId',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireClientRole,
+  getTicketById
+);
+
+// Reply to a ticket
+router.post(
+  '/:ticketId/reply',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireClientRole,
+  TicketValidation.validateReply,
+  replyToTicket
+);
+
+// ============ ADMIN ROUTES ============
+// Get all tickets (admin only)
+router.get(
+  '/admin/all',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  getAllTickets
+);
+
+// Get ticket statistics
+router.get(
+  '/admin/stats',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  getTicketStats
+);
+
+// Update ticket (admin only)
+router.put(
+  '/admin/:ticketId',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  TicketValidation.validateUpdateTicket,
+  updateTicket
+);
+
+// Assign ticket
+router.post(
+  '/admin/:ticketId/assign',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  assignTicket
+);
+
+// Add admin reply
+router.post(
+  '/admin/:ticketId/reply',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  TicketValidation.validateReply,
+  addAdminReply
+);
+
+// Escalate ticket
+router.post(
+  '/admin/:ticketId/escalate',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  escalateTicket
+);
+
+// Resolve ticket
+router.post(
+  '/admin/:ticketId/resolve',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  resolveTicket
+);
+
+// Close ticket
+router.post(
+  '/admin/:ticketId/close',
+  AuthMiddleware.authenticate,
+  RoleMiddleware.requireAdmin,
+  closeTicket
+);
+
+// ============ PARTNER ROUTES ============
+// Get all tickets for partner's listings
+router.get(
+  '/partner/all',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  getPartnerTickets
+);
+
+// Partner reply to ticket
+router.post(
+  '/partner/:ticketId/reply',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  addPartnerReply
+);
+
+// Partner close ticket
+router.post(
+  '/partner/:ticketId/close',
+  AuthMiddleware.authenticate,
+  requireSpacePartner,
+  partnerCloseTicket
+);
+
+export { router as ticketRoutes };
