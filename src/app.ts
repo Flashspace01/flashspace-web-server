@@ -61,6 +61,17 @@ const allowedOrigins = [
   "http://72.60.219.115",
 ];
 
+// Middleware to handle Private Network Access (PNA) preflight requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    if (req.headers["access-control-request-private-network"]) {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
+  }
+  next();
+});
+
 app.use(
   cors({
     ...corsOptions,
