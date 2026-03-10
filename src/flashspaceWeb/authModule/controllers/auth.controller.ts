@@ -36,10 +36,22 @@ export class AuthController {
       const result = await this.authService.signup(signupData);
 
       if (result.success) {
+        // Set secure cookies if tokens are returned
+        if (result.tokens) {
+          AuthMiddleware.setTokenCookies(
+            res,
+            result.tokens.accessToken,
+            result.tokens.refreshToken
+          );
+        }
+
         res.status(201).json({
           success: true,
           message: result.message,
-          data: result.user,
+          data: {
+            user: result.user,
+            tokens: result.tokens,
+          },
           error: {},
         });
       } else {
@@ -446,6 +458,7 @@ export class AuthController {
           message: "Profile retrieved successfully",
           data: {
             id: user._id.toString(),
+            _id: user._id.toString(),
             email: user.email,
             fullName: user.fullName,
             phoneNumber: user.phoneNumber,
@@ -494,6 +507,7 @@ export class AuthController {
               isAuthenticated: true,
               user: {
                 id: user._id.toString(),
+                _id: user._id.toString(),
                 email: user.email,
                 fullName: user.fullName,
                 phoneNumber: user.phoneNumber,

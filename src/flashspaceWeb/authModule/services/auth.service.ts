@@ -66,9 +66,6 @@ export class AuthService {
       // Hash password
       const hashedPassword = await PasswordUtil.hash(password);
 
-      // Generate OTP for email verification
-      const otpData = OTPUtil.generateWithExpiry(10); // 10 minutes validity
-
       // Create user
       const userData = {
         email: email.toLowerCase(),
@@ -77,32 +74,32 @@ export class AuthService {
         phoneNumber,
         authProvider: AuthProvider.LOCAL,
         role: selectedRole,
-        isEmailVerified: false,
-        emailVerificationOTP: otpData.otp,
-        emailVerificationOTPExpiry: otpData.expiresAt,
-        emailVerificationOTPAttempts: 0,
-        lastOTPRequestTime: new Date(),
-        otpRequestCount: 1,
+        isEmailVerified: true, // Automatically verify email
         refreshTokens: [],
       };
 
       const user = await this.userRepository.create(userData);
 
-      // Send OTP email
-      try {
-        await EmailUtil.sendEmailVerificationOTP(email, otpData.otp, fullName);
-        console.log("✅ Verification OTP sent to:", email);
-        console.log("📌 OTP Code (for testing):", otpData.otp);
-      } catch (emailError) {
-        console.error("Error sending verification OTP:", emailError);
-        // Continue with registration even if email fails
-      }
+      // Generate tokens for immediate login
+      const tokenPayload: Omit<JwtPayload, 'iat' | 'exp'> = {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      };
+
+      const tokens = JwtUtil.generateTokenPair(tokenPayload);
+
+      // Save refresh token
+      await this.userRepository.addRefreshToken(
+        user._id.toString(),
+        tokens.refreshToken
+      );
 
       return {
         success: true,
-        message:
-          "Account created successfully. Please check your email for the verification code.",
+        message: "Account created successfully. Welcome to FlashSpace!",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
@@ -111,6 +108,7 @@ export class AuthService {
           kycVerified: user.kycVerified,
           credits: user.credits || 0,
         },
+        tokens,
       };
     } catch (error) {
       console.error("Signup error:", error);
@@ -197,6 +195,7 @@ export class AuthService {
         success: true,
         message: "Login successful",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
@@ -327,6 +326,7 @@ export class AuthService {
         success: true,
         message: "Google authentication successful",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
@@ -368,6 +368,7 @@ export class AuthService {
         success: true,
         message: "Email verified successfully",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
@@ -770,6 +771,7 @@ export class AuthService {
         success: true,
         message: "Email verified successfully! Welcome to FlashSpace.",
         user: {
+          _id: verifiedUser._id.toString(),
           id: verifiedUser._id.toString(),
           email: verifiedUser.email,
           fullName: verifiedUser.fullName,

@@ -351,10 +351,12 @@ export class AuthMiddleware {
     const frontendUrl = (process.env.FRONTEND_URL || "").trim();
     const isLocalFrontend =
       frontendUrl.includes("localhost") || frontendUrl.includes("127.0.0.1");
+
+    // In production, we MUST use secure cookies and None SameSite for cross-domain
+    // On localhost, we MUST NOT use secure cookies (if using http) and Lax SameSite
     const shouldUseSecureCookies =
-      process.env.COOKIE_SECURE === "true" ||
-      process.env.NODE_ENV === "production" ||
-      (!!frontendUrl && !isLocalFrontend);
+      !isLocalFrontend &&
+      (process.env.COOKIE_SECURE === "true" || process.env.NODE_ENV === "production");
 
     return {
       httpOnly: true,
