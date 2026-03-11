@@ -286,6 +286,7 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
             type: "Property",
             kycStatus: pObj.kycStatus || "not_started",
             propertyStatus: pObj.status || "draft",
+            images: pObj.images || [],
           };
         } catch (err) {
           console.error("Mapping error for property:", p._id, err);
@@ -2836,4 +2837,3 @@ export const getUserVisits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
-

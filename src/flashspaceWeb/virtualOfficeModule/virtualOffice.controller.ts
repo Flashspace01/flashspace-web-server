@@ -216,10 +216,7 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Partner virtual offices retrieved",
-      data: {
-        ...result,
-        offices: formattedSpaces,
-      },
+      data: formattedSpaces,
     });
   } catch (err) {
     sendError(res, 500, "Failed to fetch partner virtual offices", err);

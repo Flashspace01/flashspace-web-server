@@ -238,7 +238,10 @@ export const getPartnerSpaces = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: "Partner spaces retrieved successfully",
-      data: spaces.map(flattenProperty),
+      data: spaces.map((space: any) => ({
+        ...flattenProperty(space),
+        type: "Coworking Space",
+      })),
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner spaces", err);

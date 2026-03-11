@@ -281,10 +281,15 @@ export const getPartnerMeetingRooms = async (req: Request, res: Response) => {
     const _limit = limit ? Math.min(limit, 100) : 100;
     const rooms = await MeetingRoomService.getRooms(query, _limit);
 
+    const formattedRooms = rooms.map((room: any) => ({
+      ...flattenProperty(room),
+      type: "Meeting Room",
+    }));
+
     res.status(200).json({
       success: true,
       message: "Partner meeting rooms retrieved successfully",
-      data: rooms.map(flattenProperty),
+      data: formattedRooms,
     });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve partner meeting rooms", err);

@@ -2,6 +2,8 @@ import { Router } from "express";
 import { requireSpacePartner } from "../middleware/spacePartner.middleware";
 import * as spaceController from "../controllers/space.controller";
 import * as spaceKycController from "../controllers/spacekyc.controller";
+import * as dashboardController from "../controllers/spacePartnerDashboard.controller";
+import * as staffController from "../controllers/staff.controller";
 import {
   setSpaceDetails,
   getAllSpaceDetails,
@@ -18,6 +20,12 @@ export const spacePartnerRoutes = Router();
 spacePartnerRoutes.use(AuthMiddleware.authenticate);
 // spacePartnerRoutes.use(requireSpacePartner);
 
+// Staff management routes
+spacePartnerRoutes.get("/staff", staffController.getMyStaff);
+spacePartnerRoutes.post("/staff", staffController.addStaff);
+spacePartnerRoutes.put("/staff/:id", staffController.updateStaff);
+spacePartnerRoutes.delete("/staff/:id", staffController.deleteStaff);
+
 // Accept/reject space details (admin or reviewer)
 spacePartnerRoutes.put("/space-details/:id/accept", acceptSpaceDetails);
 spacePartnerRoutes.put("/space-details/:id/reject", rejectSpaceDetails);
@@ -25,6 +33,9 @@ spacePartnerRoutes.put("/space-details/:id/reject", rejectSpaceDetails);
 // Space Details routes
 spacePartnerRoutes.post("/space-details", setSpaceDetails);
 spacePartnerRoutes.get("/space-details", getAllSpaceDetails);
+
+// Dashboard routes
+spacePartnerRoutes.get("/dashboard", dashboardController.getDashboardStats);
 
 // Space management routes
 spacePartnerRoutes.post("/spaces", spaceController.createSpace);
