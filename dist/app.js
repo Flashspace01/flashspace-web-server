@@ -23,7 +23,7 @@ const PORT = process.env.PORT || 5000;
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app); // Create HTTP server
 // Required behind reverse proxies (Render/Nginx) for secure cookies and protocol detection
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 // Initialize email service
 email_util_1.EmailUtil.initialize();
 // Initialize Google OAuth
@@ -110,5 +110,5 @@ app.use((req, res, next) => {
 // Serve uploaded files statically
 // Serve uploaded files statically
 app.use("/uploads", express_1.default.static(path_1.default.join(__dirname, "../uploads")));
-// Main API routes
+// Main API routes to go
 app.use("/api", mainRoutes_1.mainRoutes);

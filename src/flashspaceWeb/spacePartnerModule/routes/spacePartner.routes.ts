@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireSpacePartner } from "../middleware/spacePartner.middleware";
 import * as spaceController from "../controllers/space.controller";
 import * as spaceKycController from "../controllers/spacekyc.controller";
+import { getDashboardStats } from "../controllers/dashboard.controller";
 import {
   setSpaceDetails,
   getAllSpaceDetails,
@@ -17,6 +18,9 @@ export const spacePartnerRoutes = Router();
 // Base middleware for all space partner routes
 spacePartnerRoutes.use(AuthMiddleware.authenticate);
 // spacePartnerRoutes.use(requireSpacePartner);
+
+// Dashboard stats
+spacePartnerRoutes.get("/dashboard", getDashboardStats);
 
 // Accept/reject space details (admin or reviewer)
 spacePartnerRoutes.put("/space-details/:id/accept", acceptSpaceDetails);
@@ -43,6 +47,13 @@ spacePartnerRoutes.post("/payments", partnerFinancialsController.createPayment);
 spacePartnerRoutes.get("/payments", partnerFinancialsController.getPayments);
 // Space user KYC routes (for partners to submit their own KYC)
 spacePartnerRoutes.get("/kyc", spaceKycController.getMySpaceUserKyc);
+
+// Staff management routes
+import * as staffController from "../controllers/staff.controller";
+spacePartnerRoutes.get("/staff", staffController.getStaffMembers);
+spacePartnerRoutes.post("/staff", staffController.addStaffMember);
+spacePartnerRoutes.put("/staff/:id", staffController.updateStaffMember);
+spacePartnerRoutes.delete("/staff/:id", staffController.deleteStaffMember);
 
 // Business info KYC route
 spacePartnerRoutes.put(

@@ -20,31 +20,15 @@ export const initSocket = (httpServer: HttpServer) => {
 
   const redisHost = process.env.REDIS_HOST || "localhost";
   const redisPort = parseInt(process.env.REDIS_PORT || "6379");
-<<<<<<< HEAD
   const redisUrl = (
     process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`
   ).trim();
-=======
-  // Use REDIS_URL if available, otherwise construct from host/port
-  const redisUrl = (
-    process.env.REDIS_URL || `redis://${redisHost}:${redisPort}`
-  ).trim();
-
->>>>>>> 3c9403e (Final commit)
   const forceTls = (process.env.REDIS_TLS || "").toLowerCase() === "true";
   const normalizedRedisUrl =
     forceTls && redisUrl.startsWith("redis://")
       ? redisUrl.replace(/^redis:\/\//, "rediss://")
       : redisUrl;
 
-<<<<<<< HEAD
-=======
-  console.log(
-    "Connecting to Redis at:",
-    normalizedRedisUrl.replace(/:[^:@]+@/, ":****@"),
-  ); // Mask password
-
->>>>>>> 3c9403e (Final commit)
   // Create Redis client (TLS via rediss:// protocol)
   const pubClient = createClient({ url: normalizedRedisUrl });
   const subClient = pubClient.duplicate();
@@ -65,9 +49,14 @@ export const initSocket = (httpServer: HttpServer) => {
     },
   });
 
+  //eajfejd
   Promise.all([pubClient.connect(), subClient.connect()])
     .then(() => {
       io.adapter(createAdapter(pubClient, subClient));
+      console.log(
+        "Connecting to Redis at:",
+        normalizedRedisUrl.replace(/:[^:@]+@/, ":****@"),
+      ); // Mask password
       console.log(
         `Socket.io Adapter connected to Redis at ${normalizedRedisUrl}`,
       );

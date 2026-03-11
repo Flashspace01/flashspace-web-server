@@ -258,16 +258,50 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
     // Fetch properties where partner matches userId
     // Explicitly cast to ObjectId just in case
     const partnerId = new mongoose.Types.ObjectId(userId);
-    console.log(`[DEBUG] Searching for properties with partner: ${partnerId}`);
+    console.log(`[DEBUG] Searching for properties for partner: ${partnerId}`);
 
-    const properties = await PropertyModel.find({
+    // Find properties owned BY this partner
+    const ownedProperties = await PropertyModel.find({
       partner: partnerId,
       isDeleted: false,
     });
 
+    // ALSO: Find properties mentioned in this partner's coworking spaces or meeting rooms
+    // (In case they are manager/staff but the property record is owned by a main account)
+    const [coworkingRefs, meetingRefs] = await Promise.all([
+      CoworkingSpaceModel.find({
+        $or: [{ partner: partnerId }, { managers: partnerId }],
+        isDeleted: false,
+      }).select("property"),
+      MeetingRoomModel.find({
+        partner: partnerId,
+        isDeleted: false,
+      }).select("property"),
+    ]);
+
+    const linkedPropertyIds = [
+      ...coworkingRefs.map((c) => c.property),
+      ...meetingRefs.map((m) => m.property),
+    ].filter(Boolean);
+
+    const relatedProperties = await PropertyModel.find({
+      _id: { $in: linkedPropertyIds },
+      isDeleted: false,
+    });
+
+    // Merge and deduplicate
+    const allProperties = [...ownedProperties];
+    relatedProperties.forEach((rp) => {
+      if (!allProperties.find((p) => p._id.toString() === rp._id.toString())) {
+        allProperties.push(rp);
+      }
+    });
+
     console.log(
-      `[DEBUG] Found ${properties.length} properties for partner: ${userId}`,
+      `[DEBUG] Found ${allProperties.length} total related properties for partner: ${userId}`,
     );
+
+    const properties = allProperties;
 
     const spaces = properties
       .map((p: any) => {
@@ -282,10 +316,12 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
             city: pObj.city || "N/A",
             area: pObj.area || "N/A",
             location: pObj.area || "N/A",
-            status: pObj.isActive ? "ACTIVE" : "INACTIVE",
+            status: pObj.isActive ? "active" : "inactive",
             type: "Property",
             kycStatus: pObj.kycStatus || "not_started",
             propertyStatus: pObj.status || "draft",
+            images: pObj.images || [],
+            image: pObj.images?.[0] || "",
           };
         } catch (err) {
           console.error("Mapping error for property:", p._id, err);
@@ -2836,4 +2872,3 @@ export const getUserVisits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
-
