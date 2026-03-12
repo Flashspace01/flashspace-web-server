@@ -1,5 +1,54 @@
 import { Request, Response } from "express";
 import ChatSession from "../models/ChatSession";
+import axios from "axios";
+
+const AI_BACKEND_URL = "http://91.108.105.211:8001/chat";
+
+// Send message to AI backend and return response
+export const sendMessage = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Message is required" });
+    }
+
+    console.log(`[CHAT] Sending message to AI backend: "${message}"`);
+
+    // Call AI backend
+    const response = await axios.post(
+      AI_BACKEND_URL,
+      {
+        query: message,
+        conversation_id: "default",
+        session_id: userId // Use userId as session identifier
+      },
+      { timeout: 30000 } // 30s timeout
+    );
+
+    const aiResponse = response.data;
+    console.log(`[CHAT] AI backend response:`, aiResponse);
+
+    // Extract reply from response (backend returns { reply, session_id } or similar)
+    const reply = aiResponse.reply || aiResponse.message || aiResponse.response || JSON.stringify(aiResponse);
+
+    res.status(200).json({
+      success: true,
+      reply,
+      message: reply // Also include as message for compatibility
+    });
+  } catch (error: any) {
+    console.error("[CHAT] Error calling AI backend:", error.message || error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get response from AI backend"
+    });
+  }
+};
 
 // Get all chat sessions for the authenticated user
 export const getSessions = async (req: Request, res: Response) => {
