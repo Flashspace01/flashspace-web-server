@@ -27,6 +27,7 @@ import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.m
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SeatBookingModel } from "../../seatingModule/seating.model";
+import { PaymentModel, PaymentType } from "../../paymentModule/payment.model";
 
 // ============ DASHBOARD ============
 
@@ -344,10 +345,10 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
         type: b.type,
         date: b.createdAt
           ? new Date(b.createdAt).toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
           : "Unknown",
         kycStatus: b.kycStatus || "pending",
         status: b.status,
@@ -832,7 +833,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
     else if (type === "coworking_space") normalizedType = "CoworkingSpace";
     else if (type === "meeting_room") normalizedType = "MeetingRoom";
 
-    const filter: any = { user: userId, isDeleted: false };
+    const filter: any = { user: userId, isDeleted: { $ne: true } };
     if (normalizedType) filter.type = normalizedType;
     if (status) filter.status = status;
 
@@ -850,12 +851,33 @@ export const getAllBookings = async (req: Request, res: Response) => {
       }
     }
 
+    // Completed payments with missing bookings (legacy failure recovery)
+    let paymentTypeFilter: string | undefined;
+    if (normalizedType === "VirtualOffice") paymentTypeFilter = PaymentType.VIRTUAL_OFFICE;
+    else if (normalizedType === "CoworkingSpace") paymentTypeFilter = PaymentType.COWORKING_SPACE;
+    else if (normalizedType === "MeetingRoom") paymentTypeFilter = PaymentType.MEETING_ROOM;
+
+    const shouldIncludePaymentFallback =
+      !status || status === "pending_kyc" || status === "active";
+
+    const paymentFallbackQuery: any = {
+      user: userId,
+      status: "completed",
+      isDeleted: { $ne: true },
+      paymentType: { $ne: PaymentType.SEAT_BOOKING },
+    };
+
+    if (paymentTypeFilter) {
+      paymentFallbackQuery.paymentType = paymentTypeFilter;
+    }
+
     // 1. Fetch data and counts
     const [
       bookingsRaw,
       totalBookingsMain,
       seatBookingsRaw,
       totalSeatBookingsCount,
+      completedPaymentsRaw,
     ] = await Promise.all([
       BookingModel.find(filter)
         .sort({ createdAt: -1 })
@@ -864,14 +886,19 @@ export const getAllBookings = async (req: Request, res: Response) => {
       BookingModel.countDocuments(filter),
       seatFilter
         ? SeatBookingModel.find(seatFilter)
-            .populate("space")
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(Number(limit))
+          .populate("space")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(Number(limit))
         : Promise.resolve([]),
       seatFilter
         ? SeatBookingModel.countDocuments(seatFilter)
         : Promise.resolve(0),
+      shouldIncludePaymentFallback
+        ? PaymentModel.find(paymentFallbackQuery)
+          .sort({ createdAt: -1 })
+          .limit(limitNum)
+        : Promise.resolve([]),
     ]);
 
     // 2. Normalize seat bookings
@@ -913,11 +940,52 @@ export const getAllBookings = async (req: Request, res: Response) => {
       };
     });
 
+    // 3. Synthesize fallback bookings from completed payments when booking docs are missing
+    const existingPaymentIds = new Set(
+      (bookingsRaw as any[])
+        .map((b: any) => (b.payment ? String(b.payment) : null))
+        .filter(Boolean),
+    );
+
+    const fallbackBookingsFromPayments = (completedPaymentsRaw as any[])
+      .filter((p) => !existingPaymentIds.has(String(p._id)))
+      .map((p: any) => ({
+        _id: `payment-${p._id}`,
+        bookingNumber: `P-${String(p.razorpayOrderId || p._id).slice(-8).toUpperCase()}`,
+        type:
+          p.paymentType === PaymentType.VIRTUAL_OFFICE
+            ? "VirtualOffice"
+            : p.paymentType === PaymentType.MEETING_ROOM
+              ? "MeetingRoom"
+              : "CoworkingSpace",
+        spaceId: p.space,
+        user: p.user,
+        spaceSnapshot: {
+          _id: p.space,
+          name: p.spaceName,
+          address: "",
+          city: "",
+          image: "",
+        },
+        plan: {
+          name: p.planName || "Booked Plan",
+          price: p.totalAmount || 0,
+          tenure: p.tenure || 1,
+          tenureUnit: "months",
+        },
+        status: "pending_kyc",
+        startDate: p.startDate || p.createdAt,
+        endDate: p.startDate || p.createdAt,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      }));
+
     // 4. Combine and Re-sort
     // Note: This merging logic is simplified. For large datasets, a more robust paginated merge would be needed.
     const allBookings = [
       ...bookingsRaw.map((b) => b.toObject()),
       ...normalizedSeatBookings,
+      ...fallbackBookingsFromPayments,
     ]
       .sort(
         (a, b) =>
@@ -941,10 +1009,16 @@ export const getAllBookings = async (req: Request, res: Response) => {
       success: true,
       data: bookingsWithDays,
       pagination: {
-        total: totalBookingsMain + totalSeatBookingsCount,
+        total:
+          totalBookingsMain +
+          totalSeatBookingsCount +
+          fallbackBookingsFromPayments.length,
         page: Number(page),
         pages: Math.ceil(
-          (totalBookingsMain + totalSeatBookingsCount) / Number(limit),
+          (totalBookingsMain +
+            totalSeatBookingsCount +
+            fallbackBookingsFromPayments.length) /
+          Number(limit),
         ),
       },
     });
@@ -1237,13 +1311,17 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       const userObject = new mongoose.Types.ObjectId(userId as string);
       const profileObject = new mongoose.Types.ObjectId(profileId as string);
       let kyc: any = await KYCDocumentModel.findOne({
+        _id: profileObject,
         user: userObject,
+        isDeleted: { $ne: true },
       });
       console.log("[getKYCStatus] KYC: ", kyc);
       // 2. If not found, try BusinessInfoModel
       if (!kyc) {
         const businessInfo = await BusinessInfoModel.findOne({
-          user: userObject,
+          _id: profileId,
+          user: userId,
+          isDeleted: { $ne: true },
         });
 
         if (businessInfo) {
@@ -1275,7 +1353,12 @@ export const getKYCStatus = async (req: Request, res: Response) => {
             documents: businessInfo.documents || [],
             overallStatus: businessInfo.status || "pending",
             rejectionReason: businessInfo.rejectionReason,
-            progress: 0,
+            progress: calculateKYCProgress({
+              kycType: "business",
+              documents: businessInfo.documents || [],
+              businessInfo: businessInfo,
+              personalInfo: mainProfile?.personalInfo || {},
+            }),
             createdAt: businessInfo.createdAt,
             updatedAt: businessInfo.updatedAt,
           };
@@ -1768,23 +1851,34 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     }
 
     console.log("[STEP 3] Finding KYC profile in database...");
+    console.log("[STEP 3] profileId:", profileId, "userId:", userId);
+
     let kyc: any = await KYCDocumentModel.findOne({
       _id: profileId,
       user: userId,
     });
+    console.log("[STEP 3b] KYCDocumentModel result:", kyc ? "FOUND" : "NOT FOUND");
 
     if (!kyc) {
       // Check if it is a partner profile
       kyc = await PartnerKYCModel.findOne({ _id: profileId, user: userId });
+      console.log("[STEP 3c] PartnerKYCModel result:", kyc ? "FOUND" : "NOT FOUND");
     }
 
     if (!kyc) {
       // Check if it is a business profile
       kyc = await BusinessInfoModel.findOne({ _id: profileId, user: userId });
+      console.log("[STEP 3d] BusinessInfoModel result:", kyc ? "FOUND" : "NOT FOUND");
+
+      if (!kyc) {
+        // Debug: check if the profile exists at all (without user filter)
+        const anyProfile = await BusinessInfoModel.findById(profileId);
+        console.log("[STEP 3e] BusinessInfo exists without user filter:", anyProfile ? `YES (user: ${anyProfile.user})` : "NO");
+      }
     }
 
     if (!kyc) {
-      console.log("[STEP 3a] FAIL: Profile not found for:", profileId);
+      console.log("[STEP 3a] FAIL: Profile not found for:", profileId, "user:", userId);
       return res
         .status(404)
         .json({ success: false, message: "Profile not found" });
@@ -1850,11 +1944,22 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
       kyc.documents.push(docEntry);
     }
 
+    // Explicitly mark documents as modified to ensure Mongoose saves the array update
+    kyc.markModified("documents");
+
     // Update progress
-    kyc.progress = calculateKYCProgress(kyc);
-    // Don't auto-set to pending on document upload - let user explicitly submit
-    if (kyc.overallStatus === "not_started") {
-      kyc.overallStatus = "in_progress";
+    // Update progress - only for models that support it
+    if (typeof kyc.kycType !== "undefined") {
+      // KYCDocument or PartnerKYC model
+      kyc.progress = calculateKYCProgress(kyc);
+      if (kyc.overallStatus === "not_started") {
+        kyc.overallStatus = "in_progress";
+      }
+    } else {
+      // BusinessInfo model - uses 'status' not 'overallStatus', no 'progress' field
+      if (kyc.status === "in_progress" || !kyc.status) {
+        kyc.status = "in_progress";
+      }
     }
     kyc.updatedAt = new Date();
 
@@ -1908,34 +2013,10 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
 
     if (!kyc) {
       // Check if it is a partner profile
-      const partner = await PartnerKYCModel.findOne({
+      kyc = await PartnerKYCModel.findOne({
         _id: profileId,
         user: userId,
       });
-      if (partner) {
-        kyc = {
-          _id: partner._id,
-          user: partner.user,
-          kycType: "individual", // Partners are individuals
-          isPartner: true,
-          personalInfo: {
-            fullName: partner.fullName,
-            email: partner.email,
-            phone: partner.phone,
-            panNumber: partner.panNumber,
-            aadhaarNumber: partner.aadhaarNumber,
-            dateOfBirth: partner.dob,
-          },
-          businessInfo: {
-            companyName: "N/A",
-            partners: [],
-          },
-          documents: partner.documents || [],
-          overallStatus: partner.status,
-          createdAt: partner.createdAt,
-          updatedAt: partner.updatedAt,
-        };
-      }
     }
 
     if (!kyc) {
@@ -1949,19 +2030,24 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
         .json({ success: false, message: "Profile not found" });
     }
 
-    // Check if document exists
-    const docIndex =
-      kyc.documents?.findIndex(
-        (d: KYCDocumentItem) => d.type === documentType,
-      ) ?? -1;
-    if (docIndex === -1) {
+    // Find the document to be deleted for file removal
+    const docToDelete = kyc.documents?.find(
+      (d: KYCDocumentItem) => d.type === documentType,
+    );
+
+    if (!docToDelete) {
       return res
         .status(404)
         .json({ success: false, message: "Document not found" });
     }
 
+    // Filter out the document to be deleted
+    kyc.documents = kyc.documents?.filter((d: any) => d.type !== documentType) || [];
+
+    // Explicitly mark documents as modified for Mongoose
+    kyc.markModified("documents");
+
     // Delete file from disk if exists
-    const docToDelete = kyc.documents![docIndex];
     if (docToDelete.fileUrl) {
       const filename = docToDelete.fileUrl.split("/").pop();
       if (filename) {
@@ -1976,34 +2062,44 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
         if (fs.existsSync(filePath)) {
           fs.unlink(filePath, (err) => {
             if (err) console.error("[Delete File] Error:", err);
+            else console.log("[Delete File] Success:", filename);
           });
         }
       }
     }
 
-    // Remove document
-    kyc.documents!.splice(docIndex, 1);
+    // Update progress/status - only for models that support it
+    if (typeof kyc.kycType !== "undefined") {
+      // KYCDocument or PartnerKYC model
+      kyc.progress = calculateKYCProgress(kyc);
 
-    // Update progress
-    kyc.progress = calculateKYCProgress(kyc);
-    // If was approved/pending and user deletes doc, revert to in_progress
-    if (kyc.overallStatus === "approved" || kyc.overallStatus === "pending") {
-      kyc.overallStatus = "in_progress";
-      // Sync User verification status
-      await UserModel.findByIdAndUpdate(userId, { kycVerified: false });
+      // If was approved/pending and user deletes doc, revert to in_progress
+      if (kyc.overallStatus === "approved" || kyc.overallStatus === "pending") {
+        kyc.overallStatus = "in_progress";
+        // Sync User verification status
+        await UserModel.findByIdAndUpdate(userId, { kycVerified: false });
+      }
+    } else {
+      // BusinessInfo model
+      if (kyc.status === "approved" || kyc.status === "pending") {
+        kyc.status = "in_progress";
+      }
     }
-    kyc.updatedAt = new Date();
 
+    kyc.updatedAt = new Date();
     await kyc.save();
 
-    res
-      .status(200)
-      .json({ success: true, message: "Document deleted successfully" });
-  } catch (error) {
+    res.status(200).json({
+      success: true,
+      message: "Document deleted successfully",
+    });
+  } catch (error: any) {
     console.error("Delete KYC doc error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to delete document" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete document",
+      error: error?.message,
+    });
   }
 };
 
@@ -2239,7 +2335,94 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       success: false,
       message: "Failed to submit KYC for review",
       error: error.message,
-      stack: error.stack, // Dev only debugging
+      stack: error.stack,
+    });
+  }
+};
+
+// Delete KYC Profile
+export const deleteKYCProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    const { profileId } = req.params;
+    console.log(`[deleteKYCProfile] User: ${userId}, ProfileId: ${profileId}`);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!profileId || profileId === "undefined" || profileId === "null") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Valid Profile ID required" });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId as string);
+    const profileObjectId = new mongoose.Types.ObjectId(profileId as string);
+
+    // Attempt to find profile first to get documents for cleanup
+    let profileToClear = await KYCDocumentModel.findOne({ _id: profileObjectId, user: userObjectId });
+    if (!profileToClear) profileToClear = await PartnerKYCModel.findOne({ _id: profileObjectId, user: userObjectId });
+    if (!profileToClear) profileToClear = await BusinessInfoModel.findOne({ _id: profileObjectId, user: userObjectId });
+
+    // Cleanup Files from Disk
+    if (profileToClear && profileToClear.documents && profileToClear.documents.length > 0) {
+      console.log(`[deleteKYCProfile] Cleaning up ${profileToClear.documents.length} files for profile ${profileId}`);
+      for (const doc of (profileToClear.documents as any[])) {
+        if (doc.fileUrl) {
+          try {
+            const filename = doc.fileUrl.split("/").pop();
+            if (filename) {
+              const subDir = doc.type === "video_kyc" ? "video-kyc" : "kyc-documents";
+              const filePath = path.join(__dirname, "../../../../uploads", subDir, filename);
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log(`[deleteKYCProfile] Deleted file: ${filename}`);
+              }
+            }
+          } catch (fileErr) {
+            console.error(`[deleteKYCProfile] Error deleting file from disk:`, fileErr);
+          }
+        }
+      }
+    }
+
+    // Hard Delete from all 3 possible models
+    let profile: any = await KYCDocumentModel.findOneAndDelete(
+      { _id: profileObjectId, user: userObjectId }
+    );
+
+    if (!profile) {
+      profile = await PartnerKYCModel.findOneAndDelete(
+        { _id: profileObjectId, user: userObjectId }
+      );
+    }
+
+    if (!profile) {
+      profile = await BusinessInfoModel.findOneAndDelete(
+        { _id: profileObjectId, user: userObjectId }
+      );
+    }
+
+    if (!profile) {
+      console.log(`[deleteKYCProfile] FAIL: Profile not found or already deleted: ${profileId}`);
+      return res
+        .status(404)
+        .json({ success: false, message: "Profile not found or already removed" });
+    }
+
+    console.log(`[deleteKYCProfile] SUCCESS: Removed profile ${profileId} from database.`);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile deleted successfully",
+    });
+  } catch (error: any) {
+    console.error("Delete KYC Profile error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete profile",
+      error: error.message,
     });
   }
 };

@@ -13,6 +13,7 @@ import {
   uploadKYCDocument,
   deleteKYCDocument,
   submitKYCForReview,
+  deleteKYCProfile,
   linkBookingToProfile,
   getAllInvoices,
   getInvoiceById,
@@ -105,6 +106,8 @@ router.post(
   uploadKYCDocument,
 );
 router.delete("/kyc/upload", deleteKYCDocument);
+router.delete("/kyc/profile/:profileId", deleteKYCProfile);
+router.delete("/kyc/business-info/:profileId", deleteKYCProfile);
 router.post(
   "/kyc/submit",
   (req, res, next) => {

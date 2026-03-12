@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { AuthMiddleware } from "../authModule/middleware/auth.middleware";
 import {
   createOrder,
   verifyPayment,
@@ -11,7 +12,11 @@ import {
 export const paymentRoutes = Router();
 
 // Create a new order
-paymentRoutes.post("/create-order", createOrder);
+paymentRoutes.post(
+  "/create-order",
+  AuthMiddleware.authenticate,
+  createOrder,
+);
 
 // Verify payment (Razorpay callback)
 paymentRoutes.post("/verify", verifyPayment);
