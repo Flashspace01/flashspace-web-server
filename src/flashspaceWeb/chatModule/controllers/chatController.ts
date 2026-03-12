@@ -32,9 +32,15 @@ export const saveSession = async (req: Request, res: Response) => {
     const { _id, id, title, messages, date } = req.body;
     const sessionId = _id || id; // Frontend may send either
 
+    // Strip frontend-only fields (isTyping) before persisting to avoid re-triggering
+    // typewriter animation when sessions are reloaded from DB.
+    const cleanMessages = Array.isArray(messages)
+      ? messages.map(({ isTyping: _ignored, ...msg }: any) => msg)
+      : messages;
+
     console.log(`[CHAT] Save request — sessionId: ${sessionId}, messages: ${messages?.length}`);
 
-    if (!messages || messages.length === 0) {
+    if (!cleanMessages || cleanMessages.length === 0) {
       return res.status(400).json({ success: false, message: "Messages are required." });
     }
 
@@ -46,7 +52,7 @@ export const saveSession = async (req: Request, res: Response) => {
 
     if (existingSession) {
       existingSession.title = title || existingSession.title;
-      existingSession.messages = messages;
+      existingSession.messages = cleanMessages;
       existingSession.date = date || existingSession.date;
       await existingSession.save();
       console.log(`[CHAT] Updated existing session: ${existingSession._id}`);
@@ -61,7 +67,7 @@ export const saveSession = async (req: Request, res: Response) => {
     const newSession = new ChatSession({
       user: userId,
       title: title || "Chat session",
-      messages,
+      messages: cleanMessages,
       date: date || new Date().toLocaleDateString(),
     });
 
