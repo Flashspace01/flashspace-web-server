@@ -185,16 +185,16 @@ const seedAffiliateData = async () => {
             const numTickets = faker.number.int({ min: 2, max: 5 });
             for (let j = 0; j < numTickets; j++) {
                 const ticketId = await SupportTicketModel.generateId();
-                const ticketCreatedAt = faker.date.past({ days: 30 });
-                
+                const ticketCreatedAt = faker.date.recent({ days: 30 });
+
                 await SupportTicketModel.create({
                     ticketId,
                     affiliateId,
                     subject: faker.helpers.arrayElement([
-                        "Commission Enquiry", 
-                        "Payout Delayed", 
-                        "Lead Tracking Issue", 
-                        "Account Access", 
+                        "Commission Enquiry",
+                        "Payout Delayed",
+                        "Lead Tracking Issue",
+                        "Account Access",
                         "New Marketing Assets Request"
                     ]),
                     status: faker.helpers.arrayElement(Object.values(TicketStatus)),
