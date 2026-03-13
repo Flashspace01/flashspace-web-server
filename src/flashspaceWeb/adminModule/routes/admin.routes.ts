@@ -102,6 +102,16 @@ adminRoutes.get(
   AdminController.getRevenueDashboard,
 );
 
+// 2.2 Leaderboard Dashboard
+adminRoutes.get(
+  "/leaderboard",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  AdminController.getLeaderboard,
+);
+
 // 3. User Management - Currently Super Admin only
 adminRoutes.get(
   "/users",
