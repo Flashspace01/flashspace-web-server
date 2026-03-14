@@ -20,7 +20,12 @@ import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes"
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
+console.log("🚀 mainRoutes.ts is being loaded...");
 export const mainRoutes = Router();
+
+mainRoutes.get("/test-debug", (req, res) => {
+  res.json({ success: true, message: "Debug route is working!", timestamp: new Date() });
+});
 
 import mongoose from "mongoose";
 
@@ -67,8 +72,8 @@ mainRoutes.use("/admin", adminRoutes);
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
-// /api/coupon
-mainRoutes.use("/coupon", couponRoutes);
+// /api/coupons
+mainRoutes.use("/coupons", couponRoutes);
 // /api/mail
 mainRoutes.use("/mail", mailRoutes);
 // /api/meetingRoom

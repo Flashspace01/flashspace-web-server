@@ -1873,4 +1873,80 @@ export class AdminService {
       };
     }
   }
+
+  // Get Leaderboard (Sales & Support)
+  async getLeaderboard(): Promise<ApiResponse<any>> {
+    try {
+      // 1. Get Support Ranking
+      const supportUsers = await UserModel.find({
+        role: UserRole.SUPPORT,
+        isDeleted: false,
+      }).select("fullName email role");
+
+      const supportStats = await Promise.all(
+        supportUsers.map(async (user, index) => {
+          const totalTickets = await TicketModel.countDocuments({
+            assignee: user._id,
+          });
+          const resolvedTickets = await TicketModel.countDocuments({
+            assignee: user._id,
+            status: TicketStatus.RESOLVED,
+          });
+
+          const resolutionRate =
+            totalTickets > 0
+              ? Math.round((resolvedTickets / totalTickets) * 100)
+              : 0;
+
+          return {
+            _id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+            rank: index + 1, // Placeholder sorting for now
+            totalTickets,
+            resolvedTickets,
+            resolution: `${resolutionRate}%`,
+            resolutionRate,
+          };
+        }),
+      );
+
+      // Sort support by resolution rate
+      supportStats.sort((a, b) => b.resolutionRate - a.resolutionRate);
+      supportStats.forEach((s, idx) => (s.rank = idx + 1));
+
+      // 2. Get Sales Ranking
+      const salesUsers = await UserModel.find({
+        role: UserRole.SALES,
+        isDeleted: false,
+      })
+        .select("fullName email role")
+        .sort({ createdAt: 1 });
+
+      const salesStats = salesUsers.map((user, index) => ({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        rank: index + 1,
+      }));
+
+      return {
+        success: true,
+        message: "Leaderboard fetched successfully",
+        data: {
+          sales: salesStats,
+          support: supportStats,
+        },
+      };
+    } catch (error: any) {
+      console.error("Error fetching leaderboard:", error);
+      return {
+        success: false,
+        message: "Failed to fetch leaderboard",
+        error: error.message,
+      };
+    }
+  }
 }

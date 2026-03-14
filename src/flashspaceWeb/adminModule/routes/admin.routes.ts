@@ -17,7 +17,9 @@ import {
   getSpacePartnerPropertiesByUserId,
 } from "../../spacePartnerModule/controllers/spacekyc.controller";
 import { AffiliateAdminController } from "../../affiliatePortalModule/controllers/affiliateAdmin.controller";
-console.log("Admin Routes Loaded");
+import { financeRoutes } from "./finance.routes";
+console.log("🔒 Admin Routes Loaded");
+console.log("💰 Finance Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
@@ -311,6 +313,19 @@ adminRoutes.get(
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
   AffiliateAdminController.getAffiliateStats,
 );
+
+// 8.1 Leaderboard
+adminRoutes.get(
+  "/leaderboard",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  AdminController.getLeaderboard,
+);
+
+// 9. Finance Management
+adminRoutes.use("/finance", financeRoutes);
 
 // Note: The ticket routes from ticketModule already have /admin prefix
 // So they will be accessible at:
