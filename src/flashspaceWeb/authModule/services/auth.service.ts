@@ -246,7 +246,7 @@ export class AuthService {
         profile.role = role;
       }
 
-      // Continue with existing Google auth logic
+      // Continue wapapith existing Google auth logic
       return await this.googleAuth(profile);
     } catch (error) {
       console.error("Google token auth error:", error);

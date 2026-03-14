@@ -75,7 +75,7 @@ const seedAffiliateData = async () => {
             for (let j = 0; j < numLeads; j++) {
                 leads.push({
                     affiliateId,
-                    name: faker.person.fullName(),
+                    fullName: faker.person.fullName(),
                     phone: faker.phone.number(),
                     email: faker.internet.email().toLowerCase(),
                     company: faker.company.name(),
