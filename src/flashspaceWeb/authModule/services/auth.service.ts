@@ -77,7 +77,7 @@ export class AuthService {
         phoneNumber,
         authProvider: AuthProvider.LOCAL,
         role: selectedRole,
-        isEmailVerified: false,
+        isEmailVerified: true,
         emailVerificationOTP: otpData.otp,
         emailVerificationOTPExpiry: otpData.expiresAt,
         emailVerificationOTPAttempts: 0,
@@ -88,20 +88,38 @@ export class AuthService {
 
       const user = await this.userRepository.create(userData);
 
-      // Send OTP email
+      // Send welcome email (non-blocking)
       try {
-        await EmailUtil.sendEmailVerificationOTP(email, otpData.otp, fullName);
-        console.log("✅ Verification OTP sent to:", email);
-        console.log("📌 OTP Code (for testing):", otpData.otp);
+        await EmailUtil.sendWelcomeEmail(email, fullName);
+        console.log("✅ Welcome email sent to:", email);
       } catch (emailError) {
-        console.error("Error sending verification OTP:", emailError);
-        // Continue with registration even if email fails
+        console.error("Error sending welcome email:", emailError);
+        // Continue even if email fails
       }
+
+      // Generate tokens so the user is logged in immediately after signup
+      const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      };
+
+      const tokens = JwtUtil.generateTokenPair(tokenPayload);
+
+      // Save refresh token
+      await this.userRepository.addRefreshToken(
+        user._id.toString(),
+        tokens.refreshToken,
+      );
+
+      // Update last login
+      await this.userRepository.update(user._id.toString(), {
+        lastLogin: new Date(),
+      });
 
       return {
         success: true,
-        message:
-          "Account created successfully. Please check your email for the verification code.",
+        message: "Account created successfully. Welcome to FlashSpace!",
         user: {
           id: user._id.toString(),
           email: user.email,
@@ -111,6 +129,7 @@ export class AuthService {
           kycVerified: user.kycVerified,
           credits: user.credits || 0,
         },
+        tokens,
       };
     } catch (error) {
       console.error("Signup error:", error);
@@ -164,14 +183,6 @@ export class AuthService {
         };
       }
 
-      // Check if email is verified
-      if (!user.isEmailVerified) {
-        console.log(`⚠️ Login failed: Email not verified for ${email}`);
-        return {
-          success: false,
-          message: "Please verify your email before logging in",
-        };
-      }
 
       // Generate tokens
       const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {

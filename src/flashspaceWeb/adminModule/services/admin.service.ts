@@ -1,4 +1,4 @@
-﻿import {
+import {
   UserModel,
   AuthProvider,
   UserRole,
@@ -1870,6 +1870,65 @@ export class AdminService {
         success: false,
         message: "Failed to fetch invoices",
         error: error.message,
+      };
+    }
+  }
+
+  // Get Leaderboards (Sales and Support)
+  async getLeaderboard(): Promise<ApiResponse<any>> {
+    try {
+      // 1. Fetch Sales Staff
+      const salesUsers = await UserModel.find({ role: UserRole.SALES, isDeleted: false })
+        .select('_id fullName email role')
+        .lean();
+        
+      const sales = salesUsers.map((user, index) => ({
+        ...user,
+        rank: index + 1
+      }));
+
+      // 2. Fetch Support Staff
+      const supportUsers = await UserModel.find({ role: UserRole.SUPPORT, isDeleted: false })
+        .select('_id fullName email role')
+        .lean();
+
+      const supportPromises = supportUsers.map(async (user, index) => {
+        const totalTickets = await TicketModel.countDocuments({ assignee: user._id });
+        const resolvedTickets = await TicketModel.countDocuments({ assignee: user._id, status: TicketStatus.RESOLVED });
+        const resolutionRate = totalTickets > 0 ? Math.round((resolvedTickets / totalTickets) * 100) : 100;
+        let resolution = "Excellent";
+        if (resolutionRate < 70) resolution = "Needs Improvement";
+        else if (resolutionRate < 90) resolution = "Good";
+
+        return {
+          ...user,
+          rank: index + 1,
+          totalTickets,
+          resolvedTickets,
+          resolution,
+          resolutionRate
+        };
+      });
+      const support = await Promise.all(supportPromises);
+
+      // Sort support by resolved tickets (descending) then re-assign rank
+      support.sort((a, b) => b.resolvedTickets - a.resolvedTickets);
+      const sortedSupport = support.map((s, index) => ({ ...s, rank: index + 1 }));
+
+      return {
+        success: true,
+        message: "Leaderboard fetched successfully",
+        data: {
+          sales,
+          support: sortedSupport
+        }
+      };
+    } catch (error: any) {
+      console.error("Error fetching leaderboard:", error);
+      return {
+        success: false,
+        message: "Failed to fetch leaderboard",
+        error: error.message
       };
     }
   }
