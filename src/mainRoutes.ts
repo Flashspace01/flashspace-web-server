@@ -29,7 +29,6 @@ mainRoutes.get("/test-debug", (req, res) => {
 
 import mongoose from "mongoose";
 
-// /api/health - Check server and DB status
 mainRoutes.get("/health", (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const statusMap = {
@@ -92,7 +91,7 @@ mainRoutes.use("/notifications", notificationRoutes);
 
 // /api/visit
 import visitRoutes from "./flashspaceWeb/visitModule/routes/visit.routes";
-mainRoutes.use('/visit', visitRoutes);
+mainRoutes.use("/visit", visitRoutes);
 
 // /api/chat
-mainRoutes.use('/chat', chatRoutes);
+mainRoutes.use("/chat", chatRoutes);
