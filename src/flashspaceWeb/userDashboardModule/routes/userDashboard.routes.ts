@@ -13,6 +13,7 @@ import {
   uploadKYCDocument,
   deleteKYCDocument,
   submitKYCForReview,
+  deleteKYCProfile,
   linkBookingToProfile,
   getAllInvoices,
   getInvoiceById,
@@ -31,6 +32,7 @@ import {
   getAllPartnerSpaces,
   getUserMails,
   getUserVisits,
+  getPartnerSpaceBookingAnalytics,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
@@ -56,6 +58,7 @@ router.get("/partner/dashboard", getPartnerDashboardOverview);
 router.get("/partner/active-requests", getPartnerActiveRequests);
 router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
+router.get("/partner/analytics", getPartnerSpaceBookingAnalytics);
 router.get("/partner/clients", getPartnerClients);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
 
@@ -103,6 +106,8 @@ router.post(
   uploadKYCDocument,
 );
 router.delete("/kyc/upload", deleteKYCDocument);
+router.delete("/kyc/profile/:profileId", deleteKYCProfile);
+router.delete("/kyc/business-info/:profileId", deleteKYCProfile);
 router.post(
   "/kyc/submit",
   (req, res, next) => {

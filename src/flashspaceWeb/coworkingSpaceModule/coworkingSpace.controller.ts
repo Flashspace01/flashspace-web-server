@@ -8,6 +8,7 @@ import {
 } from "./coworkingSpace.validation";
 import { CoworkingSpaceModel } from "./coworkingSpace.model";
 import { PropertyModel } from "../propertyModule/property.model";
+import { UserRole } from "../authModule/models/user.model";
 
 const sendError = (
   res: Response,
@@ -177,6 +178,20 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
       coworkingSpaceId as string,
     );
     if (!space) return sendError(res, 404, "Coworking space not found");
+
+    if (!space.isActive) {
+      const user = (req as any).user;
+      const isPartner = user && user.id && space.partner.toString() === user.id;
+      const isAdmin = user && user.role === UserRole.ADMIN;
+
+      if (!isPartner && !isAdmin) {
+        return sendError(
+          res,
+          403,
+          "This coworking space is currently inactive and cannot be viewed.",
+        );
+      }
+    }
     res.status(200).json({
       success: true,
       message: "Coworking space retrieved successfully",

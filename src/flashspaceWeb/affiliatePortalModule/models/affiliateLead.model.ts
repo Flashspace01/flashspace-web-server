@@ -41,7 +41,7 @@ export class AffiliateLead extends TimeStamps {
   public affiliateId!: Types.ObjectId;
 
   @prop({ required: true, trim: true })
-  public name!: string;
+  public fullName!: string;
 
   @prop({ required: true, trim: true })
   public phone!: string;
