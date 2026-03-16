@@ -372,4 +372,13 @@ export class AdminController {
       res.status(statusCode).json(result);
     }
   }
+  // GET /api/admin/leaderboard
+  static async getLeaderboard(req: Request, res: Response) {
+    const result = await adminService.getLeaderboard();
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
 }

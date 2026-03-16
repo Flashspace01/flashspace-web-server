@@ -78,6 +78,7 @@ export const flattenProperty = (spaceDoc: any) => {
 
     return {
       ...rest,
+      propertyId: property._id || property.id,
       name: property.name,
       address: property.address,
       city: property.city,

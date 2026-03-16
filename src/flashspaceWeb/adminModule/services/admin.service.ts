@@ -1,4 +1,4 @@
-﻿import {
+import {
   UserModel,
   AuthProvider,
   UserRole,
@@ -1869,6 +1869,111 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch invoices",
+        error: error.message,
+      };
+    }
+  }
+
+  async getLeaderboard(): Promise<ApiResponse<any>> {
+    try {
+      // 1. Sales Leaderboard
+      // Rank sales agents (for now, placeholder rank based on creation date)
+      const salesUsers = await UserModel.find({
+        role: UserRole.SALES,
+        isDeleted: false,
+      })
+        .select("fullName email role")
+        .sort({ createdAt: 1 })
+        .lean();
+
+      const sales = (salesUsers as any[]).map((u, index) => ({
+        _id: u._id,
+        fullName: u.fullName,
+        email: u.email,
+        role: u.role,
+        rank: index + 1,
+      }));
+
+      // 2. Support Leaderboard
+      const supportUsers = await UserModel.find({
+        role: UserRole.SUPPORT,
+        isDeleted: false,
+      })
+        .select("fullName email role")
+        .lean();
+
+      const supportStats = await Promise.all(
+        (supportUsers as any[]).map(async (u) => {
+          const totalTickets = await TicketModel.countDocuments({
+            assignee: u._id,
+            isDeleted: { $ne: true },
+          });
+          const resolvedTickets = await TicketModel.countDocuments({
+            assignee: u._id,
+            status: { $in: [TicketStatus.RESOLVED, TicketStatus.CLOSED] },
+            isDeleted: { $ne: true },
+          });
+
+          // Calculate average resolution time
+          const resolvedTicketsDocs = await TicketModel.find({
+            assignee: u._id,
+            status: { $in: [TicketStatus.RESOLVED, TicketStatus.CLOSED] },
+            resolvedAt: { $exists: true, $ne: null },
+          }).select("createdAt resolvedAt");
+
+          let totalResolutionTime = 0;
+          resolvedTicketsDocs.forEach((t: any) => {
+            if (t.resolvedAt) {
+              totalResolutionTime +=
+                (t.resolvedAt as Date).getTime() - (t.createdAt as Date).getTime();
+            }
+          });
+
+          const avgResolutionMs =
+            resolvedTicketsDocs.length > 0
+              ? totalResolutionTime / resolvedTicketsDocs.length
+              : 0;
+          const avgResolutionHours = (avgResolutionMs / (1000 * 3600)).toFixed(1);
+          const resolutionStr = `${avgResolutionHours} hrs`;
+
+          const resolutionRate =
+            totalTickets > 0
+              ? Math.round((resolvedTickets / totalTickets) * 100)
+              : 0;
+
+          return {
+            _id: u._id,
+            fullName: u.fullName,
+            email: u.email,
+            role: u.role,
+            totalTickets,
+            resolvedTickets,
+            resolution: resolutionStr,
+            resolutionRate,
+          };
+        }),
+      );
+
+      // Rank support by resolution rate
+      supportStats.sort((a, b) => b.resolutionRate - a.resolutionRate);
+      const support = supportStats.map((s, index) => ({
+        ...s,
+        rank: index + 1,
+      }));
+
+      return {
+        success: true,
+        message: "Leaderboard fetched successfully",
+        data: {
+          sales,
+          support,
+        },
+      };
+    } catch (error: any) {
+      console.error("Error in getLeaderboard:", error);
+      return {
+        success: false,
+        message: "Failed to fetch leaderboard",
         error: error.message,
       };
     }

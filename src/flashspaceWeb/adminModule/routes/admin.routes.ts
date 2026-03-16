@@ -312,9 +312,12 @@ adminRoutes.get(
   AffiliateAdminController.getAffiliateStats,
 );
 
-// Note: The ticket routes from ticketModule already have /admin prefix
-// So they will be accessible at:
-// GET /api/admin/tickets/admin/all
-// GET /api/admin/tickets/admin/stats
-// PUT /api/admin/tickets/admin/:ticketId
-// etc.
+// 9. Leaderboard
+adminRoutes.get(
+  "/leaderboard",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  AdminController.getLeaderboard,
+);

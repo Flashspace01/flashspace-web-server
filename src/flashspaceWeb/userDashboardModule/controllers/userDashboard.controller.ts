@@ -274,9 +274,9 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
       .map((p: any) => {
         try {
           const pObj = typeof p.toObject === "function" ? p.toObject() : p;
-          // Stringify _id and id explicitly
           const _id = String(pObj._id || pObj.id || "");
           return {
+            ...pObj, // Spread all fields
             _id,
             id: _id,
             name: pObj.name || "N/A",
@@ -287,6 +287,7 @@ export const getAllPartnerSpaces = async (req: Request, res: Response) => {
             type: "Property",
             kycStatus: pObj.kycStatus || "not_started",
             propertyStatus: pObj.status || "draft",
+            image: pObj.images?.[0] || pObj.image || "",
           };
         } catch (err) {
           console.error("Mapping error for property:", p._id, err);
@@ -322,7 +323,18 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
       partner: partnerId,
       isDeleted: false,
       status: { $in: ["pending_payment", "pending_kyc"] },
-    }).populate("user", "fullName email");
+    }).populate("user", "fullName email phoneNumber");
+
+    const userIds = [
+      ...new Set(bookings.map((b: any) => b.user?._id || b.user)),
+    ];
+    const businessInfos = await BusinessInfoModel.find({
+      user: { $in: userIds },
+      isDeleted: false,
+    });
+    const businessMap = new Map(
+      businessInfos.map((info) => [info.user.toString(), info]),
+    );
 
     const requests = bookings.map((b: any) => {
       const name = b.user?.fullName || "Unknown";
@@ -334,12 +346,16 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
           .substring(0, 2)
           .toUpperCase() || "UN";
 
+      const business = businessMap.get(b.user?._id?.toString() || b.user?.toString());
+
       return {
         id: b.bookingNumber || b._id.toString(),
         user: {
           name,
           email: b.user?.email || "Unknown",
+          phone: b.user?.phoneNumber || "N/A",
           avatar: initials,
+          company: business?.companyName || "N/A",
         },
         space: b.spaceSnapshot?.name || "Unknown Space",
         type: b.type,
@@ -577,7 +593,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     const bookings = await BookingModel.find({
       partner: userId,
       isDeleted: false,
-    }).populate("user", "fullName email");
+    }).populate("user", "fullName email phoneNumber");
 
     // 2. Fetch business info for all users in these bookings to get company names
     const userIds = [
@@ -619,6 +635,8 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         userId: userIdStr,
         companyName: business?.companyName || user?.fullName || "N/A",
         contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phoneNumber || "N/A",
         plan: booking.plan?.name || "N/A",
         space: booking.spaceSnapshot?.name || "N/A",
         startDate: booking.startDate
@@ -629,6 +647,8 @@ export const getPartnerClients = async (req: Request, res: Response) => {
           : "N/A",
         status,
         kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+        dealValue: booking.plan?.finalPrice || booking.plan?.price || 0,
+        createdAt: booking.createdAt,
       };
 
       // If user already exists in map, decide which booking to keep
