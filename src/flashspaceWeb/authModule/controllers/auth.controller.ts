@@ -35,11 +35,21 @@ export class AuthController {
 
       const result = await this.authService.signup(signupData);
 
-      if (result.success) {
+      if (result.success && result.tokens) {
+        // Set auth cookies so user is logged in immediately after signup
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
+
         res.status(201).json({
           success: true,
           message: result.message,
-          data: result.user,
+          data: {
+            user: result.user,
+            tokens: result.tokens,
+          },
           error: {},
         });
       } else {
