@@ -17,7 +17,9 @@ import {
   getSpacePartnerPropertiesByUserId,
 } from "../../spacePartnerModule/controllers/spacekyc.controller";
 import { AffiliateAdminController } from "../../affiliatePortalModule/controllers/affiliateAdmin.controller";
-console.log("Admin Routes Loaded");
+import { financeRoutes } from "./finance.routes";
+console.log("🔒 Admin Routes Loaded");
+console.log("💰 Finance Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
@@ -100,6 +102,16 @@ adminRoutes.get(
     Permission.VIEW_ALL_SPACES,
   ]),
   AdminController.getRevenueDashboard,
+);
+
+// 2.2 Leaderboard Dashboard
+adminRoutes.get(
+  "/leaderboard",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_DASHBOARD,
+  ]),
+  AdminController.getLeaderboard,
 );
 
 // 3. User Management - Currently Super Admin only
@@ -312,7 +324,7 @@ adminRoutes.get(
   AffiliateAdminController.getAffiliateStats,
 );
 
-// 9. Leaderboard
+// 8.1 Leaderboard
 adminRoutes.get(
   "/leaderboard",
   RBACMiddleware.requireAnyPermission([
@@ -321,3 +333,13 @@ adminRoutes.get(
   ]),
   AdminController.getLeaderboard,
 );
+
+// 9. Finance Management
+adminRoutes.use("/finance", financeRoutes);
+
+// Note: The ticket routes from ticketModule already have /admin prefix
+// So they will be accessible at:
+// GET /api/admin/tickets/admin/all
+// GET /api/admin/tickets/admin/stats
+// PUT /api/admin/tickets/admin/:ticketId
+// etc.
