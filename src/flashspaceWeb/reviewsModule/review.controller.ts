@@ -243,9 +243,9 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
     ]);
 
     const allSpaceIds = [
-      ...coworkingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
-      ...virtualIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
-      ...meetingIds.map((id: any) => new mongoose.Types.ObjectId(id.toString())),
+      ...coworkingIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
+      ...virtualIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
+      ...meetingIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
     ];
 
     if (allSpaceIds.length === 0) {

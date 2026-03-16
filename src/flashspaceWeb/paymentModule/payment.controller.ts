@@ -149,7 +149,7 @@ async function createBookingAndInvoice(payment: any) {
           coordinates: property.location?.coordinates || [],
         };
       }
-    } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
+      } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
       const space = await MeetingRoomModel.findById(payment.spaceId).populate(
         "property",
       );
@@ -204,10 +204,10 @@ async function createBookingAndInvoice(payment: any) {
     let finalPartnerId: any = foundPartnerId || null;
     if (!finalPartnerId) {
       if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
-        const spaceSet = await VirtualOfficeModel.findById(payment.space);
+        const spaceSet = await VirtualOfficeModel.findById(payment.spaceId);
         finalPartnerId = spaceSet?.partner || null;
       } else if (payment.paymentType === PaymentType.COWORKING_SPACE) {
-        const spaceSet = await CoworkingSpaceModel.findById(payment.space);
+        const spaceSet = await CoworkingSpaceModel.findById(payment.spaceId);
         finalPartnerId = spaceSet?.partner || null;
       } else if (payment.paymentType === PaymentType.MEETING_ROOM) {
         const spaceSet = await MeetingRoomModel.findById(payment.space);

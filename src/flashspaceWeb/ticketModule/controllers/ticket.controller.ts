@@ -30,7 +30,7 @@ export const createTicket = async (
       });
     }
 
-    const { subject, description, category, priority, attachments } = req.body;
+    const { subject, description, category, priority, attachments, bookingId } = req.body;
 
     if (!description || description.trim().length < 10) {
       return res.status(400).json({
@@ -45,13 +45,23 @@ export const createTicket = async (
       category,
       priority,
       attachments,
+      bookingId,
     });
 
     // Notify admins
-    console.log(
-      `Emitting new_ticket_created to admin_feed for ticket: ${ticket._id}`,
-    );
+    console.log(`Emitting new_ticket_created to admin_feed for ticket: ${ticket._id}`);
     getIO().to("admin_feed").emit("new_ticket_created", ticket);
+
+    // Notify the specific space partner (not broadcast to all)
+    if (bookingId) {
+      getIO().emit("partner_new_ticket", { ticket });
+    }
+
+    // Notify the affiliate if this ticket is linked to an affiliate's coupon
+    if ((ticket as any).affiliateId) {
+      const affiliateRoomId = `affiliate_${(ticket as any).affiliateId.toString()}`;
+      getIO().to(affiliateRoomId).emit("affiliate_new_ticket", { ticket });
+    }
 
     res.status(201).json({
       success: true,
@@ -524,9 +534,14 @@ export const addPartnerReply = async (
       message,
     );
 
-    // Emit socket event
-    if (ticket) {
-      getIO().to(ticketId).emit("new_message", { ticketId, ticket });
+    // Emit socket event - emit the new message to the ticket room
+    if (ticket && ticket.messages && ticket.messages.length > 0) {
+      getIO()
+        .to(ticketId)
+        .emit("new_message", {
+          ticketId,
+          message: ticket.messages[ticket.messages.length - 1],
+        });
     }
 
     res.status(200).json({
@@ -573,6 +588,95 @@ export const partnerCloseTicket = async (
     res.status(error.message.includes("access denied") ? 403 : 500).json({
       success: false,
       message: error.message || "Failed to close ticket",
+    });
+  }
+};
+
+// ============ AFFILIATE CONTROLLERS ============
+
+export const getAffiliateTickets = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const affiliateId = req.user?._id || req.user?.id;
+    if (!affiliateId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const result = await TicketService.getAffiliateTickets(affiliateId, page, limit);
+    res.status(200).json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Error fetching affiliate tickets:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed" });
+  }
+};
+
+export const tapInToTicket = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const userRole = req.user?.role || "";
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+    const { ticketId } = req.params as { ticketId: string };
+    const ticket = await TicketService.tapInToTicket(ticketId, userId, userRole);
+
+    // Broadcast tap-in event to all room participants
+    if (ticket) {
+      getIO().to(ticketId).emit("tap_in", { ticketId, userId, role: userRole, ticket });
+      // Also emit the tap-in system message as a new_message
+      const lastMsg = ticket.messages?.[ticket.messages.length - 1];
+      if (lastMsg) {
+        getIO().to(ticketId).emit("new_message", { ticketId, message: lastMsg });
+      }
+    }
+
+    res.status(200).json({ success: true, message: "Tapped in successfully", data: ticket });
+  } catch (error: any) {
+    console.error("Error tapping in:", error);
+    res.status(error.message.includes("Access denied") ? 403 : 500).json({
+      success: false,
+      message: error.message || "Failed to tap in",
+    });
+  }
+};
+
+export const addAffiliateReply = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const affiliateId = req.user?._id || req.user?.id;
+    if (!affiliateId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+    const { ticketId } = req.params as { ticketId: string };
+    const { message } = req.body;
+
+    if (!message?.trim()) {
+      return res.status(400).json({ success: false, message: "Message is required" });
+    }
+
+    const ticket = await TicketService.addAffiliateReply(ticketId, affiliateId, message);
+
+    if (ticket?.messages?.length) {
+      getIO().to(ticketId).emit("new_message", {
+        ticketId,
+        message: ticket.messages[ticket.messages.length - 1],
+      });
+    }
+
+    res.status(200).json({ success: true, message: "Reply sent", data: ticket });
+  } catch (error: any) {
+    console.error("Error sending affiliate reply:", error);
+    res.status(error.message.includes("tap in") ? 403 : 500).json({
+      success: false,
+      message: error.message || "Failed to send reply",
     });
   }
 };
