@@ -52,9 +52,9 @@ export const createTicket = async (
     console.log(`Emitting new_ticket_created to admin_feed for ticket: ${ticket._id}`);
     getIO().to("admin_feed").emit("new_ticket_created", ticket);
 
-    // Notify the specific space partner (not broadcast to all)
-    if (bookingId) {
-      getIO().emit("partner_new_ticket", { ticket });
+    // Notify the specific space partner (directed to their user feed)
+    if (ticket.partnerId) {
+      getIO().to(ticket.partnerId.toString()).emit("partner_new_ticket", { ticket });
     }
 
     // Notify the affiliate if this ticket is linked to an affiliate's coupon
@@ -588,6 +588,52 @@ export const partnerCloseTicket = async (
     res.status(error.message.includes("access denied") ? 403 : 500).json({
       success: false,
       message: error.message || "Failed to close ticket",
+    });
+  }
+};
+
+export const partnerMessageClient = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const partnerId = req.user?._id || req.user?.id;
+    if (!partnerId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    const { clientUserId, bookingId, subject, message } = req.body;
+
+    if (!clientUserId || !subject || !message) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    const ticket = await TicketService.partnerMessageClient(partnerId, {
+      clientUserId,
+      bookingId,
+      subject,
+      message,
+    });
+
+    // Emit socket event
+    if (ticket && ticket.messages && ticket.messages.length > 0) {
+      getIO()
+        .to(ticket._id.toString())
+        .emit("new_message", {
+          ticketId: ticket._id.toString(),
+          message: ticket.messages[ticket.messages.length - 1],
+        });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: ticket,
+    });
+  } catch (error: any) {
+    console.error("Error messaging client:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send message",
     });
   }
 };

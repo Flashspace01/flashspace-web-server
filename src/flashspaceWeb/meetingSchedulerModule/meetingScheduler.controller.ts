@@ -161,7 +161,7 @@ export const getAvailability = async (req: Request, res: Response) => {
 
 export const bookMeeting = async (req: Request, res: Response) => {
   try {
-    const { fullName, email, phoneNumber, slotTime, notes } =
+    const { fullName, email, phoneNumber, slotTime, notes, spaceId } =
       res.locals.validatedBody || req.body;
 
     const result = await MeetingSchedulerService.bookMeeting({
@@ -170,6 +170,7 @@ export const bookMeeting = async (req: Request, res: Response) => {
       phoneNumber,
       slotTime: new Date(slotTime),
       notes,
+      spaceId,
     });
 
     if (!result.success) {

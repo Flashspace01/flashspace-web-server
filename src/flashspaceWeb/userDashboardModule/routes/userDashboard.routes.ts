@@ -33,6 +33,8 @@ import {
   getUserMails,
   getUserVisits,
   getPartnerSpaceBookingAnalytics,
+  getPartnerPropertyAnalytics,
+  convertPartnerRequest,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
@@ -56,9 +58,14 @@ router.get(
 );
 router.get("/partner/dashboard", getPartnerDashboardOverview);
 router.get("/partner/active-requests", getPartnerActiveRequests);
+router.post("/partner/requests/:requestId/convert", convertPartnerRequest);
 router.get("/partner/spaces", getAllPartnerSpaces);
 router.get("/partner/space/:spaceId/bookings", getPartnerSpaceBookings);
 router.get("/partner/analytics", getPartnerSpaceBookingAnalytics);
+router.get(
+  "/partner/property/:propertyId/analytics",
+  getPartnerPropertyAnalytics,
+);
 router.get("/partner/clients", getPartnerClients);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
 

@@ -72,6 +72,12 @@ export const initSocket = (httpServer: HttpServer) => {
       console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
     });
 
+    // Leave ticket room
+    socket.on("leave_ticket", (ticketId: string) => {
+      socket.leave(ticketId);
+      console.log(`Socket ${socket.id} left ticket room: ${ticketId}`);
+    });
+
     // Join user specific notification feed
     socket.on("join_user_feed", (userId: string) => {
       if (userId) {

@@ -10,6 +10,8 @@ import { Types } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
 import { BookingModel } from "../../bookingModule/booking.model";
+import { MeetingModel } from "../../meetingSchedulerModule/meeting.model";
+import Visit from "../../visitModule/models/visit.model";
 
 export interface CreateTicketDTO {
   subject: string;
@@ -44,14 +46,28 @@ export class TicketService {
 
     let chatType: "user_admin" | "user_partner" = "user_admin";
     let affiliateId: Types.ObjectId | undefined = undefined;
+    let partnerId: Types.ObjectId | undefined = undefined;
 
     if (data.bookingId) {
       const booking = (await BookingModel.findById(data.bookingId).lean()) as any;
       if (booking) {
         chatType = "user_partner";
+        if (booking.partner) {
+          partnerId = new Types.ObjectId(booking.partner.toString());
+        }
         if (booking.affiliateId) {
           affiliateId = new Types.ObjectId(booking.affiliateId.toString());
         }
+      }
+    }
+
+    let bookingObjectId: Types.ObjectId | undefined;
+    if (data.bookingId) {
+      if (Types.ObjectId.isValid(data.bookingId)) {
+        bookingObjectId = new Types.ObjectId(data.bookingId);
+      } else {
+        const booking = await BookingModel.findOne({ bookingNumber: data.bookingId }).select("_id").lean();
+        if (booking) bookingObjectId = booking._id as Types.ObjectId;
       }
     }
 
@@ -64,7 +80,8 @@ export class TicketService {
       priority: data.priority || TicketPriority.MEDIUM,
       status: TicketStatus.OPEN,
       attachments: data.attachments || [],
-      bookingId: data.bookingId ? new Types.ObjectId(data.bookingId) : undefined,
+      bookingId: bookingObjectId,
+      partnerId,
       chatType,
       affiliateId,
       tappedIn: [],
@@ -390,7 +407,12 @@ export class TicketService {
     }
 
     const skip = (page - 1) * limit;
-    const query = { bookingId: { $in: bookingIds } };
+    const query = {
+      $or: [
+        { bookingId: { $in: bookingIds } },
+        { partnerId: new Types.ObjectId(partnerId) }
+      ]
+    };
 
     const [tickets, total] = await Promise.all([
       TicketModel.find(query)
@@ -548,6 +570,106 @@ export class TicketService {
     );
 
     return TicketModel.findById(ticket._id)
+      .populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "bookingNumber spaceSnapshot type")
+      .lean();
+  }
+
+  static async partnerMessageClient(
+    partnerId: string,
+    data: { clientUserId: string; bookingId?: string; subject: string; message: string }
+  ) {
+    const partnerObjectId = new Types.ObjectId(partnerId);
+
+    // 1. Try to find if this bookingId is an ObjectId or a bookingNumber
+    let bookingObjectId: Types.ObjectId | undefined;
+    if (data.bookingId) {
+      if (Types.ObjectId.isValid(data.bookingId)) {
+        bookingObjectId = new Types.ObjectId(data.bookingId);
+      } else {
+        const booking = await BookingModel.findOne({ bookingNumber: data.bookingId }).select("_id").lean();
+        if (booking) {
+          bookingObjectId = booking._id as Types.ObjectId;
+        }
+      }
+    }
+
+    // 2. Identify the client
+    if (!data.clientUserId || !Types.ObjectId.isValid(data.clientUserId)) {
+      console.error("[TicketService.partnerMessageClient] Invalid clientUserId:", data.clientUserId);
+      throw new Error(`Invalid or missing client identification: ${data.clientUserId}`);
+    }
+
+    let clientObjectId = new Types.ObjectId(data.clientUserId);
+    
+    // Check if this ID actually belongs to a meeting or visit, and if that lead has a user account
+    try {
+      const [meeting, visit] = await Promise.all([
+        MeetingModel.findById(data.clientUserId).select("bookingUserEmail").lean(),
+        Visit.findById(data.clientUserId).select("email").lean()
+      ]);
+      const email = (meeting as any)?.bookingUserEmail || (visit as any)?.email;
+      if (email) {
+        const user = await UserModel.findOne({ email }).select("_id").lean();
+        if (user) {
+          console.log(`[TicketService.partnerMessageClient] Linked lead ${data.clientUserId} to user ${user._id}`);
+          clientObjectId = user._id as Types.ObjectId;
+        }
+      }
+    } catch (err) {
+      console.warn("[TicketService.partnerMessageClient] Error during lead lookup:", err);
+      // Continue anyway with the original clientUserId
+    }
+
+    // 3. Check for existing direct chat between this partner and user for this context
+    const query: any = {
+      chatType: "user_partner",
+      partnerId: partnerObjectId,
+      $or: [
+        { user: clientObjectId }
+      ]
+    };
+
+    if (bookingObjectId) {
+      query.$or.push({ bookingId: bookingObjectId });
+    }
+    
+    // Also check if the clientUserId itself was used as bookingId (for guest leads)
+    if (data.clientUserId && Types.ObjectId.isValid(data.clientUserId)) {
+      query.$or.push({ bookingId: new Types.ObjectId(data.clientUserId) });
+    }
+
+    let ticket = await TicketModel.findOne(query);
+
+    if (ticket) {
+      console.log(`[TicketService.partnerMessageClient] Found existing ticket: ${ticket.ticketNumber}`);
+      ticket.messages.push({
+        sender: "partner",
+        message: data.message,
+        createdAt: new Date()
+      });
+      ticket.status = TicketStatus.IN_PROGRESS;
+      await ticket.save();
+    } else {
+      console.log(`[TicketService.partnerMessageClient] Creating new ticket for ${clientObjectId}`);
+      const ticketNumber = Ticket.generateTicketNumber();
+      ticket = await TicketModel.create({
+        ticketNumber,
+        subject: data.subject,
+        description: data.message,
+        user: clientObjectId,
+        partnerId: partnerObjectId,
+        bookingId: bookingObjectId || (Types.ObjectId.isValid(data.clientUserId) ? new Types.ObjectId(data.clientUserId) : undefined),
+        category: TicketCategory.LEADS,
+        priority: TicketPriority.MEDIUM,
+        status: TicketStatus.OPEN,
+        chatType: "user_partner",
+        messages: [{ sender: "partner", message: data.message, createdAt: new Date() }],
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+    }
+
+    return await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();

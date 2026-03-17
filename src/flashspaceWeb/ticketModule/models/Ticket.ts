@@ -91,6 +91,9 @@ export class Ticket extends TimeStamps {
   @prop({ ref: () => Booking, default: null })
   public bookingId?: Ref<Booking>;
 
+  @prop({ ref: () => User, default: null })
+  public partnerId?: Ref<User>;
+
   // ── Tap-In / Multi-party chat fields ─────────────────────────────
   /**
    * chatType controls who can see and reply.
