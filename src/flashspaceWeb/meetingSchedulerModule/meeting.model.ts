@@ -1,4 +1,4 @@
-import { prop, modelOptions, getModelForClass, index } from "@typegoose/typegoose";
+import { prop, modelOptions, getModelForClass, index, Ref } from "@typegoose/typegoose";
 
 export enum MeetingStatus {
     Scheduled = "scheduled",
@@ -39,6 +39,12 @@ export class Meeting {
 
     @prop({ enum: MeetingStatus, default: MeetingStatus.Scheduled })
     public status!: MeetingStatus;
+
+    @prop({ ref: () => "User" }) // Use string reference to avoid circular dependency
+    public partner?: Ref<any>;
+
+    @prop()
+    public spaceId?: string;
 
     @prop()
     public notes?: string;

@@ -10,6 +10,7 @@ import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
 import Mail from "../../mailModule/models/mail.model";
 import Visit from "../../visitModule/models/visit.model";
+import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
 import {
   CreditLedgerModel,
   CreditType,
@@ -28,6 +29,8 @@ import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.mode
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SeatBookingModel } from "../../seatingModule/seating.model";
 import { PaymentModel, PaymentType } from "../../paymentModule/payment.model";
+import { MeetingModel, MeetingStatus } from "../../meetingSchedulerModule/meeting.model";
+import { MeetingSchedulerService } from "../../meetingSchedulerModule/meetingScheduler.service";
 
 // ============ DASHBOARD ============
 
@@ -336,44 +339,183 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
       businessInfos.map((info) => [info.user.toString(), info]),
     );
 
-    const requests = bookings.map((b: any) => {
-      const name = b.user?.fullName || "Unknown";
-      const initials =
-        name
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .substring(0, 2)
-          .toUpperCase() || "UN";
+    const [meetings, visits] = await Promise.all([
+      MeetingModel.find({
+        partner: partnerId,
+        status: "scheduled",
+      }),
+      Visit.find({
+        partnerId: partnerId,
+        status: "Pending"
+      })
+    ]);
 
-      const business = businessMap.get(b.user?._id?.toString() || b.user?.toString());
+    // Find real users for meeting/visit emails to link chat correctly
+    const meetingEmails = meetings.map(m => m.bookingUserEmail);
+    const visitEmails = visits.map(v => v.email);
+    const allEmails = [...new Set([...meetingEmails, ...visitEmails])];
+    
+    const leadUsers = await UserModel.find({ email: { $in: allEmails } }).select("_id email").lean();
+    const userEmailMap = new Map(leadUsers.map(u => [u.email, u._id.toString()]));
 
-      return {
-        id: b.bookingNumber || b._id.toString(),
-        user: {
-          name,
-          email: b.user?.email || "Unknown",
-          phone: b.user?.phoneNumber || "N/A",
-          avatar: initials,
-          company: business?.companyName || "N/A",
-        },
-        space: b.spaceSnapshot?.name || "Unknown Space",
-        type: b.type,
-        date: b.createdAt
-          ? new Date(b.createdAt).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })
-          : "Unknown",
-        kycStatus: b.kycStatus || "pending",
-        status: b.status,
-      };
-    });
+    // 4. Find Support Tickets (Queries) linked to these bookings or partner directly
+    const partnerBookingIds = await BookingModel.find({
+      partner: partnerId,
+      isDeleted: false,
+    }).distinct("_id");
+
+    const supportTickets = await TicketModel.find({
+      $or: [
+        { bookingId: { $in: partnerBookingIds } },
+        { partnerId: partnerId }
+      ],
+      status: { $in: ["open", "in_progress"] },
+    }).populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "spaceSnapshot")
+      .lean();
+
+    const combinedRequests = [
+      ...bookings.map((b: any) => {
+        const name = b.user?.fullName || "Unknown";
+        const initials =
+          name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase() || "UN";
+
+        const business = businessMap.get(b.user?._id?.toString() || b.user?.toString());
+
+        return {
+          id: b.bookingNumber || b._id.toString(),
+          user: {
+            id: b.user?._id?.toString() || b.user?.toString(),
+            name,
+            email: b.user?.email || "Unknown",
+            phone: b.user?.phoneNumber || "N/A",
+            avatar: initials,
+            company: business?.companyName || "N/A",
+          },
+          space: b.spaceSnapshot?.name || "Unknown Space",
+          type: b.type,
+          date: b.createdAt
+            ? new Date(b.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+            : "Unknown",
+          kycStatus: b.kycStatus || "pending",
+          status: b.status,
+          category: "Booking"
+        };
+      }),
+      ...meetings.map((m: any) => {
+        const name = m.bookingUserName || "Unknown";
+        const initials =
+          name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase() || "UN";
+        return {
+          id: m._id.toString(),
+          user: {
+            id: userEmailMap.get(m.bookingUserEmail) || m._id.toString(), // Use user ID if exists, otherwise request ID
+            name: m.bookingUserName,
+            email: m.bookingUserEmail,
+            phone: m.bookingUserPhone,
+            avatar: initials,
+            company: "N/A",
+          },
+          space: m.notes ? m.notes.split(" - ")[0] : "General Inquiry",
+          type: "Meeting",
+          date: m.createdAt
+            ? new Date(m.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+            : "Unknown",
+          kycStatus: "approved",
+          status: m.status,
+          category: "Meeting"
+        };
+      }),
+      ...visits.map((v: any) => {
+        const name = v.visitor || "Unknown";
+        const initials =
+          name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase() || "UN";
+        return {
+          id: v._id.toString(),
+          user: {
+            id: userEmailMap.get(v.email) || v._id.toString(), // Use user ID if exists, otherwise request ID
+            name: v.visitor,
+            email: v.email,
+            phone: "N/A",
+            avatar: initials,
+            company: "N/A",
+          },
+          space: v.space || "Space Visit",
+          type: "Visit",
+          date: v.date
+            ? new Date(v.date).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+            : "Unknown",
+          kycStatus: "approved",
+          status: v.status,
+          category: "Visit"
+        };
+      }),
+      ...supportTickets.map((t: any) => {
+        const name = t.user?.fullName || "Unknown";
+        const initials =
+          name
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase() || "UN";
+        return {
+          id: t._id.toString(),
+          ticketNumber: t.ticketNumber,
+          user: {
+            id: t.user?._id?.toString() || t._id.toString(),
+            name,
+            email: t.user?.email || "Unknown",
+            phone: t.user?.phoneNumber || "N/A",
+            avatar: initials,
+            company: "N/A",
+          },
+          space: t.bookingId?.spaceSnapshot?.name || t.subject || "Query",
+          type: "Query",
+          date: t.createdAt
+            ? new Date(t.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })
+            : "Unknown",
+          kycStatus: "approved",
+          status: t.status,
+          category: "Ticket"
+        };
+      })
+    ];
 
     return res.status(200).json({
       success: true,
-      data: requests,
+      data: combinedRequests,
     });
   } catch (error) {
     console.error("Failed to fetch partner active requests:", error);
@@ -838,6 +980,153 @@ export const getPartnerSpaceBookingAnalytics = async (
       success: false,
       message: "Failed to fetch booking analytics",
     });
+  }
+};
+
+export const getPartnerPropertyAnalytics = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?.id;
+    const { propertyId } = req.params;
+
+    if (!propertyId || !mongoose.Types.ObjectId.isValid(propertyId as string)) {
+      return res.status(400).json({ success: false, message: "Invalid property ID" });
+    }
+
+    const analytics = await BookingService.getPartnerPropertyAnalytics(
+      userId as string,
+      propertyId as string
+    );
+
+    res.status(200).json({ success: true, data: analytics });
+  } catch (error) {
+    console.error("Partner Property Analytics error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch property analytics",
+    });
+  }
+};
+
+export const convertPartnerRequest = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const requestId = req.params.requestId as string;
+    const { category } = req.body;
+
+    if (!requestId || !category) {
+      return res.status(400).json({ success: false, message: "Request ID and category are required" });
+    }
+
+    // For non-booking categories, requestId must be a valid ObjectId
+    if (category !== "Booking" && !mongoose.Types.ObjectId.isValid(requestId)) {
+        return res.status(400).json({ success: false, message: "Invalid Request ID format" });
+    }
+
+    const partnerObjectId = new mongoose.Types.ObjectId(userId);
+
+    let updated;
+    if (category === "Booking") {
+      const query = mongoose.Types.ObjectId.isValid(requestId as string)
+        ? { $or: [{ _id: requestId }, { bookingNumber: requestId }], partner: partnerObjectId, isDeleted: false }
+        : { bookingNumber: requestId, partner: partnerObjectId, isDeleted: false };
+
+      const booking = await BookingModel.findOne(query);
+      if (booking) {
+        booking.status = "active";
+        booking.kycStatus = "approved";
+        
+        if (!booking.startDate) booking.startDate = new Date();
+        if (!booking.endDate) {
+          const endDate = new Date(booking.startDate);
+          endDate.setMonth(endDate.getMonth() + (booking.plan?.tenure || 12));
+          booking.endDate = endDate;
+        }
+        
+        booking.updatedAt = new Date();
+        await booking.save();
+        updated = booking;
+      }
+    } else if (category === "Meeting") {
+      updated = await MeetingModel.findOneAndUpdate(
+        { _id: requestId, partner: partnerObjectId },
+        { status: MeetingStatus.Completed },
+        { new: true }
+      );
+    } else if (category === "Visit") {
+      updated = await Visit.findOneAndUpdate(
+        { _id: requestId, partnerId: partnerObjectId },
+        { status: "Completed" },
+        { new: true }
+      );
+    } else if (category === "Ticket") {
+      // Find tickets by ID and either partnerId match OR linked to one of partner's bookings
+      const partnerBookingIds = await BookingModel.find({
+        partner: partnerObjectId,
+        isDeleted: false
+      }).distinct("_id");
+
+      updated = await TicketModel.findOneAndUpdate(
+        {
+          _id: requestId,
+          $or: [
+            { partnerId: partnerObjectId },
+            { bookingId: { $in: partnerBookingIds } }
+          ]
+        },
+        { status: TicketStatus.RESOLVED },
+        { new: true }
+      );
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid category" });
+    }
+
+    if (!updated) {
+      console.log(`[convertPartnerRequest] 404: Not found or unauthorized. ID: ${requestId}, Category: ${category}, Partner: ${userId}`);
+      return res.status(404).json({ success: false, message: "Request not found or not authorized" });
+    }
+
+    // Resolve any active chat tickets for this enquiry
+    if (category !== "Ticket") {
+      try {
+        const ticketQuery: any = {
+          partnerId: partnerObjectId,
+          status: { $in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] }
+        };
+
+      if (category === "Booking") {
+        ticketQuery.$or = [
+          { bookingId: updated._id },
+          { bookingId: (updated as any).bookingNumber }
+        ];
+      } else {
+        // For Meetings and Visits, the inquiry ID is stored in bookingId field
+        ticketQuery.bookingId = requestId;
+      }
+
+      await TicketModel.updateMany(
+        ticketQuery,
+        { 
+          status: TicketStatus.RESOLVED,
+          updatedAt: new Date()
+        }
+      );
+      } catch (ticketError) {
+        console.error("[convertPartnerRequest] Failed to resolve tickets:", ticketError);
+        // Don't fail the whole request if ticket resolution fails
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${category} marked as converted successfully`,
+      data: updated
+    });
+  } catch (error) {
+    console.error("Convert Request error:", error);
+    res.status(500).json({ success: false, message: "Failed to convert request" });
   }
 };
 

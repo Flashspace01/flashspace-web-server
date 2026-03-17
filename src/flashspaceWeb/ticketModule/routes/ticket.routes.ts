@@ -19,6 +19,7 @@ import {
   getPartnerTickets,
   addPartnerReply,
   partnerCloseTicket,
+  partnerMessageClient,
   getAffiliateTickets,
   tapInToTicket,
   addAffiliateReply,
@@ -46,6 +47,7 @@ router.post('/admin/:ticketId/close', AuthMiddleware.authenticate, RoleMiddlewar
 router.get('/partner/all', AuthMiddleware.authenticate, requireSpacePartner, getPartnerTickets);
 router.post('/partner/:ticketId/reply', AuthMiddleware.authenticate, requireSpacePartner, addPartnerReply);
 router.post('/partner/:ticketId/close', AuthMiddleware.authenticate, requireSpacePartner, partnerCloseTicket);
+router.post('/partner/message-client', AuthMiddleware.authenticate, requireSpacePartner, partnerMessageClient);
 
 // ============ AFFILIATE ROUTES ============
 // NOTE: these must be declared before /:ticketId to avoid route shadowing

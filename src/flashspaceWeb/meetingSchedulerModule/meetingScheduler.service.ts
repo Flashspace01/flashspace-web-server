@@ -22,6 +22,7 @@ interface BookMeetingRequest {
   email: string;
   phoneNumber: string;
   slotTime: Date;
+  spaceId?: string;
   notes?: string;
 }
 
@@ -243,6 +244,26 @@ export class MeetingSchedulerService {
     // Calculate expiration time (30 mins after meeting ends)
     const expiresAt = slotEnd.plus({ minutes: 30 }).toJSDate();
 
+    // Resolve Partner from Space if provided
+    let partnerId = null;
+    if (request.spaceId) {
+      try {
+        const { VirtualOfficeModel } = await import('../virtualOfficeModule/virtualOffice.model');
+        const { CoworkingSpaceModel } = await import('../coworkingSpaceModule/coworkingSpace.model');
+        const { MeetingRoomModel } = await import('../meetingRoomModule/meetingRoom.model');
+
+        let space: any = await VirtualOfficeModel.findById(request.spaceId);
+        if (!space) space = await CoworkingSpaceModel.findById(request.spaceId);
+        if (!space) space = await MeetingRoomModel.findById(request.spaceId);
+
+        if (space) {
+          partnerId = space.partner;
+        }
+      } catch (err) {
+        console.error("Error resolving partner for meeting:", err);
+      }
+    }
+
     // Create meeting in database
     const meeting = await MeetingModel.create({
       bookingUserName: request.fullName,
@@ -253,6 +274,8 @@ export class MeetingSchedulerService {
       googleCalendarEventId: calendarEvent?.eventId,
       googleMeetLink: calendarEvent?.meetLink || "",
       notes: request.notes,
+      spaceId: request.spaceId,
+      partner: partnerId,
       status: MeetingStatus.Scheduled,
       expiresAt,
     });
@@ -300,18 +323,16 @@ export class MeetingSchedulerService {
     if (!meeting) {
       return null;
     }
+    return meeting;
+  }
 
-    return {
-      id: meeting._id,
-      bookingUserName: meeting.bookingUserName,
-      bookingUserEmail: meeting.bookingUserEmail,
-      bookingUserPhone: meeting.bookingUserPhone,
-      startTime: meeting.startTime,
-      endTime: meeting.endTime,
-      googleMeetLink: meeting.googleMeetLink,
-      status: meeting.status,
-      notes: meeting.notes,
-    };
+  static async updateMeetingStatus(partnerId: string, meetingId: string, status: string): Promise<any> {
+    const meeting = await MeetingModel.findOneAndUpdate(
+      { _id: meetingId, partner: partnerId },
+      { status },
+      { new: true }
+    );
+    return meeting;
   }
 
   /**
