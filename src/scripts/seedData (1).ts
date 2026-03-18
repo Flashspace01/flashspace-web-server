@@ -652,7 +652,7 @@ const virtualOffices = [
       "Wellness Programs",
     ],
     area: "Koramangala",
-    availability: "Available Now",
+    availability: "Available Now",  
     popular: false,
     image: "https://shorturl.at/Fyr6o",
   },

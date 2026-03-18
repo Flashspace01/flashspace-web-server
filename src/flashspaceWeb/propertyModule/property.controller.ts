@@ -61,7 +61,8 @@ export const updateProperty = async (req: Request, res: Response) => {
     }
 
     // 1. ADDED: Validation to ensure all documents are approved before KYC approval
-    if (req.body.kycStatus === "approved") {
+    // Skip this check for admins as they may be manually publishing/overriding
+    if (req.body.kycStatus === "approved" && userRole !== "admin") {
       const property = await PropertyModel.findById(propertyId);
       if (!property) {
         return sendError(res, 404, "Property not found");
