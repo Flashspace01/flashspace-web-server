@@ -224,6 +224,7 @@ export const deleteProperty = async (req: Request, res: Response) => {
 export const uploadPropertyImage = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
     const { propertyId } = req.params;
     const file = req.file;
 
@@ -231,12 +232,14 @@ export const uploadPropertyImage = async (req: Request, res: Response) => {
       return sendError(res, 400, "Image file is required");
     }
 
-    const property = await PropertyModel.findOne({
-      _id: propertyId,
-      partner: userId,
-    });
+    const query: any = { _id: propertyId };
+    if (userRole !== "admin") {
+      query.partner = userId;
+    }
+
+    const property = await PropertyModel.findOne(query);
     if (!property) {
-      return sendError(res, 404, "Property not found or unauthorized");
+      return sendError(res, 404, "Property not found or unauthorized for this user");
     }
 
     const fileUrl = getMulterFileUrl(file.filename, "property_image");
@@ -255,6 +258,51 @@ export const uploadPropertyImage = async (req: Request, res: Response) => {
     });
   } catch (err) {
     sendError(res, 500, "Failed to upload image", err);
+  }
+};
+
+export const uploadMultiplePropertyImages = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+    const { propertyId } = req.params;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return sendError(res, 400, "No image files provided");
+    }
+
+    const query: any = { _id: propertyId };
+    if (userRole !== "admin") {
+      query.partner = userId;
+    }
+
+    const property = await PropertyModel.findOne(query);
+    if (!property) {
+      return sendError(res, 404, "Property not found or unauthorized for this user");
+    }
+
+    const fileUrls = files.map((file) =>
+      getMulterFileUrl(file.filename, "property_image"),
+    );
+
+    if (!property.images) {
+      property.images = [];
+    }
+
+    property.images.push(...fileUrls);
+    await property.save();
+
+    res.status(200).json({
+      success: true,
+      message: `${fileUrls.length} images uploaded successfully`,
+      data: { urls: fileUrls },
+    });
+  } catch (err) {
+    sendError(res, 500, "Failed to upload images", err);
   }
 };
 
