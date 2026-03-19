@@ -9,6 +9,7 @@ import { getMyClients } from "../controllers/affiliateClient.controller";
 import * as invoiceController from "../controllers/affiliateInvoice.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { UserRole } from "../../authModule/models/user.model";
+import { couponController } from "../../couponModule/coupon.controller";
 
 const router = express.Router();
 
@@ -21,6 +22,15 @@ if (!create || !getAll || !getRecent || !getStats) {
 // Affiliate portal data is only for logged-in affiliate/admin users.
 router.use(AuthMiddleware.authenticate);
 router.use(AuthMiddleware.requireRole(UserRole.AFFILIATE, UserRole.ADMIN));
+
+// Coupon Routes
+router.post("/coupons/generate", (req, res) => {
+    console.log("DEBUG: Hit POST /api/affiliate/coupons/generate");
+    return couponController.generateAffiliateCoupon(req, res);
+});
+router.get("/my-coupon", (req, res) => {
+    return couponController.getAffiliateCoupon(req, res);
+});
 
 // Quotation Routes
 router.post("/quotations", create);
@@ -55,4 +65,5 @@ router.get("/clients", getMyClients);
 router.get("/invoices", invoiceController.getInvoices);
 router.get("/invoices/:id", invoiceController.getInvoiceById);
 
+console.log("🚀 affiliate.routes.ts is being loaded...");
 export { router as affiliateRoutes };

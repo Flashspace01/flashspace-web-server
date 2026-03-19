@@ -256,6 +256,7 @@ export class AuthMiddleware {
       }
 
       if (!roles.includes(req.user.role as UserRole)) {
+        console.log(`[AuthMiddleware.requireRole] Denied: User role ${req.user.role} is not in allowed roles: ${roles.join(", ")}`);
         res.status(403).json({
           success: false,
           message: "Insufficient permissions",
@@ -263,6 +264,7 @@ export class AuthMiddleware {
         return;
       }
 
+      console.log(`[AuthMiddleware.requireRole] Allowed: User role ${req.user.role} matches allowed roles: ${roles.join(", ")}`);
       next();
     };
   }
