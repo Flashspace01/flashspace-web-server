@@ -45,6 +45,13 @@ propertyRoutes.post(
 );
 
 propertyRoutes.post(
+  "/:propertyId/upload-multiple-images",
+  AuthMiddleware.authenticate,
+  uploadKYCFile.array("files", 20),
+  PropertyController.uploadMultiplePropertyImages,
+);
+
+propertyRoutes.post(
   "/:propertyId/upload-document",
   AuthMiddleware.authenticate,
   uploadKYCFile.single("file"),
