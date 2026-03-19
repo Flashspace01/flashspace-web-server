@@ -141,3 +141,20 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Main API routes
 app.use("/api", mainRoutes);
+
+// 404 Handler for /api
+app.use("/api", (req, res) => {
+  console.log(`[404] No route found for ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Default 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Requested resource not found",
+  });
+});

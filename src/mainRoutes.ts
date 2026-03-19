@@ -20,12 +20,8 @@ import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes"
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
-console.log("🚀 mainRoutes.ts is being loaded...");
 export const mainRoutes = Router();
 
-mainRoutes.get("/test-debug", (req, res) => {
-  res.json({ success: true, message: "Debug route is working!", timestamp: new Date() });
-});
 
 import mongoose from "mongoose";
 
