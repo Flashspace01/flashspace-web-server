@@ -55,6 +55,7 @@ export class PropertyKYCDocumentItem {
 @index({ city: 1, area: 1 })
 @index({ location: "2dsphere" })
 @index({ isActive: 1, isDeleted: 1 }) // ADDED: Index for fast frontend filtering
+@index({ avgRating: -1 })
 export class Property {
   @prop({ required: true, trim: true })
   public name!: string;
@@ -103,6 +104,12 @@ export class Property {
 
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;
+
+  @prop({ default: 0 })
+  public avgRating?: number;
+
+  @prop({ default: 0 })
+  public totalReviews?: number;
 }
 
 export const PropertyModel = getModelForClass(Property);

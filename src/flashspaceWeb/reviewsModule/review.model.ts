@@ -115,18 +115,67 @@ export class Review {
           };
 
     // Fixed: Route update directly to the specific model
+    let updatedSpace: any = null;
     switch (spaceModelName) {
       case "CoworkingSpace":
-        await CoworkingSpaceModel.findByIdAndUpdate(spaceId, updateData);
+        updatedSpace = await CoworkingSpaceModel.findByIdAndUpdate(
+          spaceId,
+          updateData,
+          { new: true },
+        );
         break;
       case "VirtualOffice":
-        await VirtualOfficeModel.findByIdAndUpdate(spaceId, updateData);
+        updatedSpace = await VirtualOfficeModel.findByIdAndUpdate(
+          spaceId,
+          updateData,
+          { new: true },
+        );
         break;
       case "MeetingRoom":
-        await MeetingRoomModel.findByIdAndUpdate(spaceId, updateData);
+        updatedSpace = await MeetingRoomModel.findByIdAndUpdate(
+          spaceId,
+          updateData,
+          { new: true },
+        );
         break;
       default:
         console.warn(`Unknown spaceModelName: ${spaceModelName}`);
+    }
+
+    // 2. Update Property Master Rating
+    if (updatedSpace && updatedSpace.property) {
+      const propertyId = updatedSpace.property.toString();
+
+      // Find all spaces belonging to this property across all types
+      const [coworkingIds, virtualIds, meetingIds] = await Promise.all([
+        CoworkingSpaceModel.distinct("_id", { property: propertyId }),
+        VirtualOfficeModel.distinct("_id", { property: propertyId }),
+        MeetingRoomModel.distinct("_id", { property: propertyId }),
+      ]);
+
+      const allSpaceIds = [...coworkingIds, ...virtualIds, ...meetingIds];
+
+      // Calculate aggregate rating for the whole property
+      const propertyStats = await ReviewModel.aggregate([
+        { $match: { space: { $in: allSpaceIds } } },
+        {
+          $group: {
+            _id: null,
+            nRating: { $sum: 1 },
+            avgRating: { $avg: "$rating" },
+          },
+        },
+      ]);
+
+      if (propertyStats.length > 0) {
+        const { PropertyModel } = await import(
+          "../propertyModule/property.model"
+        );
+        await PropertyModel.findByIdAndUpdate(propertyId, {
+          totalReviews: propertyStats[0].nRating,
+          avgRating: Math.round(propertyStats[0].avgRating * 10) / 10,
+        });
+      }
     }
   }
 }
