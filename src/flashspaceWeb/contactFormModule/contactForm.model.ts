@@ -27,13 +27,13 @@ export class contactForm{
     @prop({required:true})
     public phoneNumber!:string
 
-    @prop({required:true})
-    public companyName!:string;
+    @prop({required:false,trim:true})
+    public companyName?:string;
 
-    @prop({type:()=>[String],required:true,enum:VirtualOfficeSolutions})
-    public serviceInterest!:VirtualOfficeSolutions[];
+    @prop({type:()=>[String],required:false,enum:VirtualOfficeSolutions})
+    public serviceInterest?:VirtualOfficeSolutions[];
 
-    @prop()
+    @prop({required:false})
     public message?: string;
 
     @prop({default:true})

@@ -48,6 +48,7 @@ export const createContactForm = async (req: Request, res: Response) => {
       error: {},
     });
   } catch (err: any) {
+    console.error("Create Contact Form Error:", err);
     res.status(500).json({
       success: false,
       message: "Something went wrong !!",
