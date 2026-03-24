@@ -88,6 +88,11 @@ export const flattenProperty = (spaceDoc: any) => {
       images: property.images,
       features: property.features,
       amenities: property.features, // Send as amenities for backwards compatibility if needed
+      // Map both space-level and property-level ratings for the frontend
+      rating: rest.avgRating || property.avgRating || 4.5, // Fallback to 4.5 if no rating yet
+      reviews: rest.totalReviews || property.totalReviews || 0,
+      avgRating: rest.avgRating || property.avgRating,
+      totalReviews: rest.totalReviews || property.totalReviews,
     };
   }
   return docObj;

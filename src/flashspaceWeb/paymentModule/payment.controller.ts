@@ -145,6 +145,11 @@ async function createBookingAndInvoice(payment: any) {
       endDate.setHours(endDate.getHours() + (payment.tenure || 1)); // tenure as hours
     }
 
+    // Fetch user and KYC profile to determine if we can skip pending status
+    const user = await UserModel.findById(payment.user);
+    const kycProfile = await KYCDocumentModel.findOne({ user: payment.user });
+    const isAlreadyVerified = user?.kycVerified || false;
+
     // Create booking
     let booking: any = null;
     if (payment.paymentType !== "seat_booking") {
@@ -171,15 +176,22 @@ async function createBookingAndInvoice(payment: any) {
         payment: payment._id,
         razorpayOrderId: payment.razorpayOrderId,
         razorpayPaymentId: payment.razorpayPaymentId,
-        status: "pending_kyc",
-        kycStatus: "not_started",
+        status: isAlreadyVerified ? "active" : "pending_kyc",
+        kycStatus: isAlreadyVerified ? "approved" : "not_started",
+        kycProfile: kycProfile?._id,
         timeline: [
           {
             status: "payment_received",
             date: new Date(),
-            note: `Payment of ₹${payment.totalAmount} received`,
+            note: `Payment of ₹${payment.totalAmount} received${isAlreadyVerified ? " and KYC verified" : ""}`,
             by: "System",
           },
+          ...(isAlreadyVerified ? [{
+            status: "active",
+            date: new Date(),
+            note: "Booking activated automatically (KYC already verified)",
+            by: "System",
+          }] : []),
         ],
         documents: [],
         startDate,
@@ -255,10 +267,9 @@ async function createBookingAndInvoice(payment: any) {
       );
     }
 
-    // Create/update KYC record
-    let kyc = await KYCDocumentModel.findOne({ user: payment.user });
-    if (!kyc && booking) {
-      kyc = await KYCDocumentModel.create({
+    // Ensure KYC record exists or link it
+    if (!kycProfile && booking) {
+      await KYCDocumentModel.create({
         user: payment.user,
         booking: booking._id,
         personalInfo: {
