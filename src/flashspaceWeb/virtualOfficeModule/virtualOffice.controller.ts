@@ -108,7 +108,7 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
     }
 
     const { deleted, limit, page, property } = validation.data.query;
-    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _limit = limit ? Math.min(limit, 100) : 12; // paginate by default
     const _page = page ? Math.max(page, 1) : 1;
 
     const query: any = deleted === "true" ? { isDeleted: true } : {};
@@ -126,6 +126,16 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
           ? "No virtual offices found"
           : "Virtual offices retrieved successfully",
       data: result.offices.map(flattenProperty),
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
+      },
     });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve virtual offices", err);
@@ -163,7 +173,7 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
 
     const { city } = validation.data.params;
     const { limit, page } = validation.data.query;
-    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
     const result = await VirtualOfficeService.getOffices(
@@ -184,6 +194,16 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
         ...result,
         offices: result.offices.map(flattenProperty),
       },
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
+      },
     });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve offices by city", err);
@@ -198,7 +218,7 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
     }
 
     const { limit, page } = validation.data.query;
-    const _limit = limit ? Math.min(limit, 100) : 10;
+    const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
     const userId = (req as any).user?.id;
@@ -219,6 +239,16 @@ export const getPartnerVirtualOffices = async (req: Request, res: Response) => {
       data: {
         ...result,
         offices: formattedSpaces,
+      },
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
       },
     });
   } catch (err) {

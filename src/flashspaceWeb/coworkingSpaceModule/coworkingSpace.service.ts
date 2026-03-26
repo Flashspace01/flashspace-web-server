@@ -97,51 +97,78 @@ export class CoworkingSpaceService {
     return space;
   }
 
-  static async getSpaces(query: FilterQuery<any>) {
+  static async getSpaces(
+    query: FilterQuery<any>,
+    options?: { limit?: number; page?: number },
+  ) {
     // If the query targets a property field (like city), we need to resolve it via the PropertyModel first
     // Strict property filtering if provided
-    if (query.property) {
-      query.property =
-        typeof query.property === "string"
-          ? new Types.ObjectId(query.property)
-          : query.property;
+    const filter: any = { ...query };
+
+    const limit = options?.limit ?? 0;
+    const page = options?.page && options.page > 0 ? options.page : 1;
+
+    if (filter.property) {
+      filter.property =
+        typeof filter.property === "string"
+          ? new Types.ObjectId(filter.property)
+          : filter.property;
 
       // Remove other property-derived filters to ensure they don't conflict
-      delete query.city;
-      delete query.name;
-      delete query.area;
-    } else if (query.city || query.name || query.area) {
+      delete filter.city;
+      delete filter.name;
+      delete filter.area;
+    } else if (filter.city || filter.name || filter.area) {
       const propertyQuery: any = {};
-      if (query.city) propertyQuery.city = query.city;
-      if (query.name) propertyQuery.name = query.name;
-      if (query.area) propertyQuery.area = query.area;
+      if (filter.city) propertyQuery.city = filter.city;
+      if (filter.name) propertyQuery.name = filter.name;
+      if (filter.area) propertyQuery.area = filter.area;
 
       const legacyFieldQuery: any = {};
-      if (query.city) legacyFieldQuery.city = query.city;
-      if (query.name) legacyFieldQuery.name = query.name;
-      if (query.area) legacyFieldQuery.area = query.area;
+      if (filter.city) legacyFieldQuery.city = filter.city;
+      if (filter.name) legacyFieldQuery.name = filter.name;
+      if (filter.area) legacyFieldQuery.area = filter.area;
 
       const matchedProperties =
         await PropertyModel.find(propertyQuery).select("_id");
       const propertyIds = matchedProperties.map((p) => p._id);
 
-      delete query.city;
-      delete query.name;
-      delete query.area;
+      delete filter.city;
+      delete filter.name;
+      delete filter.area;
 
       if (propertyIds.length > 0) {
-        query.$or = [{ property: { $in: propertyIds } }, legacyFieldQuery];
+        filter.$or = [{ property: { $in: propertyIds } }, legacyFieldQuery];
       } else {
-        Object.assign(query, legacyFieldQuery);
+        Object.assign(filter, legacyFieldQuery);
       }
     }
 
-    return await CoworkingSpaceModel.find({
-      ...query,
-      isDeleted: false,
-    })
+    const finalQuery = { ...filter, isDeleted: false };
+    const baseQuery = CoworkingSpaceModel.find(finalQuery)
       .populate("property")
       .sort({ createdAt: -1 });
+
+    if (limit && limit > 0) {
+      const total = await CoworkingSpaceModel.countDocuments(finalQuery);
+      const spaces = await baseQuery.limit(limit).skip((page - 1) * limit);
+      return {
+        spaces,
+        total,
+        limit,
+        page,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    const spaces = await baseQuery;
+    return {
+      spaces,
+      total: spaces.length,
+      limit: spaces.length,
+      page: 1,
+      totalPages: 1,
+    };
   }
 
   static async getSpaceById(spaceId: string) {

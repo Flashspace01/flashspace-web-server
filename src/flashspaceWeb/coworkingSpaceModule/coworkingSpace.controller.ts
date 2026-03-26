@@ -144,27 +144,53 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const { deleted, property } = validation.data.query;
+    const { deleted, property, limit, page } = validation.data.query;
+    const _limit = limit ? Math.min(limit, 100) : 12;
+    const _page = page ? Math.max(page, 1) : 1;
+
     const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
 
     if (property) {
       query.property = property;
     }
 
-    const spaces = await CoworkingSpaceService.getSpaces(query);
+    const result = await CoworkingSpaceService.getSpaces(query, {
+      limit: _limit,
+      page: _page,
+    });
 
-    if (spaces.length === 0) {
+    if (result.spaces.length === 0) {
       return res.status(200).json({
         success: true,
         message: "No coworking spaces found",
         data: [],
+        pagination: {
+          total: 0,
+          page: _page,
+          limit: _limit,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: _page > 1,
+          nextPage: null,
+          prevPage: _page > 1 ? _page - 1 : null,
+        },
         error: {},
       });
     }
     res.status(200).json({
       success: true,
       message: "Coworking spaces retrieved successfully",
-      data: spaces.map(flattenProperty),
+      data: result.spaces.map(flattenProperty),
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
+      },
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces", err);
@@ -207,22 +233,58 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
 export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
   try {
     const { city } = req.params;
-    const spaces = await CoworkingSpaceService.getSpaces({
-      city: new RegExp(`^${city}$`, "i"),
-    });
+    const limitRaw = (req.query as any).limit;
+    const pageRaw = (req.query as any).page;
+    const parsedLimit = Number(limitRaw);
+    const parsedPage = Number(pageRaw);
+    const _limit =
+      limitRaw && !Number.isNaN(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 100)
+        : 12;
+    const _page =
+      pageRaw && !Number.isNaN(parsedPage) && parsedPage > 0
+        ? parsedPage
+        : 1;
 
-    if (spaces.length === 0) {
+    const result = await CoworkingSpaceService.getSpaces(
+      {
+        city: new RegExp(`^${city}$`, "i"),
+      },
+      { limit: _limit, page: _page },
+    );
+
+    if (result.spaces.length === 0) {
       return res.status(200).json({
         success: true,
         message: `No coworking spaces found in ${city}`,
         data: [],
+        pagination: {
+          total: 0,
+          page: _page,
+          limit: _limit,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: _page > 1,
+          nextPage: null,
+          prevPage: _page > 1 ? _page - 1 : null,
+        },
         error: {},
       });
     }
     res.status(200).json({
       success: true,
       message: `Coworking spaces in ${city} retrieved successfully`,
-      data: spaces.map(flattenProperty),
+      data: result.spaces.map(flattenProperty),
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
+      },
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve spaces by city", err);
@@ -232,13 +294,39 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
 export const getPartnerSpaces = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const spaces = await CoworkingSpaceService.getSpaces({
-      $or: [{ partner: userId }, { managers: userId }],
-    });
+    const limitRaw = (req.query as any).limit;
+    const pageRaw = (req.query as any).page;
+    const parsedLimit = Number(limitRaw);
+    const parsedPage = Number(pageRaw);
+    const _limit =
+      limitRaw && !Number.isNaN(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 100)
+        : 12;
+    const _page =
+      pageRaw && !Number.isNaN(parsedPage) && parsedPage > 0
+        ? parsedPage
+        : 1;
+
+    const result = await CoworkingSpaceService.getSpaces(
+      {
+        $or: [{ partner: userId }, { managers: userId }],
+      },
+      { limit: _limit, page: _page },
+    );
     res.status(200).json({
       success: true,
       message: "Partner spaces retrieved successfully",
-      data: spaces.map(flattenProperty),
+      data: result.spaces.map(flattenProperty),
+      pagination: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        hasNextPage: result.page < result.totalPages,
+        hasPrevPage: result.page > 1,
+        nextPage: result.page < result.totalPages ? result.page + 1 : null,
+        prevPage: result.page > 1 ? result.page - 1 : null,
+      },
     });
   } catch (err: any) {
     sendError(res, 500, "Failed to retrieve partner spaces", err);
