@@ -7,23 +7,23 @@ const authController = new AuthController();
 
 // Public routes (no authentication required)
 router.post('/signup', 
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes - DISABLED FOR DEV
+  AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
   authController.signup
 );
 
 router.post('/login', 
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes - DISABLED FOR DEV
+  AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
   authController.login
 );
 
 // OTP-based verification
 router.post('/verify-otp',
-  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
+  AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
   authController.verifyOTP
 );
 
 router.post('/resend-otp',
-  // AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
   authController.resendOTP
 );
 
