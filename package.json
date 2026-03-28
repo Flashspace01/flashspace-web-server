@@ -13,6 +13,7 @@
     "test:feedback": "ts-node src/scripts/test-feedback.ts",
     "test:rbac": "ts-node src/scripts/test-rbac-security.ts",
     "seed": "ts-node src/scripts/seedData.ts",
+    "seed:spaces":"ts-node src/scripts/newseed.ts",
     "seed:roles": "ts-node src/scripts/seedInternalRoles.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
     "test:email": "ts-node src/scripts/test-email.ts",
