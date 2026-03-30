@@ -59,6 +59,9 @@ export class Property {
   @prop({ required: true, trim: true })
   public name!: string;
 
+  @prop({ required: false, trim: true })
+  public spaceId?: string;
+
   @prop({ required: true })
   public address!: string;
 

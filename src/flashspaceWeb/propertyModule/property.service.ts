@@ -11,6 +11,7 @@ export class PropertyService {
       location: data.location,
       images: data.images || [],
       partner: partnerId,
+      spaceId: data.spaceId,
     };
     const property = new PropertyModel(propertyData);
     return await property.save();
@@ -31,6 +32,7 @@ export class PropertyService {
     if (data.status) updateData.status = data.status;
     if (data.kycRejectionReason)
       updateData.kycRejectionReason = data.kycRejectionReason;
+    if (data.spaceId) updateData.spaceId = data.spaceId;
 
     if (Object.keys(updateData).length === 0) return null;
 
@@ -66,6 +68,7 @@ export const flattenProperty = (spaceDoc: any) => {
 
   if (docObj.property && typeof docObj.property === "object") {
     const { property, ...rest } = docObj;
+    console.log(`🔍 [BACKEND DEBUG] RAW PROPERTY JSON:`, JSON.stringify(property, null, 2));
     const derivedCoordinates =
       rest.coordinates ||
       (Array.isArray(property.location?.coordinates) &&
@@ -81,6 +84,7 @@ export const flattenProperty = (spaceDoc: any) => {
       propertyId: property._id || property.id,
       name: property.name,
       address: property.address,
+      spaceId: property.spaceId,
       city: property.city,
       area: property.area,
       location: property.location,
@@ -88,6 +92,7 @@ export const flattenProperty = (spaceDoc: any) => {
       images: property.images,
       features: property.features,
       amenities: property.features, // Send as amenities for backwards compatibility if needed
+      property: property, // Optional: Keep reference to original property just in case
     };
   }
   return docObj;

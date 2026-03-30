@@ -1,0 +1,1930 @@
+{
+  "coworkingData": [
+    {
+      "name": "Workzone - Ahmedabad",
+      "spaceId": "FSAMD04",
+      "address": "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India",
+      "city": "Ahmedabad",
+      "price": "₹5500/month",
+      "originalPrice": "₹5500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Ahmedabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Task Alley Rentals LLP",
+      "spaceId": "FSAMD03",
+      "address": "2HV6+3MX, Maganbhai Barot Marg, Amrutbagh Colony, Sadhna Colony, Hindu Colony, Navrangpura, Ahmedabad, Gujarat 380009, India",
+      "city": "Ahmedabad",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Ahmedabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sweet Spot Spaces",
+      "spaceId": "FSAMD02",
+      "address": "Office No 4-D fourth, Vardaan Complex, Tower, Lakhudi Rd, near SARDAR PATEL STADIUM, Vithalbhai Patel Colony, Nathalal Colony, Navrangpura, Ahmedabad, Gujarat 380009, India",
+      "city": "Ahmedabad",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Ahmedabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "RegisterKaro",
+      "spaceId": "FSAMD01",
+      "address": "Block-A, 606 Prahladnagar Trade Center, B/H Titanium City Center, Vejalpur, Ahmedabad, Gujarat, 380051",
+      "city": "Ahmedabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Ahmedabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "IndiraNagar - Aspire Coworks",
+      "spaceId": "FSBLR01",
+      "address": "17, 7th Main Rd, Indira Nagar II Stage, Hoysala Nagar, Indiranagar, Bengaluru, Karnataka 560038, India",
+      "city": "Bangalore",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Koramangala - Aspire Coworks",
+      "spaceId": "FSBLR02",
+      "address": "2nd & 3rd Floor, Balaji Arcade, 472/7, 20th L Cross Rd, 4th Block, Koramangala, Bengaluru, Karnataka 560095, India",
+      "city": "Bangalore",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "EcoSpace - Hebbal, HMT Layout",
+      "spaceId": "FSBLR05",
+      "address": "No,33, 4th Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India",
+      "city": "Bangalore",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Laksh Space - Hebbal, HMT layout",
+      "spaceId": "FSBLR03",
+      "address": "No,33, 1st Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India",
+      "city": "Bangalore",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "RegisterKaro",
+      "spaceId": "FSBLR04",
+      "address": "Unit 101, Oxford Towers, No. 139 Old Airport Road, Bengaluru-560008",
+      "city": "Bangalore",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "SIERRA CARTEL",
+      "spaceId": "",
+      "address": "",
+      "city": "Bangalore",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Bangalore",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "WorkYard CWS",
+      "spaceId": "FSCND01",
+      "address": "Plot No 337, Phase, 2, Industrial Area Phase II, Chandigarh, 160002, India",
+      "city": "Chandigarh",
+      "price": "₹8000/month",
+      "originalPrice": "₹8000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Chandigarh",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Senate Space",
+      "spaceId": "FSCHN01",
+      "address": "W-126, 3rd Floor, 3rd Ave, Anna Nagar, Chennai, Tamil Nadu 600040, India",
+      "city": "Chennai",
+      "price": "₹6500/month",
+      "originalPrice": "₹6500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Chennai",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "WBB Office",
+      "spaceId": "FSCHN02",
+      "address": "Room no 1 No. 19, Metro Station, 35, Anna Salai, near Little Mount, Little Mount, Nandanam, Chennai, Tamil Nadu 600015, India",
+      "city": "Chennai",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Chennai",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Qube Spaces",
+      "spaceId": "FSCTH01",
+      "address": "QUBE, Dhruv Banerjee Pathlab, 97, TP Nagar Rd, in front of New Delhi Sweets, Indira Commercial Complex, Korba, Transport Nagar, Chhattisgarh 495677, India",
+      "city": "Chhattisgarh",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Chhattisgarh",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Stirring Minds",
+      "spaceId": "FSDL01",
+      "address": "Kundan Mansion, 2-A/3, Asaf Ali Rd, Turkman Gate, New Delhi, Delhi, 110002, India",
+      "city": "Delhi",
+      "price": "₹5000/month",
+      "originalPrice": "₹5000/month",
+      "rating": 4.9,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CP Alt F",
+      "spaceId": "FSDL02",
+      "address": "J6JF+53C, Connaught Lane, Barakhamba, New Delhi, Delhi 110001, India",
+      "city": "Delhi",
+      "price": "₹15000/month",
+      "originalPrice": "₹15000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Vision Cowork",
+      "spaceId": "",
+      "address": "Lower Ground Floor, Saket Salcon, Rasvilas, next to Select Citywalk Mall, Saket District Centre, District Centre, Sector 6, Pushp Vihar, Mal, New Delhi, Delhi 110017, India",
+      "city": "Delhi",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Mytime Cowork",
+      "spaceId": "FSDL06",
+      "address": "55 Lane-2, Westend Marg, Saiyad Ul Ajaib Village, Saket, New Delhi, Delhi 110030, India",
+      "city": "Delhi",
+      "price": "₹5500/month",
+      "originalPrice": "₹5500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Okhla Alt F",
+      "spaceId": "FSDL03",
+      "address": "101, NH-19, CRRI, Ishwar Nagar, Okhla, New Delhi, Delhi 110044, India",
+      "city": "Delhi",
+      "price": "₹8000/month",
+      "originalPrice": "₹8000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "WBB Office",
+      "spaceId": "",
+      "address": "Office no. 102, 52A first floor, Vijay Block, Block E, Laxmi Nagar, Delhi, 110092, India",
+      "city": "Delhi",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Budha Coworking Spaces",
+      "spaceId": "",
+      "address": "3rd floor, H.no 33, Pocket 5, Sector-24, Rohini, Delhi, 110085, India",
+      "city": "Delhi",
+      "price": "₹4000/month",
+      "originalPrice": "₹4000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Work & Beyond",
+      "spaceId": "FSDL09",
+      "address": "E-518 first floor Kocchar plaza near Ramphal Chowk dwarka  sector 7, Block E, Palam Extension, Palam, Delhi, 110077, India",
+      "city": "Delhi",
+      "price": "₹5000/month",
+      "originalPrice": "₹5000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Getset Spaces",
+      "spaceId": "FSDL04",
+      "address": "3rd Floor, LMR House, S-16, Block C, Green Park Extension, Green Park, New Delhi, Delhi 110016, India",
+      "city": "Delhi",
+      "price": "₹4000/month",
+      "originalPrice": "₹4000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sanogic Coworking Space",
+      "spaceId": "FSDL08",
+      "address": "Unit No. - 111, Aggarwal City Square, Plot No. 10, District Centre  Manglam Place, Sector-3, Rohini, New Delhi - 110085",
+      "city": "Delhi",
+      "price": "₹5500/month",
+      "originalPrice": "₹5500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "MSB Cospazes",
+      "spaceId": "FSDL07",
+      "address": "No.26-27-A, H- Block, Third Floor, (Office No.401 & 404) Vikas Marg, Laxmi Nagar, Delhi-110092,",
+      "city": "Delhi",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "RegisterKaro",
+      "spaceId": "FSDL05",
+      "address": "808B, DLF Prime Tower, Pocket F, Okhla Phase I, Okhla Industrial Estate, New Delhi, Delhi 110020",
+      "city": "Delhi",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Delhi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Infrapro - Sector 44",
+      "spaceId": "FSGUR01",
+      "address": "Plot no 4, 2nd floor, Minarch Tower, Sector 44, Gurugram, Haryana 122003, India",
+      "city": "Gurgaon",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Gurgaon",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "TEAM COWORK- Palm Court - Gurgaon",
+      "spaceId": "FSGUR02",
+      "address": "Mehrauli Rd, Gurugram, Haryana 122022, India",
+      "city": "Gurgaon",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Gurgaon",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "MSB COspaze",
+      "spaceId": "FSGUR03",
+      "address": "2nd Floor, Sona Marble Building, Sneh Vihar, Bhondsi, Gurgaon - 122102",
+      "city": "Gurgaon",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Gurgaon",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "The Work Lounge",
+      "spaceId": "FSGUR04",
+      "address": "2nd floor, Welldone tech park, 213 14, Badshahpur Sohna Rd, Sector 48, Gurugram, Haryana 122018",
+      "city": "Gurgaon",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Gurgaon",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Ghoomakkad",
+      "spaceId": "FSHP01",
+      "address": "V.P.o, Sidhbari, Rakkar, Himachal Pradesh 176057, India",
+      "city": "Himachal Pradesh",
+      "price": "₹8000/month",
+      "originalPrice": "₹8000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Himachal Pradesh",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CS Coworking - GachiBowli",
+      "spaceId": "FSHYD01",
+      "address": "Door No. 1-60, A & B, 3rd Floor, KNR Square, opp. The Platina, Gachibowli, Hyderabad, Telangana 500032, India",
+      "city": "Hyderabad",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CS Coworking - Whitefield Kondapur",
+      "spaceId": "FSHYD02",
+      "address": "Doc Bhavan, Hitech City Rd, Kondapur, Whitefields, Gachibowli, Hyderabad, Telangana 500084",
+      "city": "Hyderabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CS Coworking.- Shaikpet I",
+      "spaceId": "FSHYD03",
+      "address": "4th Floor, Aparna Astute Jubilee Hills, Shaikpet, Hyderabad, Telangana 500096",
+      "city": "Hyderabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CS Coworking - Hitex Road",
+      "spaceId": "FSHYD04",
+      "address": "5th Floor, Melkiors Pride, Hitex Road, Vinayaka Nagar, Izzathnagar, HITEC City, Khanammet, Hyderabad, Telangana 500084",
+      "city": "Hyderabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CS Coworking - Raidurg",
+      "spaceId": "FSHYD05",
+      "address": "Cluster_malkajgiri 82, 19, Dargah Rd, LIG Chitrapuri Colony, Muppas Panchavati Colony, Radhe Nagar, Hyderabad, Rai Durg, Telangana 500104",
+      "city": "Hyderabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Alt F - Gachibowli",
+      "spaceId": "FSHYD06",
+      "address": "Divyasree Orion, Raidurg Panmaktha, Gachibowli, Hyderabad, Telangana 500032",
+      "city": "Hyderabad",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Hyderabad",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Jeev Business Solutions",
+      "spaceId": "FSJPR01",
+      "address": "548 1, Tonk Rd, behind Jaipur Hospital, Mahaveer Nagar, Gopal Pura Mode, Jaipur, Rajasthan 302018, India",
+      "city": "Jaipur",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Jaipur",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Qubicle Coworking",
+      "spaceId": "FSJMU01",
+      "address": "Plot 334, Lakkar Mandi Rd, opposite PNB Bank, Sector 1A, Trikuta Nagar, Jammu, Jammu and Kashmir 180012",
+      "city": "Jammu and Kashmir",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Jammu and Kashmir",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Kaytech Solutions",
+      "spaceId": "FSJMU02",
+      "address": "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003",
+      "city": "Jammu and Kashmir",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Jammu and Kashmir",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Namdhari Spaces- Ranchi",
+      "spaceId": "FSJKD01",
+      "address": "4001, 4th floor, Skyline Complex, Kadru, Ranchi, Jharkhand 834002, India",
+      "city": "Jharkhand",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Jharkhand",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Apnayt Coworkers",
+      "spaceId": "FSJDP01",
+      "address": "Apnayt Coworker J1-371 RIICO Sangaria, Industrial Area Phase, IInd, Jodhpur, Rajasthan 342013, India",
+      "city": "Jodhpur",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Jodhpur",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Spacehive",
+      "spaceId": "FSKOCH01",
+      "address": "4263, Anjikathu Rd, CSEZ, Chittethukara, Kakkanad, Kochi, Kerala 682037, India",
+      "city": "Kochi",
+      "price": "₹5500/month",
+      "originalPrice": "₹5500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kochi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "WBB Office",
+      "spaceId": "FSKOCH02",
+      "address": "E 3rd Floor, JC Chamber, Building No v8 ,60/49, Panampilly Nagar, Kochi, Kerala 682036, India",
+      "city": "Kochi",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kochi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Kommon Spaces",
+      "spaceId": "FSKOCH03",
+      "address": "1st Floor, Sowbhagya building, Kollamkudimugal, Athani, Kochi, Kakkanad, Kerala 682030",
+      "city": "Kochi",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kochi",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Camac Street - WorkZone",
+      "spaceId": "FSKOL07",
+      "address": "11th floor, Industry House, 10, Camac St, Elgin, Kolkata, West Bengal 700017, India",
+      "city": "Kolkata",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Park Street - Workzone",
+      "spaceId": "FSKOL06",
+      "address": "7th floor, Om Tower, 32, JL nehru road, Park St, Kolkata, West Bengal 700071, India",
+      "city": "Kolkata",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Near Victoria Memorial - WorkZone",
+      "spaceId": "FSKOL05",
+      "address": "Circus Ave, Kolkata, West Bengal, India",
+      "city": "Kolkata",
+      "price": "₹6000/month",
+      "originalPrice": "₹6000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Salt Lake, Sec V - EasyDaftar",
+      "spaceId": "FSKOL01",
+      "address": "CK 233, CK Block, Sector 2, Salt lake, Kolkata, West Bengal 700091",
+      "city": "Kolkata",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Salt Lake, Sec V - Workzone",
+      "spaceId": "FSKOL05",
+      "address": "Block, D2, EP & GP, 2, GP Block, Sector V, Bidhannagar, Kolkata, West Bengal 700091, India",
+      "city": "Kolkata",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Park Street - EasyDaftar",
+      "spaceId": "FSKOL02",
+      "address": "3 rd Floor, 75C, Park St, Taltala, Kolkata, West Bengal 700016, India",
+      "city": "Kolkata",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Rashbehari - EasyDaftar",
+      "spaceId": "FSKOL03",
+      "address": "132A, Shyama Prasad Mukherjee Rd, Anami Sangha, Kalighat, Kolkata, West Bengal 700026, India",
+      "city": "Kolkata",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Louden Street - EasyDaftar",
+      "spaceId": "FSKOL04",
+      "address": "8/1/2 Loudon Street, 3rd Floor. Surabhi Building, 8/1, Sir UN Brahmachari Sarani, Elgin, Kolkata, West Bengal 700017",
+      "city": "Kolkata",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "KCAN COWORKING",
+      "spaceId": "",
+      "address": "",
+      "city": "Kolkata",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Kolkata",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "365Virtualcoworks",
+      "spaceId": "FSMP01",
+      "address": "7th floor, Aaditya gateway, scheme B-704, MR 10 Rd, Sukhliya, Indore, Madhya Pradesh 452010",
+      "city": "Madhya Pradesh",
+      "price": "₹5000/month",
+      "originalPrice": "₹5000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Madhya Pradesh",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CynergX",
+      "spaceId": "FSMP02",
+      "address": "E4, 271, E-4, Arera Colony, Bhopal, Madhya Pradesh 462016",
+      "city": "Madhya Pradesh",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Madhya Pradesh",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "We Grow Coworks",
+      "spaceId": "FSNVM01",
+      "address": "PLOT NO.- 88, 8th Floor, Proxima, Arunachal Bhavan, 19, Sector 30A, Vashi, Navi Mumbai, Maharashtra 400703, India",
+      "city": "Mumbai",
+      "price": "₹10000/month",
+      "originalPrice": "₹10000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Mumbai",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "RegisterKaro",
+      "spaceId": "FSTHA01",
+      "address": "LODHA SIGNET 1 UNIT NO. 825 PREMIER COLONY GROUND KALYAN THANE Mangaon 421204",
+      "city": "Mumbai",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Mumbai",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "SS Spaces",
+      "spaceId": "FSMYS01",
+      "address": "2 Maruthi complex, Maruthi temple circle, TK layout, Saraswathipuram, Mysuru, Karnataka 570009",
+      "city": "Mysuru",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Mysuru",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sector 63, Noida - Crystaa",
+      "spaceId": "",
+      "address": "63m, Ivent, C-030, C Block, Sector 63, Noida, Hazratpur Wajidpur, Uttar Pradesh 201309, India",
+      "city": "Noida",
+      "price": "₹5500/month",
+      "originalPrice": "₹5500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Workshala- sector 3",
+      "spaceId": "FSNOD02",
+      "address": "D-9, Vyapar Marg, Block D, Noida Sector 3, Noida, Uttar Pradesh 201301, India",
+      "city": "Noida",
+      "price": "₹6500/month",
+      "originalPrice": "₹6500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sector 3 - MyWorX",
+      "spaceId": "",
+      "address": "B-7, 1st floor, metro station, B-7, next to sector-15, B Block, Sector 2, Noida, Uttar Pradesh 201301, India",
+      "city": "Noida",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sector 16 - Registerkaro",
+      "spaceId": "FSNOD01",
+      "address": "OFFICE NO – 101, FIRST FLOOR, AT, SEVEN WONDER BUSINESS CENTER, PLOT NO. A-61, A Block, Sector 16, Noida, Uttar Pradesh 201301",
+      "city": "Noida",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sector 62 - Alt F",
+      "spaceId": "FSNOD04",
+      "address": "C-20, 1/1A, Coast Guard Golf Ground Rd, C Block, Phase 2, Industrial Area, Sector 62, Noida, Uttar Pradesh 201309",
+      "city": "Noida",
+      "price": "₹7500/month",
+      "originalPrice": "₹7500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sec 142 - Alt F",
+      "spaceId": "FSNOD05",
+      "address": "Ground Floor, Plot No. 21 & 21A, Sector 142, Noida, Uttar Pradesh 201304",
+      "city": "Noida",
+      "price": "₹5000/month",
+      "originalPrice": "₹5000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sec 58 - Alt F",
+      "spaceId": "FSNOD06",
+      "address": "A100, A Block, Sector 58, Noida, Uttar Pradesh 201309",
+      "city": "Noida",
+      "price": "₹8500/month",
+      "originalPrice": "₹8500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sec 68 - Alt F",
+      "spaceId": "FSNOD07",
+      "address": "A-5, Grovy Optiva, Block A, Sector 68, Noida, Basi Bahuddin Nagar, Uttar Pradesh 201316",
+      "city": "Noida",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Noida",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Oplus Cowork",
+      "spaceId": "FSPTN01",
+      "address": "J366+73C, 3rd floor, RK Niwas, Bailey Rd, Rupaspur, Ramjaipal Nagar, Danapur Nizamat, Patna, Bihar 801503, India",
+      "city": "Patna",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Patna",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Divine Coworking",
+      "spaceId": "FSPUN01",
+      "address": "Cosmos gardens, Plot no. 26, next to Foundree Preschool Road, near Cafe Peter, Baner, Pune, Maharashtra 411069, India",
+      "city": "Pune",
+      "price": "₹10000/month",
+      "originalPrice": "₹10000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Pune",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Namdhari Spaces,zirakpur",
+      "spaceId": "FSPNB02",
+      "address": "D9, CCC, VIP Rd, Zirakpur, Punjab 140603",
+      "city": "Punjab",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Punjab",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "Sanogic Coworking,zirakpur",
+      "spaceId": "FSPNB03",
+      "address": "",
+      "city": "Punjab",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Punjab",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "WorkYard Coworking, Zirakpur",
+      "spaceId": "FSPNB04",
+      "address": "1st and 2nd Floor, City Plaza, SCO 1, Peer Muchalla Rd, near DMart Sector 5, Sector 20, Zirakpur, Sanau0li, Punjab 140603, India",
+      "city": "Punjab",
+      "price": "₹7000/month",
+      "originalPrice": "₹7000/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Punjab",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "RegisterKaro",
+      "spaceId": "FSPNB01",
+      "address": "Office No. 715, Seventh Floor, Blok D&E, Chandigarh Citi center, VIP Road, Zirakpur, Punjab, India-140603",
+      "city": "Punjab",
+      "price": "₹0/month",
+      "originalPrice": "₹0/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Punjab",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    },
+    {
+      "name": "CoSpaces",
+      "spaceId": "FSUTKD01",
+      "address": "75/1, Shiv Nagar, Araghar, Dalanwala, Dehradun, Uttarakhand 248001, India",
+      "city": "Uttarakhand",
+      "price": "₹6500/month",
+      "originalPrice": "₹6500/month",
+      "rating": 4.5,
+      "reviews": 120,
+      "features": [
+        "High-Speed WiFi",
+        "Meeting Rooms",
+        "Coffee Bar",
+        "24/7 Access"
+      ],
+      "area": "Uttarakhand",
+      "image": "",
+      "popular": false,
+      "type": "Hot Desk"
+    }
+  ],
+  "virtualOfficeData": [
+    {
+      "name": "Workzone - Ahmedabad",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "Task Alley Rentals LLP",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹15000/year"
+    },
+    {
+      "name": "Sweet Spot Spaces",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "RegisterKaro",
+      "gstPlanPrice": "₹11000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "IndiraNagar - Aspire Coworks",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹10000/year"
+    },
+    {
+      "name": "Koramangala - Aspire Coworks",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "EcoSpace - Hebbal, HMT Layout",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹10000/year"
+    },
+    {
+      "name": "Laksh Space - Hebbal, HMT layout",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹10000/year"
+    },
+    {
+      "name": "RegisterKaro",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹11000/year"
+    },
+    {
+      "name": "SIERRA CARTEL",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "WorkYard CWS",
+      "gstPlanPrice": "₹16000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹18000/year"
+    },
+    {
+      "name": "Senate Space",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "WBB Office",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Qube Spaces",
+      "gstPlanPrice": "₹16000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "Stirring Minds",
+      "gstPlanPrice": "₹9600/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "CP Alt F",
+      "gstPlanPrice": "₹32000/year",
+      "mailingPlanPrice": "₹18000/year",
+      "brPlanPrice": "₹32000/year"
+    },
+    {
+      "name": "Vision Cowork",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹18000/year"
+    },
+    {
+      "name": "Mytime Cowork",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Okhla Alt F",
+      "gstPlanPrice": "₹30000/year",
+      "mailingPlanPrice": "₹15000/year",
+      "brPlanPrice": "₹32000/year"
+    },
+    {
+      "name": "WBB Office",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Budha Coworking Spaces",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Work & Beyond",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Getset Spaces",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹10000/year"
+    },
+    {
+      "name": "Sanogic Coworking Space",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "MSB Cospazes",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹10000/year"
+    },
+    {
+      "name": "RegisterKaro",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹11000/year"
+    },
+    {
+      "name": "Infrapro - Sector 44",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "TEAM COWORK- Palm Court - Gurgaon",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "MSB COspaze",
+      "gstPlanPrice": "₹9000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹9000/year"
+    },
+    {
+      "name": "The Work Lounge",
+      "gstPlanPrice": "₹5000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Ghoomakkad",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹12000/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "CS Coworking - GachiBowli",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "CS Coworking - Whitefield Kondapur",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "CS Coworking.- Shaikpet I",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "CS Coworking - Hitex Road",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "CS Coworking - Raidurg",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "Alt F - Gachibowli",
+      "gstPlanPrice": "₹25000/year",
+      "mailingPlanPrice": "₹15000/year",
+      "brPlanPrice": "₹30000/year"
+    },
+    {
+      "name": "Jeev Business Solutions",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Qubicle Coworking",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹15000/year"
+    },
+    {
+      "name": "Kaytech Solutions",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹18000/year"
+    },
+    {
+      "name": "Namdhari Spaces- Ranchi",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Apnayt Coworkers",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Spacehive",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "WBB Office",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹9000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Kommon Spaces",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "Camac Street - WorkZone",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Park Street - Workzone",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "Near Victoria Memorial - WorkZone",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹13000/year"
+    },
+    {
+      "name": "Salt Lake, Sec V - EasyDaftar",
+      "gstPlanPrice": "₹12500/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Salt Lake, Sec V - Workzone",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Park Street - EasyDaftar",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Rashbehari - EasyDaftar",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Louden Street - EasyDaftar",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "KCAN COWORKING",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "365Virtualcoworks",
+      "gstPlanPrice": "₹8000/year",
+      "mailingPlanPrice": "₹5999/year",
+      "brPlanPrice": "₹9000/year"
+    },
+    {
+      "name": "CynergX",
+      "gstPlanPrice": "₹15000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "We Grow Coworks",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹13000/year",
+      "brPlanPrice": "₹20000/year"
+    },
+    {
+      "name": "RegisterKaro",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹15000/year",
+      "brPlanPrice": "₹20000/year"
+    },
+    {
+      "name": "SS Spaces",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹12000/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "Sector 63, Noida - Crystaa",
+      "gstPlanPrice": "₹10000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Workshala- sector 3",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "Sector 3 - MyWorX",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹8000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Sector 16 - Registerkaro",
+      "gstPlanPrice": "₹11000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹12000/year"
+    },
+    {
+      "name": "Sector 62 - Alt F",
+      "gstPlanPrice": "₹15000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹20000/year"
+    },
+    {
+      "name": "Sec 142 - Alt F",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "Sec 58 - Alt F",
+      "gstPlanPrice": "₹12000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹16000/year"
+    },
+    {
+      "name": "Sec 68 - Alt F",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Oplus Cowork",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹12000/year",
+      "brPlanPrice": "₹20000/year"
+    },
+    {
+      "name": "Divine Coworking",
+      "gstPlanPrice": "₹18000/year",
+      "mailingPlanPrice": "₹14000/year",
+      "brPlanPrice": "₹18000/year"
+    },
+    {
+      "name": "Namdhari Spaces,zirakpur",
+      "gstPlanPrice": "₹14000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "Sanogic Coworking,zirakpur",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "WorkYard Coworking, Zirakpur",
+      "gstPlanPrice": "₹0/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹0/year"
+    },
+    {
+      "name": "RegisterKaro",
+      "gstPlanPrice": "₹13000/year",
+      "mailingPlanPrice": "₹0/year",
+      "brPlanPrice": "₹14000/year"
+    },
+    {
+      "name": "CoSpaces",
+      "gstPlanPrice": "₹16000/year",
+      "mailingPlanPrice": "₹10000/year",
+      "brPlanPrice": "₹16000/year"
+    }
+  ]
+}
