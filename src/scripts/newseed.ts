@@ -5,6 +5,9 @@ dotenv.config();
 // ============ IMPORTS ============
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
+import { parse } from "csv-parse/sync";
 
 import { CoworkingSpaceModel } from "../flashspaceWeb/coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../flashspaceWeb/virtualOfficeModule/virtualOffice.model";
@@ -12,6 +15,81 @@ import { MeetingRoomModel, MeetingRoomType } from "../flashspaceWeb/meetingRoomM
 import { BookingModel } from "../flashspaceWeb/bookingModule/booking.model";
 import { UserModel, UserRole } from "../flashspaceWeb/authModule/models/user.model";
 import { PropertyModel, PropertyStatus, KYCStatus } from "../flashspaceWeb/propertyModule/property.model";
+
+const JSON_PATH = path.resolve(__dirname, "./parsed_data.json");
+const CSV_PATH = path.resolve(__dirname, "../../../FlashSpace-web-client/src/excel/93141be7-8c47-441e-b3d6-4e5a698151be.csv");
+
+const loadSeedData = () => {
+  // 1. Check for manual JSON parsed data first (user edits this)
+  if (fs.existsSync(JSON_PATH)) {
+    console.log("📂 Found parsed_data.json. Using it for seeding...");
+    const content = fs.readFileSync(JSON_PATH, "utf8");
+    const data = JSON.parse(content);
+    return { 
+      coworkingDataRaw: (data.coworkingData || []).filter((cw: any) => cw.name && cw.address && cw.city), 
+      virtualOfficeDataRaw: data.virtualOfficeData || [] 
+    };
+  }
+
+  // 2. Fallback to raw CSV if JSON is missing
+  if (!fs.existsSync(CSV_PATH)) {
+    console.warn(`⚠️ Seed source not found. Using fallback data.`);
+    return { coworkingDataRaw: [], virtualOfficeDataRaw: [] };
+  }
+
+  console.log("📄 Parsing original CSV...");
+  const fileContent = fs.readFileSync(CSV_PATH, "utf8");
+  const records = parse(fileContent, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  });
+
+  const coworkingDataRaw: any[] = [];
+  const virtualOfficeDataRaw: any[] = [];
+
+  for (const row of records as any[]) {
+    const name = row["Task Name"];
+    const spaceId = row["SPACE ID (short text)"];
+    const address = row["Address (short text)"];
+    const cityLabel = row["Location (labels)"] || "";
+    const city = cityLabel.replace(/[\[\]]/g, "").trim();
+
+    if (!name || !city || city === "[]" || !address) {
+      continue;
+    }
+
+    const cwPriceRaw = row["Coworking / Month (currency)"];
+    const cwPrice = cwPriceRaw ? `₹${cwPriceRaw}/month` : "₹0/month";
+
+    coworkingDataRaw.push({
+      name,
+      spaceId,
+      address,
+      city,
+      price: cwPrice,
+      originalPrice: cwPrice,
+      rating: 4.5,
+      reviews: 120,
+      features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"],
+      area: city,
+      image: "",
+      popular: false,
+      type: "Hot Desk",
+    });
+
+    virtualOfficeDataRaw.push({
+      name,
+      gstPlanPrice: row["GST Plan - Pricing  (currency)"] ? `₹${row["GST Plan - Pricing  (currency)"]}/year` : "₹0/year",
+      mailingPlanPrice: row["Mailing Plan - Pricing (currency)"] ? `₹${row["Mailing Plan - Pricing (currency)"]}/year` : "₹0/year",
+      brPlanPrice: row["BR Plan - Pricing  (currency)"] ? `₹${row["BR Plan - Pricing  (currency)"]}/year` : "₹0/year",
+    });
+  }
+
+  return { coworkingDataRaw, virtualOfficeDataRaw };
+};
+
+const { coworkingDataRaw, virtualOfficeDataRaw } = loadSeedData();
 
 // ============ VALIDATE ENV ============
 if (!process.env.DB_URI) {
@@ -447,7 +525,7 @@ const IMAGE_KEY_MAP: Record<string, string> = {
   "Kaytech Solutions|Jammu": "KaytechSolutions_JK",
   "Ghoomakkad|Dharamshala": "Ghumakkad_HP",
   "WorkYard CWS|Chandigarh": "Workyard_Chandigarh",
-  "WorkYard Coworking, Zirakpur|Zirakpur": "Workyard_Chandigarh",
+  "WorkYard Coworking, Zirakpur|Zikrapur": "Workyard_Chandigarh",
   "Spacehive|Kochi": "SpaceHive_Kochi",
   "Oplus Cowork|Patna": "OplusCowork_Patna",
   "Divine Coworking|Pune": "DivineCoworking_Pune",
@@ -514,7 +592,10 @@ const buildLocation = (cw: any) => {
   const cityKey = cw.city?.trim();
   if (cityKey && CITY_COORDS[cityKey]) {
     const [lng, lat] = CITY_COORDS[cityKey];
-    return { type: "Point", coordinates: [lng, lat] };
+    // Add small jitter to prevent markers from stacking exactly on top of each other
+    const jitterLng = (Math.random() - 0.5) * 0.01;
+    const jitterLat = (Math.random() - 0.5) * 0.01;
+    return { type: "Point", coordinates: [lng + jitterLng, lat + jitterLat] };
   }
   return undefined;
 };
@@ -562,193 +643,6 @@ const testUsers = [
   },
 ];
 
-// ============ SOURCE DATA ============
-const coworkingDataRaw = [
-  {
-    name: "Workzone - Ahmedabad",
-    address: "World Trade Tower, Makarba, Ahmedabad, Gujarat 380051, India",
-    city: "Ahmedabad",
-    price: "₹1,083/year",
-    originalPrice: "₹1,333",
-    rating: 4.8,
-    reviews: 245,
-    features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"],
-    area: "Makarba",
-    image: "https://res.cloudinary.com/dawsxvwsw/image/upload/v1774378619/img10_uycgaq.jpg",
-    images: [
-      "https://res.cloudinary.com/dawsxvwsw/image/upload/v1774378619/img10_uycgaq.jpg",
-      "https://res.cloudinary.com/dawsxvwsw/image/upload/v1774378618/ahm-workzone-lobby.jpg",
-      "https://res.cloudinary.com/dawsxvwsw/image/upload/v1774378618/ahm-workzone-meeting.jpg",
-    ],
-    popular: true,
-    type: "Hot Desk",
-  },
-  { name: "Sweet Spot Spaces", address: "Office No 4-D fourth, Vardaan Complex, Tower, Lakhudi Rd, near SARDAR PATEL STADIUM, Vithalbhai Patel Colony, Nathalal Colony, Navrangpura, Ahmedabad, Gujarat 380009, India", city: "Ahmedabad", price: "₹1,167/year", originalPrice: "₹1,417", rating: 4.7, reviews: 189, features: ["Premium Location", "Parking", "Event Space", "Cafeteria"], area: "Navrangpura", image: "https://shorturl.at/LdEgA", popular: false, type: "Dedicated Desk" },
-  { name: "IndiraNagar - Aspire Coworks", address: "17, 7th Main Rd, Indira Nagar II Stage, Hoysala Nagar, Indiranagar, Bengaluru, Karnataka 560038, India", city: "Bangalore", price: "₹833/year", originalPrice: "₹1,083", rating: 4.8, reviews: 267, features: ["Tech Hub", "Innovation Labs", "Startup Ecosystem", "Outdoor Terrace"], area: "Indiranagar", image: "https://shorturl.at/LdEgA", popular: true, type: "Hot Desk" },
-  { name: "Koramangala - Aspire Coworks", address: "2nd & 3rd Floor, Balaji Arcade, 472/7, 20th L Cross Rd, 4th Block, Koramangala, Bengaluru, Karnataka 560095, India", city: "Bangalore", price: "₹1,000/year", originalPrice: "₹1,250", rating: 4.6, reviews: 189, features: ["IT Corridor", "Shuttle Service", "Gaming Area", "Wellness Programs"], area: "Koramangala", image: "https://shorturl.at/Fyr6o", popular: false, type: "Dedicated Desk" },
-  { name: "EcoSpace - Hebbal", address: "No,33, 4th Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India", city: "Bangalore", price: "₹833/year", originalPrice: "₹1,083", rating: 4.5, reviews: 134, features: ["Residential Area", "Quiet Environment", "Flexible Hours", "Community Kitchen"], area: "HMT Layout", image: "https://shorturl.at/S4XWY", popular: false, type: "Hot Desk" },
-  { name: "WBB Office", address: "Room no 1 No. 19, Metro Station, 35, Anna Salai, near Little Mount, Little Mount, Nandanam, Chennai, Tamil Nadu 600015, India", city: "Chennai", price: "₹4,800/year", originalPrice: "₹6,000", rating: 4.7, reviews: 198, features: ["Metro Connectivity", "Modern Facilities", "Parking", "Food Court"], area: "Nandanam", image: "https://shorturl.at/NUpzM", popular: true, type: "Hot Desk" },
-  { name: "Senate Space", address: "W-126, 3rd Floor, 3rd Ave, Anna Nagar, Chennai, Tamil Nadu 600040, India", city: "Chennai", price: "₹917/year", originalPrice: "₹1,167", rating: 4.4, reviews: 112, features: ["Residential Area", "Peaceful Environment", "Basic Amenities", "WiFi"], area: "Anna Nagar", image: "https://shorturl.at/LdEgA", popular: false, type: "Dedicated Desk" },
-  { name: "Stirring Minds", address: "Kundan Mansion, 2-A/3, Asaf Ali Rd, Turkman Gate, Chandni Chowk, New Delhi, Delhi, 110002, India", city: "Delhi", price: "₹800/year", originalPrice: "₹1,000", rating: 4.9, reviews: 245, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Chandni Chowk", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696478/chrome_y4ymlwh9SR_apwgug.png", popular: true, type: "Hot Desk" },
-  { name: "CP Alt F", address: "J6JF+53C, Connaught Lane, Barakhamba, New Delhi, Delhi 110001, India", city: "Delhi", price: "₹2,667/year", originalPrice: "₹3,333", rating: 4.7, reviews: 189, features: ["Private Cabin Option", "Parking", "Event Space", "Cafeteria"], area: "Connaught Place", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696830/chrome_tF4p9FCNvN_e0w4dd.png", popular: true, type: "Dedicated Desk" },
-  { name: "Virtualexcel", address: "Lower Ground Floor, Saket Salcon, Rasvilas, next to Select Citywalk Mall, Saket District Centre, District Centre, Sector 6, Pushp Vihar, Mal, New Delhi, Delhi 110017, India", city: "Delhi", price: "₹1,000/year", originalPrice: "₹1,250", rating: 4.6, reviews: 156, features: ["Shopping Mall Access", "Premium Location", "Networking Events", "Printer Access"], area: "Saket", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696936/chrome_y6UfCoipUj_wkpxel.png", popular: false, type: "Hot Desk" },
-  { name: "Mytime Cowork", address: "55 Lane-2, Westend Marg, Saiyad Ul Ajaib Village, Saket, New Delhi, Delhi 110030, India", city: "Delhi", price: "₹6,500/year", originalPrice: "₹8,000", rating: 4.8, reviews: 198, features: ["Premium Location", "Executive Lounge", "Concierge", "Valet Parking", "Meeting Rooms"], area: "Saket", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696150/chrome_F5QP1MGRA2_whrsth.png", popular: true, type: "Private Office" },
-  { name: "Okhla Alt F", address: "101, NH-19, CRRI, Ishwar Nagar, Okhla, New Delhi, Delhi 110044, India", city: "Delhi", price: "₹2,500/year", originalPrice: "₹3,167", rating: 4.5, reviews: 134, features: ["Industrial Area", "Flexible Hours", "Gaming Zone", "Wellness Room"], area: "Okhla", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697088/chrome_nweqds48I9_i7xwhi.png", popular: false, type: "Hot Desk" },
-  { name: "WBB Office - Laxmi Nagar", address: "Office no. 102, 52A first floor, Vijay Block, Block E, Laxmi Nagar, Delhi, 110092, India", city: "Delhi", price: "₹4,800/year", originalPrice: "₹6,000", rating: 4.3, reviews: 89, features: ["Budget Friendly", "Basic Amenities", "WiFi", "Print Access"], area: "Laxmi Nagar", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697269/chrome_e1S9bRUX5L_t3ltud.png", popular: false, type: "Shared Desk" },
-  { name: "Budha Coworking Spaces", address: "3rd floor, H.no 33, Pocket 5, Sector-24, Rohini, Delhi, 110085, India", city: "Delhi", price: "₹4,200/year", originalPrice: "₹5,500", rating: 4.4, reviews: 112, features: ["Suburban Location", "Parking Available", "Community Events", "Cafeteria"], area: "Rohini", image: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", popular: false, type: "Hot Desk" },
-  { name: "Work & Beyond", address: "E-518 first floor Kocchar plaza near Ramphal Chowk dwark sector 7, Block E, Palam Extension, Palam, Delhi, 110077, India", city: "Delhi", price: "₹5,500/year", originalPrice: "₹7,000", rating: 4.5, reviews: 145, features: ["Airport Proximity", "Modern Amenities", "Meeting Rooms", "Parking"], area: "Dwarka", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767697175/chrome_4eVI3pxb5I_qpev0q.png", popular: false, type: "Dedicated Desk" },
-  { name: "Getset Spaces", address: "3rd Floor, LMR House, S-16, Block C, Green Park Extension, Green Park, New Delhi, Delhi 110016, India", city: "Delhi", price: "₹5,000/year", originalPrice: "₹6,500", rating: 4.6, reviews: 167, features: ["South Delhi", "Premium Facilities", "Networking", "Cafeteria"], area: "Green Park", image: "https://res.cloudinary.com/drd4942mc/image/upload/v1767696619/chrome_Usn5xZsDny_b59bwf.png", popular: true, type: "Private Office" },
-  { name: "Infrapro - Sector 44", address: "Plot no 4, 2nd floor, Minarch Tower, Sector 44, Gurugram, Haryana 122003, India", city: "Gurgaon", price: "₹1,000/year", originalPrice: "₹1,250", rating: 4.7, reviews: 178, features: ["Corporate Hub", "Modern Facilities", "Ample Parking", "Food Court"], area: "Sector 44", image: "https://shorturl.at/Fyr6o", popular: true, type: "Dedicated Desk" },
-  { name: "Palm Court - Gurgaon", address: "Mehrauli Rd, Gurugram, Haryana 122022, India", city: "Gurgaon", price: "₹1,000/year", originalPrice: "₹1,250", rating: 4.4, reviews: 134, features: ["Premium Location", "Creative Spaces", "Event Hosting", "Bike Parking"], area: "Mehrauli Road", image: "https://shorturl.at/Fyr6o", popular: false, type: "Hot Desk" },
-  { name: "Ghoomakkad", address: "V.P.o, Sidhbari, Rakkar, Himachal Pradesh 176057, India", city: "Dharamshala", price: "₹667/year", originalPrice: "₹833", rating: 4.6, reviews: 156, features: ["Mountain View", "Peaceful Environment", "Nature Workspace", "Wellness Programs"], area: "Sidhbari", image: "https://shorturl.at/LdEgA", popular: false, type: "Dedicated Desk" },
-  { name: "Cabins 24/7", address: "h, 5/86, Golden Tulip Estate, JV Hills, HITEC City, Kondapur, Telangana 500081, India", city: "Hyderabad", price: "₹1,000/year", originalPrice: "₹1,083", rating: 4.3, reviews: 98, features: ["IT Hub", "Flexible Plans", "Community Events", "Gaming Area"], area: "Kondapur", image: "https://shorturl.at/S4XWY", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking", address: "Door No. 1-60, A & B, 3rd Floor, KNR Square, opp. The Platina, Gachibowli, Hyderabad, Telangana 500032, India", city: "Hyderabad", price: "₹917/year", originalPrice: "₹1,167", rating: 4.5, reviews: 123, features: ["Tech Park", "Modern Infrastructure", "Parking", "Cafeteria"], area: "Gachibowli", image: "https://shorturl.at/NUpzM", popular: true, type: "Dedicated Desk" },
-  { name: "Jeev Business Solutions", address: "548 1, Tonk Rd, behind Jaipur Hospital, Mahaveer Nagar, Gopal Pura Mode, Jaipur, Rajasthan 302018, India", city: "Jaipur", price: "₹833/year", originalPrice: "₹1,000", rating: 4.4, reviews: 145, features: ["Central Location", "Budget Friendly", "WiFi", "Meeting Rooms"], area: "Tonk Road", image: "https://shorturl.at/Fyr6o", popular: false, type: "Hot Desk" },
-  { name: "Qubicle Coworking", address: "Trikuta Nagar Ext 1/A", city: "Jammu", price: "₹1,000/year", originalPrice: "₹1,250", rating: 4.5, reviews: 89, features: ["Residential Area", "Quiet Environment", "Basic Amenities", "WiFi"], area: "Trikuta Nagar", image: "https://shorturl.at/S4XWY", popular: false, type: "Hot Desk" },
-  { name: "Kaytech Solutions", address: "Civil Airport, Satwari, Raipur Satwari, Jammu, Jammu and Kashmir 180003", city: "Jammu", price: "₹1,500/year", originalPrice: "₹1,833", rating: 4.6, reviews: 112, features: ["Airport Proximity", "Premium Amenities", "Parking", "Meeting Rooms"], area: "Satwari", image: "https://shorturl.at/NUpzM", popular: true, type: "Private Office" },
-   { name: "Task Alley Rentals LLP", address: "2HV6+3MX, Maganbhai Barot Marg, Amrutbagh Colony, Sadhna Colony, Hindu Colony, Navrangpura, Ahmedabad, Gujarat 380009, India", city: "Ahmedabad", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Maganbhai Barot Marg", image: "", popular: false, type: "Hot Desk" },
-  { name: "RegisterKaro", address: "Block-A, 606 Prahladnagar Trade Center, B/H Titanium City Center, Vejalpur, Ahmedabad, Gujarat, 380051", city: "Ahmedabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "606 Prahladnagar Trade Center", image: "", popular: false, type: "Hot Desk" },
-  { name: "EcoSpace - Hebbal, HMT Layout", address: "No,33, 4th Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India", city: "Bangalore", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "33", image: "", popular: false, type: "Hot Desk" },
-  { name: "Laksh Space - Hebbal, HMT layout", address: "No,33, 1st Floor, 1st Main, CBI Main Rd, HMT Layout, Ganganagar, Bengaluru, Karnataka 560032, India", city: "Bangalore", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "33", image: "", popular: false, type: "Hot Desk" },
-  { name: "RegisterKaro", address: "Unit 101, Oxford Towers, No. 139 Old Airport Road, Bengaluru-560008", city: "Bangalore", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Oxford Towers", image: "", popular: false, type: "Hot Desk" },
-  { name: "SIERRA CARTEL", address: "MG Road, Bangalore, Karnataka, India", city: "Bangalore", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Bangalore", image: "", popular: false, type: "Hot Desk" },
-  { name: "WorkYard CWS", address: "Plot No 337, Phase, 2, Industrial Area Phase II, Chandigarh, 160002, India", city: "Chandigarh", price: "₹8000/year", originalPrice: "₹9600", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Phase", image: "", popular: false, type: "Hot Desk" },
-  { name: "Qube Spaces", address: "QUBE, Dhruv Banerjee Pathlab, 97, TP Nagar Rd, in front of New Delhi Sweets, Indira Commercial Complex, Korba, Transport Nagar, Chhattisgarh 495677, India", city: "Chhattisgarh", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Dhruv Banerjee Pathlab", image: "", popular: false, type: "Hot Desk" },
-  { name: "Vision Cowork", address: "Lower Ground Floor, Saket Salcon, Rasvilas, next to Select Citywalk Mall, Saket District Centre, District Centre, Sector 6, Pushp Vihar, Mal, New Delhi, Delhi 110017, India", city: "Delhi", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Saket Salcon", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sanogic Coworking Space", address: "Unit No. - 111, Aggarwal City Square, Plot No. 10, District Centre  Manglam Place, Sector-3, Rohini, New Delhi - 110085", city: "Delhi", price: "₹5500/year", originalPrice: "₹6600", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Aggarwal City Square", image: "", popular: false, type: "Hot Desk" },
-  { name: "MSB Cospazes", address: "No.26-27-A, H- Block, Third Floor, (Office No.401 & 404) Vikas Marg, Laxmi Nagar, Delhi-110092,", city: "Delhi", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "H- Block", image: "", popular: false, type: "Hot Desk" },
-  { name: "RegisterKaro", address: "808B, DLF Prime Tower, Pocket F, Okhla Phase I, Okhla Industrial Estate, New Delhi, Delhi 110020", city: "Delhi", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "DLF Prime Tower", image: "", popular: false, type: "Hot Desk" },
-  { name: "TEAM COWORK- Palm Court - Gurgaon", address: "Mehrauli Rd, Gurugram, Haryana 122022, India", city: "Gurgaon", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Gurugram", image: "", popular: false, type: "Hot Desk" },
-  { name: "MSB COspaze", address: "2nd Floor, Sona Marble Building, Sneh Vihar, Bhondsi, Gurgaon - 122102", city: "Gurgaon", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Sona Marble Building", image: "", popular: false, type: "Hot Desk" },
-  { name: "The Work Lounge", address: "2nd floor, Welldone tech park, 213 14, Badshahpur Sohna Rd, Sector 48, Gurugram, Haryana 122018", city: "Gurgaon", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Welldone tech park", image: "", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking - GachiBowli", address: "Door No. 1-60, A & B, 3rd Floor, KNR Square, opp. The Platina, Gachibowli, Hyderabad, Telangana 500032, India", city: "Hyderabad", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "A & B", image: "", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking - Whitefield Kondapur", address: "Doc Bhavan, Hitech City Rd, Kondapur, Whitefields, Gachibowli, Hyderabad, Telangana 500084", city: "Hyderabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Hitech City Rd", image: "", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking.- Shaikpet I", address: "4th Floor, Aparna Astute Jubilee Hills, Shaikpet, Hyderabad, Telangana 500096", city: "Hyderabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Aparna Astute Jubilee Hills", image: "", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking - Hitex Road", address: "5th Floor, Melkiors Pride, Hitex Road, Vinayaka Nagar, Izzathnagar, HITEC City, Khanammet, Hyderabad, Telangana 500084", city: "Hyderabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Melkiors Pride", image: "", popular: false, type: "Hot Desk" },
-  { name: "CS Coworking - Raidurg", address: "Cluster_malkajgiri 82, 19, Dargah Rd, LIG Chitrapuri Colony, Muppas Panchavati Colony, Radhe Nagar, Hyderabad, Rai Durg, Telangana 500104", city: "Hyderabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "19", image: "", popular: false, type: "Hot Desk" },
-  { name: "Alt F - Gachibowli", address: "Divyasree Orion, Raidurg Panmaktha, Gachibowli, Hyderabad, Telangana 500032", city: "Hyderabad", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Raidurg Panmaktha", image: "", popular: false, type: "Hot Desk" },
-  { name: "Namdhari Spaces- Ranchi", address: "4001, 4th floor, Skyline Complex, Kadru, Ranchi, Jharkhand 834002, India", city: "Jharkhand", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "4th floor", image: "", popular: false, type: "Hot Desk" },
-  { name: "Apnayt Coworkers", address: "Apnayt Coworker J1-371 RIICO Sangaria, Industrial Area Phase, IInd, Jodhpur, Rajasthan 342013, India", city: "Jodhpur", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Industrial Area Phase", image: "", popular: false, type: "Hot Desk" },
-  { name: "Spacehive", address: "4263, Anjikathu Rd, CSEZ, Chittethukara, Kakkanad, Kochi, Kerala 682037, India", city: "Kochi", price: "₹5500/year", originalPrice: "₹6600", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Anjikathu Rd", image: "", popular: false, type: "Hot Desk" },
-  { name: "Kommon Spaces", address: "1st Floor, Sowbhagya building, Kollamkudimugal, Athani, Kochi, Kakkanad, Kerala 682030", city: "Kochi", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Sowbhagya building", image: "", popular: false, type: "Hot Desk" },
-  { name: "Camac Street - WorkZone", address: "11th floor, Industry House, 10, Camac St, Elgin, Kolkata, West Bengal 700017, India", city: "Kolkata", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Industry House", image: "", popular: false, type: "Hot Desk" },
-  { name: "Park Street - Workzone", address: "7th floor, Om Tower, 32, JL nehru road, Park St, Kolkata, West Bengal 700071, India", city: "Kolkata", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Om Tower", image: "", popular: false, type: "Hot Desk" },
-  { name: "Near Victoria Memorial - WorkZone", address: "Circus Ave, Kolkata, West Bengal, India", city: "Kolkata", price: "₹6000/year", originalPrice: "₹7200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Kolkata", image: "", popular: false, type: "Hot Desk" },
-  { name: "Salt Lake, Sec V - EasyDaftar", address: "CK 233, CK Block, Sector 2, Salt lake, Kolkata, West Bengal 700091", city: "Kolkata", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "CK Block", image: "", popular: false, type: "Hot Desk" },
-  { name: "Salt Lake, Sec V - Workzone", address: "Block, D2, EP & GP, 2, GP Block, Sector V, Bidhannagar, Kolkata, West Bengal 700091, India", city: "Kolkata", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "D2", image: "", popular: false, type: "Hot Desk" },
-  { name: "Park Street - EasyDaftar", address: "3 rd Floor, 75C, Park St, Taltala, Kolkata, West Bengal 700016, India", city: "Kolkata", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "75C", image: "", popular: false, type: "Hot Desk" },
-  { name: "Rashbehari - EasyDaftar", address: "132A, Shyama Prasad Mukherjee Rd, Anami Sangha, Kalighat, Kolkata, West Bengal 700026, India", city: "Kolkata", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Shyama Prasad Mukherjee Rd", image: "", popular: false, type: "Hot Desk" },
-  { name: "Louden Street - EasyDaftar", address: "8/1/2 Loudon Street, 3rd Floor. Surabhi Building, 8/1, Sir UN Brahmachari Sarani, Elgin, Kolkata, West Bengal 700017", city: "Kolkata", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "3rd Floor. Surabhi Building", image: "", popular: false, type: "Hot Desk" },
-  { name: "KCAN COWORKING", address: "Park Street, Kolkata, West Bengal, India", city: "Kolkata", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Kolkata", image: "", popular: false, type: "Hot Desk" },
-  { name: "365Virtualcoworks", address: "7th floor, Aaditya gateway, scheme B-704, MR 10 Rd, Sukhliya, Indore, Madhya Pradesh 452010", city: "Madhya Pradesh", price: "₹5000/year", originalPrice: "₹6000", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Aaditya gateway", image: "", popular: false, type: "Hot Desk" },
-  { name: "CynergX", address: "E4, 271, E-4, Arera Colony, Bhopal, Madhya Pradesh 462016", city: "Madhya Pradesh", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "271", image: "", popular: false, type: "Hot Desk" },
-  { name: "We Grow Coworks", address: "PLOT NO.- 88, 8th Floor, Proxima, Arunachal Bhavan, 19, Sector 30A, Vashi, Navi Mumbai, Maharashtra 400703, India", city: "Mumbai", price: "₹10000/year", originalPrice: "₹12000", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "8th Floor", image: "", popular: false, type: "Hot Desk" },
-  { name: "RegisterKaro", address: "LODHA SIGNET 1 UNIT NO. 825 PREMIER COLONY GROUND KALYAN THANE Mangaon 421204", city: "Mumbai", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Mumbai", image: "", popular: false, type: "Hot Desk" },
-  { name: "SS Spaces", address: "2 Maruthi complex, Maruthi temple circle, TK layout, Saraswathipuram, Mysuru, Karnataka 570009", city: "Mysuru", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Maruthi temple circle", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sector 63, Noida - Crystaa", address: "63m, Ivent, C-030, C Block, Sector 63, Noida, Hazratpur Wajidpur, Uttar Pradesh 201309, India", city: "Noida", price: "₹5500/year", originalPrice: "₹6600", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Ivent", image: "", popular: false, type: "Hot Desk" },
-  { name: "Workshala- sector 3", address: "D-9, Vyapar Marg, Block D, Noida Sector 3, Noida, Uttar Pradesh 201301, India", city: "Noida", price: "₹6500/year", originalPrice: "₹7800", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Vyapar Marg", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sector 3 - MyWorX", address: "B-7, 1st floor, metro station, B-7, next to sector-15, B Block, Sector 2, Noida, Uttar Pradesh 201301, India", city: "Noida", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "1st floor", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sector 16 - Registerkaro", address: "OFFICE NO – 101, FIRST FLOOR, AT, SEVEN WONDER BUSINESS CENTER, PLOT NO. A-61, A Block, Sector 16, Noida, Uttar Pradesh 201301", city: "Noida", price: "₹0/year", originalPrice: "₹0", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "FIRST FLOOR", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sector 62 - Alt F", address: "C-20, 1/1A, Coast Guard Golf Ground Rd, C Block, Phase 2, Industrial Area, Sector 62, Noida, Uttar Pradesh 201309", city: "Noida", price: "₹7500/year", originalPrice: "₹9000", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "1/1A", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sec 142 - Alt F", address: "Ground Floor, Plot No. 21 & 21A, Sector 142, Noida, Uttar Pradesh 201304", city: "Noida", price: "₹5000/year", originalPrice: "₹6000", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Plot No. 21 & 21A", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sec 58 - Alt F", address: "A100, A Block, Sector 58, Noida, Uttar Pradesh 201309", city: "Noida", price: "₹8500/year", originalPrice: "₹10200", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "A Block", image: "", popular: false, type: "Hot Desk" },
-  { name: "Sec 68 - Alt F", address: "A-5, Grovy Optiva, Block A, Sector 68, Noida, Basi Bahuddin Nagar, Uttar Pradesh 201316", city: "Noida", price: "₹7000/year", originalPrice: "₹8400", rating: 4.5, reviews: 120, features: ["High-Speed WiFi", "Meeting Rooms", "Coffee Bar", "24/7 Access"], area: "Grovy Optiva", image: "", popular: false, type: "Hot Desk" },
-];
-
-// New partner locations appended from VOS Locations sheet
-
- 
-
-
-// Additional VO pricing from VOS sheet for new locations
-
-  
-
-
-let virtualOfficeDataRaw = [
-  { name: "Workzone - Ahmedabad", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹13000/year" },
-  { name: "Sweet Spot Spaces", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹16000/year" },
-  { name: "IndiraNagar - Aspire Coworks", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "Koramangala - Aspire Coworks", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹7000/year", brPlanPrice: "₹8000/year" },
-  { name: "EcoSpace - Hebbal", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "WBB Office", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Senate Space", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹14000/year" },
-  { name: "Stirring Minds", gstPlanPrice: "₹9600/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "CP Alt F", gstPlanPrice: "₹32000/year", mailingPlanPrice: "₹18000/year", brPlanPrice: "₹32000/year" },
-  { name: "Virtualexcel", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹12000/year", brPlanPrice: "₹14000/year" },
-  { name: "Mytime Cowork", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹12000/year", brPlanPrice: "₹10000/year" },
-  { name: "Okhla Alt F", gstPlanPrice: "₹30000/year", mailingPlanPrice: "₹15000/year", brPlanPrice: "₹32000/year" },
-  { name: "WBB Office - Laxmi Nagar", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹14000/year" },
-  { name: "Budha Coworking Spaces", gstPlanPrice: "₹917/year", mailingPlanPrice: "₹733/year", brPlanPrice: "₹1,083/year" },
-  { name: "Work & Beyond", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹800/year", brPlanPrice: "₹12000/year" },
-  { name: "Getset Spaces", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "Infrapro - Sector 44", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Palm Court - Gurgaon", gstPlanPrice: "₹1,000/year", mailingPlanPrice: "₹750/year", brPlanPrice: "₹1,175/year" },
-  { name: "Ghoomakkad", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹12000/year", brPlanPrice: "₹16000/year" },
-  { name: "Cabins 24/7", gstPlanPrice: "₹1,000/year", mailingPlanPrice: "₹667/year", brPlanPrice: "₹1,175/year" },
-  { name: "CS Coworking", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹13000/year" },
-  { name: "Jeev Business Solutions", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Qubicle Coworking", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹15000/year" },
-  { name: "Task Alley Rentals LLP", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹15000/year" },
-  { name: "RegisterKaro", gstPlanPrice: "₹11000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹12000/year" },
-  { name: "EcoSpace - Hebbal, HMT Layout", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "Laksh Space - Hebbal, HMT layout", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "RegisterKaro", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹11000/year" },
-  { name: "SIERRA CARTEL", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "WorkYard CWS", gstPlanPrice: "₹16000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹18000/year" },
-  { name: "Qube Spaces", gstPlanPrice: "₹16000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹16000/year" },
-  { name: "Vision Cowork", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹18000/year" },
-  { name: "Sanogic Coworking Space", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹14000/year" },
-  { name: "MSB Cospazes", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹10000/year" },
-  { name: "RegisterKaro", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹11000/year" },
-  { name: "TEAM COWORK- Palm Court - Gurgaon", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹12000/year" },
-  { name: "MSB COspaze", gstPlanPrice: "₹9000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹9000/year" },
-  { name: "The Work Lounge", gstPlanPrice: "₹5000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "CS Coworking - GachiBowli", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹13000/year" },
-  { name: "CS Coworking - Whitefield Kondapur", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹14000/year" },
-  { name: "CS Coworking.- Shaikpet I", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹13000/year" },
-  { name: "CS Coworking - Hitex Road", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹13000/year" },
-  { name: "CS Coworking - Raidurg", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹13000/year" },
-  { name: "Alt F - Gachibowli", gstPlanPrice: "₹25000/year", mailingPlanPrice: "₹15000/year", brPlanPrice: "₹30000/year" },
-  { name: "Namdhari Spaces- Ranchi", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹0/year" },
-  { name: "Apnayt Coworkers", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹0/year" },
-  { name: "Spacehive", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹9000/year", brPlanPrice: "₹13000/year" },
-  { name: "Kommon Spaces", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹13000/year" },
-  { name: "Camac Street - WorkZone", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Park Street - Workzone", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹13000/year" },
-  { name: "Near Victoria Memorial - WorkZone", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹13000/year" },
-  { name: "Salt Lake, Sec V - EasyDaftar", gstPlanPrice: "₹12500/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹14000/year" },
-  { name: "Salt Lake, Sec V - Workzone", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹14000/year" },
-  { name: "Park Street - EasyDaftar", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹14000/year" },
-  { name: "Rashbehari - EasyDaftar", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹14000/year" },
-  { name: "Louden Street - EasyDaftar", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹14000/year" },
-  { name: "KCAN COWORKING", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "365Virtualcoworks", gstPlanPrice: "₹8000/year", mailingPlanPrice: "₹5999/year", brPlanPrice: "₹9000/year" },
-  { name: "CynergX", gstPlanPrice: "₹15000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹12000/year" },
-  { name: "We Grow Coworks", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹13000/year", brPlanPrice: "₹20000/year" },
-  { name: "RegisterKaro", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹15000/year", brPlanPrice: "₹20000/year" },
-  { name: "SS Spaces", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹12000/year", brPlanPrice: "₹16000/year" },
-  { name: "Sector 63, Noida - Crystaa", gstPlanPrice: "₹10000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Workshala- sector 3", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹14000/year" },
-  { name: "Sector 3 - MyWorX", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹12000/year" },
-  { name: "Sector 16 - Registerkaro", gstPlanPrice: "₹11000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹12000/year" },
-  { name: "Sector 62 - Alt F", gstPlanPrice: "₹15000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹20000/year" },
-  { name: "Sec 142 - Alt F", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹16000/year" },
-  { name: "Sec 58 - Alt F", gstPlanPrice: "₹12000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹16000/year" },
-  { name: "Sec 68 - Alt F", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "Oplus Cowork", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹12000/year", brPlanPrice: "₹20000/year" },
-  { name: "Divine Coworking", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹14000/year", brPlanPrice: "₹18000/year" },
-  { name: "Namdhari Spaces,zirakpur", gstPlanPrice: "₹14000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹0/year" },
-  { name: "Sanogic Coworking,zirakpur", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "WorkYard Coworking, Zirakpur", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "RegisterKaro", gstPlanPrice: "₹13000/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹14000/year" },
-  { name: "CoSpaces", gstPlanPrice: "₹16000/year", mailingPlanPrice: "₹10000/year", brPlanPrice: "₹16000/year" },
-  { name: "HawkisH Coworking Space", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "RAINBOW COWORKING", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "Cabin 24/7", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "We work", gstPlanPrice: "₹0/year", mailingPlanPrice: "₹0/year", brPlanPrice: "₹0/year" },
-  { name: "Kaytech Solutions", gstPlanPrice: "₹18000/year", mailingPlanPrice: "₹8000/year", brPlanPrice: "₹18000/year" },
-];
 
 
 // ============ SEED SCRIPT ============
@@ -771,7 +665,7 @@ async function seedDatabase() {
 
     // 1. Seed Users
     console.log("👤 Seeding Users...");
-    const hashedUsers = await Promise.all(testUsers.map(async (u) => ({ ...u, password: await bcrypt.hash(u.password, 12)})));
+    const hashedUsers = await Promise.all(testUsers.map(async (u) => ({ ...u, password: await bcrypt.hash(u.password, 12) })));
     const insertedUsers = await UserModel.insertMany(hashedUsers);
     const partnerUser = insertedUsers.find((u) => u.role === UserRole.PARTNER);
     const regularUser = insertedUsers.find((u) => u.email === "test@example.com");
@@ -790,10 +684,11 @@ async function seedDatabase() {
       const finalImages = cloudImages.length ? cloudImages : propertyImages;
       // a. Create Unique Property
       const property = await PropertyModel.create({
-        name: cw.name, address: cw.address, city: cw.city, area: cw.area, features: cw.features, images: finalImages,
+        name: cw.name, spaceId: cw.spaceId, address: cw.address, city: cw.city, area: cw.area, features: cw.features, images: finalImages,
         location: buildLocation(cw),
         partner: partnerUser?._id, status: PropertyStatus.ACTIVE, kycStatus: KYCStatus.APPROVED, isActive: true,
       });
+      console.log(`✅ Created property: ${property.name} with spaceId: ${property.spaceId}`);
 
       // b. Add Coworking Service
       const finalPriceCW = parsePrice(cw.price);
