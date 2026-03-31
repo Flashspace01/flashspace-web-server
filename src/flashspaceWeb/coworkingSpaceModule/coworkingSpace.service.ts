@@ -50,6 +50,13 @@ export class CoworkingSpaceService {
       totalReviews: 0,
     });
 
+    // Ensure property details (including spaceId) are present in the response
+    await savedSpace.populate({
+      path: "property",
+      select:
+        "spaceId name address city area location images features isActive isDeleted status",
+    });
+
     // Check if we can automatically advance it
     await checkAndAdvanceSpaceStatus(partnerId, property._id.toString());
 
@@ -146,7 +153,11 @@ export class CoworkingSpaceService {
 
     const finalQuery = { ...filter, isDeleted: false };
     const baseQuery = CoworkingSpaceModel.find(finalQuery)
-      .populate("property")
+      .populate({
+        path: "property",
+        select:
+          "spaceId name address city area location images features isActive isDeleted status",
+      })
       .sort({ createdAt: -1 });
 
     if (limit && limit > 0) {
@@ -178,7 +189,11 @@ export class CoworkingSpaceService {
     return await CoworkingSpaceModel.findOne({
       _id: spaceId,
       isDeleted: false,
-    }).populate("property");
+    }).populate({
+      path: "property",
+      select:
+        "spaceId name address city area location images features isActive isDeleted status",
+    });
   }
 
   // FIXED: Added userRole and dynamic RBAC query

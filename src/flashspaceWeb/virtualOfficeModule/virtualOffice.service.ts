@@ -22,6 +22,13 @@ export class VirtualOfficeService {
     });
     const savedOffice = await office.save();
 
+    // Ensure property details (including spaceId) are present in the response
+    await savedOffice.populate({
+      path: "property",
+      select:
+        "spaceId name address city area location images features isActive isDeleted status",
+    });
+
     // Check if we can automatically advance it
     await checkAndAdvanceSpaceStatus(partnerId, property._id.toString());
 
@@ -102,7 +109,11 @@ export class VirtualOfficeService {
     }
 
     const offices = await VirtualOfficeModel.find(filter)
-      .populate("property")
+      .populate({
+        path: "property",
+        select:
+          "spaceId name address city area location images features isActive isDeleted status",
+      })
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip((page - 1) * limit);
@@ -120,7 +131,11 @@ export class VirtualOfficeService {
 
   static async getOfficeById(officeId: string) {
     return await VirtualOfficeModel.findOne({ _id: officeId, isDeleted: false })
-      .populate("property")
+      .populate({
+        path: "property",
+        select:
+          "spaceId name address city area location images features isActive isDeleted status",
+      })
       .populate("partner", "firstName lastName email");
   }
 
