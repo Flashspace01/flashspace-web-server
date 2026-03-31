@@ -557,48 +557,48 @@ const resolveImagesForSpace = (name: string, city?: string): string[] => {
 
 // Basic city centroid fallbacks so new spaces render on the map
 // Coordinates are [lng, lat]
-const CITY_COORDS: Record<string, [number, number]> = {
-  Ahmedabad: [72.5714, 23.0225],
-  Bangalore: [77.5946, 12.9716],
-  Bengaluru: [77.5946, 12.9716],
-  Chennai: [80.2707, 13.0827],
-  Delhi: [77.2090, 28.6139],
-  Gurugram: [77.0266, 28.4595],
-  Gurgaon: [77.0266, 28.4595],
-  Hyderabad: [78.4867, 17.3850],
-  Jaipur: [75.7873, 26.9124],
-  Jammu: [74.8723, 32.7266],
-  Dharamshala: [76.3242, 32.2190],
-  Chandigarh: [76.7794, 30.7333],
-  Kochi: [76.2711, 9.9312],
-  Jodhpur: [73.0243, 26.2389],
-  Ranchi: [85.3096, 23.3441],
-  Bhopal: [77.4126, 23.2599],
-  Chhattisgarh: [82.0, 21.3],
-  Kolkata: [88.3639, 22.5726],
-  Patna: [85.1376, 25.5941],
-  Pune: [73.8567, 18.5204],
-  Noida: [77.3910, 28.5355],
-  Mysuru: [76.6394, 12.2958],
-  Indiranagar: [77.6408, 12.9784],
-  Koramangala: [77.6266, 12.9352],
-  Hebbal: [77.5920, 13.0350],
-  Zirakpur: [76.8195, 30.6425],
-  Chandigarh_Tribune: [76.85, 30.73],
-};
+// const CITY_COORDS: Record<string, [number, number]> = {
+//   Ahmedabad: [72.5714, 23.0225],
+//   Bangalore: [77.5946, 12.9716],
+//   Bengaluru: [77.5946, 12.9716],
+//   Chennai: [80.2707, 13.0827],
+//   Delhi: [77.2090, 28.6139],
+//   Gurugram: [77.0266, 28.4595],
+//   Gurgaon: [77.0266, 28.4595],
+//   Hyderabad: [78.4867, 17.3850],
+//   Jaipur: [75.7873, 26.9124],
+//   Jammu: [74.8723, 32.7266],
+//   Dharamshala: [76.3242, 32.2190],
+//   Chandigarh: [76.7794, 30.7333],
+//   Kochi: [76.2711, 9.9312],
+//   Jodhpur: [73.0243, 26.2389],
+//   Ranchi: [85.3096, 23.3441],
+//   Bhopal: [77.4126, 23.2599],
+//   Chhattisgarh: [82.0, 21.3],
+//   Kolkata: [88.3639, 22.5726],
+//   Patna: [85.1376, 25.5941],
+//   Pune: [73.8567, 18.5204],
+//   Noida: [77.3910, 28.5355],
+//   Mysuru: [76.6394, 12.2958],
+//   Indiranagar: [77.6408, 12.9784],
+//   Koramangala: [77.6266, 12.9352],
+//   Hebbal: [77.5920, 13.0350],
+//   Zirakpur: [76.8195, 30.6425],
+//   Chandigarh_Tribune: [76.85, 30.73],
+// };
 
-const buildLocation = (cw: any) => {
-  if (cw.location && Array.isArray(cw.location.coordinates)) return cw.location;
-  const cityKey = cw.city?.trim();
-  if (cityKey && CITY_COORDS[cityKey]) {
-    const [lng, lat] = CITY_COORDS[cityKey];
-    // Add small jitter to prevent markers from stacking exactly on top of each other
-    const jitterLng = (Math.random() - 0.5) * 0.01;
-    const jitterLat = (Math.random() - 0.5) * 0.01;
-    return { type: "Point", coordinates: [lng + jitterLng, lat + jitterLat] };
-  }
-  return undefined;
-};
+// const buildLocation = (cw: any) => {
+//   if (cw.location && Array.isArray(cw.location.coordinates)) return cw.location;
+//   const cityKey = cw.city?.trim();
+//   if (cityKey && CITY_COORDS[cityKey]) {
+//     const [lng, lat] = CITY_COORDS[cityKey];
+//     // Add small jitter to prevent markers from stacking exactly on top of each other
+//     const jitterLng = (Math.random() - 0.5) * 0.01;
+//     const jitterLat = (Math.random() - 0.5) * 0.01;
+//     return { type: "Point", coordinates: [lng + jitterLng, lat + jitterLat] };
+//   }
+//   return undefined;
+// };
 
 // Normalize main + gallery images for a property
 const buildImages = (cw: any): string[] => {

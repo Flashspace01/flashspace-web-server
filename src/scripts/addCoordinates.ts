@@ -10,58 +10,120 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 // Accurate coordinates for each location based on Google Maps
 // Format: Search the exact address on Google Maps, right-click on location, copy coordinates
 const coordinatesMap: Record<string, { lat: number; lng: number }> = {
-  // Ahmedabad
-  "Workzone - Ahmedabad": { lat: 23.0071, lng: 72.5101 }, // World Trade Tower, Makarba
-  "Sweet Spot Spaces": { lat: 23.0349, lng: 72.5612 }, // Navrangpura, near Sardar Patel Stadium
-
-  // Bangalore
-  "IndiraNagar - Aspire Coworks": { lat: 12.9784, lng: 77.6408 }, // Indiranagar 7th Main Rd
-  "Koramangala - Aspire Coworks": { lat: 12.9279, lng: 77.6271 }, // Koramangala 4th Block
-  "EcoSpace - Hebbal, HMT Layout": { lat: 13.0358, lng: 77.597 }, // HMT Layout, Ganganagar
-
-  // Chennai
-  "WBB Office - Chennai": { lat: 13.0143, lng: 80.2217 }, // Anna Salai, Little Mount
-  "Senate Space": { lat: 13.0878, lng: 80.2086 }, // Anna Nagar
-
-  // Delhi - Accurate Google Maps Coordinates
-  "Stirring Minds": { lat: 28.648, lng: 77.2265 }, // Kundan Mansion, Asaf Ali Rd, Turkman Gate
-  "CP Alt F": { lat: 28.6304, lng: 77.2177 }, // Connaught Lane, Barakhamba
-  Virtualexcel: { lat: 28.5279, lng: 77.219 }, // Saket Salcon, next to Select Citywalk Mall
-  "Mytime Cowork": { lat: 28.521, lng: 77.213 }, // Lane-2, Westend Marg, Saiyad Ul Ajaib, Saket
-  "Okhla Alt F": { lat: 28.542, lng: 77.2736 }, // NH-19, CRRI, Ishwar Nagar, Okhla
-  "WBB Office": { lat: 28.6331, lng: 77.2767 }, // Laxmi Nagar, Vijay Block
-  "Budha Coworking Spaces": { lat: 28.735, lng: 77.115 }, // Sector-24, Rohini
-  "Work & Beyond": { lat: 28.579, lng: 77.064 }, // Kocchar Plaza, Ramphal Chowk, Dwarka Sector 7
-  "Getset Spaces": { lat: 28.559, lng: 77.2067 }, // Green Park Extension, S-16, LMR House
-
-  // Gurgaon
-  "Infrapro - Sector 44": { lat: 28.4505, lng: 77.0526 }, // Minarch Tower, Sector 44
-  "Palm Court - Gurgaon": { lat: 28.4089, lng: 76.9904 }, // Mehrauli Road
-
-  // Dharamshala
-  Ghoomakkad: { lat: 32.2396, lng: 76.3239 }, // Sidhbari, Rakkar
-
-  // Hyderabad
-  "Cabins 24/7": { lat: 17.463, lng: 78.3713 }, // Golden Tulip Estate, Kondapur, HITEC City
-  "CS Coworking": { lat: 17.4401, lng: 78.3489 }, // KNR Square, Gachibowli
-
-  // Jaipur
-  "Jeev Business Solutions": { lat: 26.8738, lng: 75.811 }, // Tonk Rd, Gopal Pura Mode
-
-  // Jammu
-  "Qubicle Coworking": { lat: 32.7156, lng: 74.8578 }, // Trikuta Nagar
-  "Kaytech Solutions": { lat: 32.6899, lng: 74.8378 }, // Civil Airport, Satwari
-
-  // Additional seeded names
-  "Baner Tech Park": { lat: 18.559, lng: 73.7868 },
-  "Cyber City Hub": { lat: 28.494, lng: 77.0895 },
+  "365VirtualCoworkers_MP": { lat: 23.2599, lng: 77.4126 },
+  "365Virtualcoworks": { lat: 23.2599, lng: 77.4126 },
   "Andheri Hub": { lat: 19.1136, lng: 72.8697 },
-  "Koramangala Workspace": { lat: 12.9352, lng: 77.6245 },
-  "Salt Lake Coworks": { lat: 22.5764, lng: 88.4333 },
+  "ApnaYtCoworkers_Jodhpur": { lat: 26.2684, lng: 73.0059 },
+  "Apnayt Coworkers": { lat: 26.1992389, lng: 73.006155 },
   "BKC Business Center": { lat: 19.0607, lng: 72.8656 },
+  "Baner Tech Park": { lat: 18.559, lng: 73.7868 },
+  "Budha Coworking Spaces": { lat: 28.7268158, lng: 77.0733491 },
+  "CP Alt F": { lat: 28.6304203, lng: 77.2200772 },
+  "CS Coworking": { lat: 17.4401, lng: 78.3489 },
+  "CS Coworking - GachiBowli": { lat: 17.4484393, lng: 78.3614054 },
+  "CSCoworkingGachibowli_Hyderabad": { lat: 17.4484393, lng: 78.3614054 },
+  "Cabins 24/7": { lat: 17.463, lng: 78.3713 },
+  "Camac Street - WorkZone": { lat: 22.5486684, lng: 88.3442228 },
+  "CamacStreet_Kolkata": { lat: 22.5486684, lng: 88.3442228 },
+  "Chhattisgarh": { lat: 21.2787, lng: 81.8661 },
+  "CoSpaces": { lat: 30.3062963, lng: 78.0459798 },
+  "Cyber City Hub": { lat: 28.494, lng: 77.0895 },
+  "CynergX": { lat: 23.2326, lng: 77.4334 },
+  "CynergX_MP": { lat: 23.2326, lng: 77.4334 },
+  "Divine Coworking": { lat: 18.561661, lng: 73.7803276 },
+  "DivineCoworking_Pune": { lat: 18.561661, lng: 73.7803276 },
+  "EcoSpace - Hebbal": { lat: 13.0358, lng: 77.597 },
+  "EcoSpace - Hebbal, HMT Layout": { lat: 13.0264718, lng: 77.5883936 },
+  "EcospaceHebbal_Bangalore": { lat: 13.0264718, lng: 77.5883936 },
+  "GetSetSpaces_Delhi": { lat: 28.5578753, lng: 76.9446457 },
+  "Getset Spaces": { lat: 28.5578753, lng: 76.9446457 },
+  "Ghoomakkad": { lat: 32.198496, lng: 76.36691 },
+  "Ghumakkad_HP": { lat: 32.198496, lng: 76.36691 },
+  "Gujarat_Ahmedabad": { lat: 23.0225, lng: 72.5714 },
   "Hi-Tech City Address": { lat: 17.4506, lng: 78.3822 },
+  "IndiraNagar - Aspire Coworks": { lat: 12.9785513, lng: 77.6328796 },
+  "IndiraNagar_Bangalore": { lat: 12.9785513, lng: 77.6328796 },
   "Indiranagar Prestige": { lat: 12.9719, lng: 77.6412 },
+  "Infrapro - Sector 44": { lat: 28.4541099, lng: 77.0678306 },
+  "InfrraPro_Gurgaon": { lat: 28.4541099, lng: 77.0678306 },
+  "Jeev Business Solutions": { lat: 26.8605651, lng: 75.7884309 },
+  "JeevanBusiness_Jaipur": { lat: 26.8605651, lng: 75.7884309 },
+  "Kaytech Solutions": { lat: 32.6763476, lng: 74.839509 },
+  "KaytechSolutions_JK": { lat: 32.6763476, lng: 74.839509 },
+  "Kommon Spaces": { lat: 10.0214688, lng: 76.2711021 },
+  "Koramangala - Aspire Coworks": { lat: 12.9368459, lng: 77.6261411 },
+  "Koramangala Workspace": { lat: 12.9352, lng: 77.6245 },
+  "Koramangala_Bangalore": { lat: 12.9368459, lng: 77.6261411 },
+  "Laksh Space - Hebbal, HMT layout": { lat: 13.0264528, lng: 77.5085707 },
+  "LakshHebbal_Bangalore": { lat: 13.0264528, lng: 77.5085707 },
+  "Louden Street - EasyDaftar": { lat: 22.5437679, lng: 88.3511721 },
+  "Makarba_Ahmedabad": { lat: 22.9894244, lng: 72.4310689 },
+  "MyTimeCowork_Delhi": { lat: 28.5193209, lng: 77.2010251 },
+  "Mytime Cowork": { lat: 28.5193209, lng: 77.1984502 },
+  "Near Victoria Memorial - WorkZone": { lat: 22.5418453, lng: 88.3473113 },
+  "Okhla Alt F": { lat: 28.5512242, lng: 77.2710071 },
+  "OkhlaAltF_Delhi": { lat: 28.5512242, lng: 77.2710071 },
+  "Oplus Cowork": { lat: 25.6107093, lng: 85.0575122 },
+  "OplusCowork_Patna": { lat: 25.6107093, lng: 85.0575122 },
+  "Palm Court - Gurgaon": { lat: 28.4089, lng: 76.9904 },
+  "Park Street - EasyDaftar": { lat: 22.5509305, lng: 88.3519798 },
+  "Park Street - Workzone": { lat: 22.5544012, lng: 88.3476143 },
+  "ParkStreetEasyDaftar_Kolkata": { lat: 22.5437679, lng: 88.3511721 },
+  "ParkStreet_Kolkata": { lat: 22.5418453, lng: 88.3473113 },
   "Premium Pune Address": { lat: 18.5204, lng: 73.8567 },
+  "Qubicle Coworking": { lat: 32.6904688, lng: 74.878062 },
+  "QuibickleCoworking_JK": { lat: 32.6904688, lng: 74.878062 },
+  "Rashbehari - EasyDaftar": { lat: 22.5196358, lng: 88.3080372 },
+  "RegisterKaroCowork_Delhi": { lat: 28.6139, lng: 77.209 },
+  "RegisterKaroOxford_Bangalore": { lat: 12.9716, lng: 77.5946 },
+  "RegisterKaro_Mumbai": { lat: 19.076, lng: 72.8777 },
+  "RegisterKaro_Punjab": { lat: 30.8422, lng: 75.4168 },
+  "RegisterKaro|Ahmedabad": { lat: 23.0225, lng: 72.5714 },
+  "RegisterKaro|Bangalore": { lat: 12.9716, lng: 77.5946 },
+  "RegisterKaro|Delhi": { lat: 28.6139, lng: 77.209 },
+  "SSSpaces_Mysuru": { lat: 12.3023, lng: 76.6268 },
+  "Salt Lake Coworks": { lat: 22.5764, lng: 88.4333 },
+  "Salt Lake, Sec V - EasyDaftar": { lat: 22.5734792, lng: 88.4274254 },
+  "Salt Lake, Sec V - Workzone": { lat: 22.5724611, lng: 88.4343427 },
+  "SaltLakeEasyDaftar_Kolkata": { lat: 22.5724611, lng: 88.4343427 },
+  "Sanogic Coworking": { lat: 28.6139, lng: 77.209 },
+  "Sanogic Coworking Space": { lat: 28.6989748, lng: 77.1126788 },
+  "Sanogic Coworking,zirakpur": { lat: 30.6455195, lng: 76.8122981 },
+  "SanogicCoworking_Delhi": { lat: 28.6989748, lng: 77.1126788 },
+  "SanogicCoworking_Punjab": { lat: 30.901, lng: 75.8573 },
+  "Sector 3 - MyWorX": { lat: 28.5850725, lng: 77.3103113 },
+  "Sector 63, Noida - Crystaa": { lat: 28.6181289, lng: 77.3795597 },
+  "Sector63Crysta_Noida": { lat: 28.6181289, lng: 77.3795597 },
+  "Senat_Chennai": { lat: 13.0883669, lng: 80.2152799 },
+  "Senate Space": { lat: 13.0883669, lng: 80.2152799 },
+  "SpaceHive_Kochi": { lat: 10.0036829, lng: 76.3464392 },
+  "Spacehive": { lat: 10.0036829, lng: 76.3464392 },
+  "Stirring Minds": { lat: 28.6419581, lng: 77.230509 },
+  "StirringMinds_Delhi": { lat: 28.6419581, lng: 77.230509 },
+  "Sweet Spot Spaces": { lat: 23.0427955, lng: 72.5593332 },
+  "SweetSpot_Ahmedabad": { lat: 23.0427955, lng: 72.5593332 },
+  "TEAM COWORK- Palm Court - Gurgaon": { lat: 28.4725201, lng: 77.0521724 },
+  "Task Alley Rentals LLP": { lat: 23.0427955, lng: 72.5593332 },
+  "TeamCowork_Gurgaon": { lat: 28.4725201, lng: 77.0521724 },
+  "The Work Lounge": { lat: 28.4595, lng: 77.0266 },
+  "TheWorLaunge_Gurgaon": { lat: 28.4595, lng: 77.0266 },
+  "Virtualexcel": { lat: 28.5283, lng: 77.2173 },
+  "Vision Cowork": { lat: 28.5193433, lng: 77.1845508 },
+  "VisionCowork_Delhi": { lat: 28.5193433, lng: 77.1845508 },
+  "WBB Office": { lat: 9.9553103, lng: 76.2934427 },
+  "WBB Office - Chennai": { lat: 13.0143, lng: 80.2217 },
+  "WBB Office - Laxmi Nagar": { lat: 28.6331, lng: 77.2767 },
+  "WBBOffice_Delhi": { lat: 9.9553103, lng: 76.2934427 },
+  "WBB_Chennai": { lat: 13.0143, lng: 80.2217 },
+  "We Grow Coworks": { lat: 19.0655, lng: 72.9868599 },
+  "Work & Beyond": { lat: 28.5850018, lng: 77.0556738 },
+  "WorkBeyond_Delhi": { lat: 28.5850018, lng: 77.0556738 },
+  "WorkShalaSec3_Noida": { lat: 28.406765, lng: 76.9101 },
+  "WorkYard CWS": { lat: 30.698397, lng: 76.784799 },
+  "WorkYard Coworking, Zirakpur": { lat: 30.658681, lng: 76.858228 },
+  "Workshala- sector 3": { lat: 28.406765, lng: 76.9101 },
+  "Workyard_Chandigarh": { lat: 30.658681, lng: 76.858228 },
+  "Workzone - Ahmedabad": { lat: 22.9894244, lng: 72.4310689 },
 };
 
 async function addCoordinates() {
@@ -92,12 +154,15 @@ async function addCoordinates() {
       !Number.isNaN(coords.lng);
 
     const getBestMatchCoordinates = (spaceDoc: any, propertyDoc?: any) => {
-      const candidateNames = [
+      const city = propertyDoc?.address?.city || spaceDoc?.city || spaceDoc?.address?.city || "";
+      const names = [
         propertyDoc?.name,
         spaceDoc?.name,
       ].filter(Boolean) as string[];
 
-      for (const name of candidateNames) {
+      for (const name of names) {
+        const nameWithCity = city ? `${name}|${city}` : null;
+        if (nameWithCity && coordinatesMap[nameWithCity]) return coordinatesMap[nameWithCity];
         if (coordinatesMap[name]) return coordinatesMap[name];
       }
 
@@ -113,19 +178,14 @@ async function addCoordinates() {
 
     const upsertPropertyLocation = async (propertyDoc: any, coords: { lat: number; lng: number }) => {
       if (!propertyDoc?._id) return;
-      const hasValidLocation =
-        Array.isArray(propertyDoc.location?.coordinates) &&
-        propertyDoc.location.coordinates.length === 2;
-
-      if (!hasValidLocation) {
-        await PropertyModel.findByIdAndUpdate(propertyDoc._id, {
-          location: {
-            type: "Point",
-            coordinates: [coords.lng, coords.lat],
-          },
-        });
-        propertyLocationUpdatedCount++;
-      }
+      
+      await PropertyModel.findByIdAndUpdate(propertyDoc._id, {
+        location: {
+          type: "Point",
+          coordinates: [coords.lng, coords.lat],
+        },
+      });
+      propertyLocationUpdatedCount++;
     };
 
     // Update CoworkingSpaces
@@ -136,21 +196,17 @@ async function addCoordinates() {
 
     for (const space of coworkingSpaces) {
       const propertyDoc = (space as any).property;
-      const existingCoords = (space as any).coordinates;
-
-      if (isValidCoordinates(existingCoords)) {
-        await upsertPropertyLocation(propertyDoc, existingCoords);
-        skippedCount++;
-        continue;
-      }
-
       const coords = getBestMatchCoordinates(space, propertyDoc);
+      
       if (coords && isValidCoordinates(coords)) {
         await CoworkingSpaceModel.findByIdAndUpdate(space._id, { coordinates: coords });
         await upsertPropertyLocation(propertyDoc, coords);
 
-        console.log(`✓ Updated: ${propertyDoc?.name || (space as any).name || space._id}`);
+        console.log(`✓ Updated/Refined: ${propertyDoc?.name || (space as any).name || space._id}`);
         updatedCount++;
+      } else if (isValidCoordinates((space as any).coordinates)) {
+        await upsertPropertyLocation(propertyDoc, (space as any).coordinates);
+        skippedCount++;
       } else {
         console.log(`⚠ No coordinates found for: ${propertyDoc?.name || (space as any).name || space._id}`);
       }
@@ -164,21 +220,17 @@ async function addCoordinates() {
 
     for (const office of virtualOffices) {
       const propertyDoc = (office as any).property;
-      const existingCoords = (office as any).coordinates;
-
-      if (isValidCoordinates(existingCoords)) {
-        await upsertPropertyLocation(propertyDoc, existingCoords);
-        skippedCount++;
-        continue;
-      }
-
       const coords = getBestMatchCoordinates(office, propertyDoc);
+
       if (coords && isValidCoordinates(coords)) {
         await VirtualOfficeModel.findByIdAndUpdate(office._id, { coordinates: coords });
         await upsertPropertyLocation(propertyDoc, coords);
 
-        console.log(`✓ Updated: ${propertyDoc?.name || (office as any).name || office._id}`);
+        console.log(`✓ Updated/Refined: ${propertyDoc?.name || (office as any).name || office._id}`);
         updatedCount++;
+      } else if (isValidCoordinates((office as any).coordinates)) {
+        await upsertPropertyLocation(propertyDoc, (office as any).coordinates);
+        skippedCount++;
       } else {
         console.log(`⚠ No coordinates found for: ${propertyDoc?.name || (office as any).name || office._id}`);
       }
