@@ -54,6 +54,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       location,
       images,
       popular,
+      spaceId,
       propertyId,
     } = validation.data.body;
 
@@ -76,6 +77,7 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
         location,
         images,
         popular,
+        spaceId,
         propertyId,
       },
       partnerId,

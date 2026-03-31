@@ -37,6 +37,7 @@ const LocationSchema = z.object({
 
 export const createCoworkingSpaceSchema = z.object({
   body: z.object({
+    spaceId: z.string().trim().min(1).optional(),
     name: z.string().min(3, "Name must be at least 3 characters").optional(),
     address: z.string().min(5, "Address is required").optional(),
     city: z.string().min(2, "City is required").optional(),
@@ -67,6 +68,7 @@ export const updateCoworkingSpaceSchema = z.object({
       .regex(/^[0-9a-fA-F]{24}$/, "Invalid ID format"),
   }),
   body: z.object({
+    spaceId: z.string().trim().min(1).optional(),
     name: z.string().min(3).optional(),
     address: z.string().min(5).optional(),
     city: z.string().min(2).optional(),

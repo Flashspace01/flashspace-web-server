@@ -45,7 +45,11 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized: No partner found");
 
     const createdOffice = await VirtualOfficeService.createOffice(
-      { ...validation.data.body, propertyId: (req.body as any).propertyId },
+      {
+        ...validation.data.body,
+        spaceId: (req.body as any).spaceId,
+        propertyId: (req.body as any).propertyId,
+      },
       partnerId,
     );
 
