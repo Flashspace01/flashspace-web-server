@@ -11,6 +11,7 @@ import http from "http"; // Import http module
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import { mainRoutes } from "./mainRoutes";
 import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
@@ -114,6 +115,50 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Main API routes
+app.use("/api", mainRoutes);
+
+// --- Backend Proxy Implementation ---
+// Acts as a fallback: Any request to /api that was NOT handled by mainRoutes
+// will be proxied to the Actual API.
+app.use(
+  "/api",
+  createProxyMiddleware({
+    target: process.env.API_BASE_URL || "https://api.external-service.com",
+    changeOrigin: true,
+    // Add /api prefix to target if needed, or mapping depends on requirements
+    // Here we assume the target also expects /api/path or we can rewrite
+    // pathRewrite: { "^/api": "" }, 
+    on: {
+      proxyReq: (proxyReq: any, req: any) => {
+        // Add secure headers from .env (Not exposed to frontend)
+        if (process.env.EXTERNAL_API_KEY) {
+          proxyReq.setHeader("X-API-Key", process.env.EXTERNAL_API_KEY);
+        }
+
+        // Handle body if express.json() was already called
+        if (req.body && Object.keys(req.body).length) {
+          const bodyData = JSON.stringify(req.body);
+          proxyReq.setHeader("Content-Type", "application/json");
+          proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+          proxyReq.write(bodyData);
+        }
+      },
+    },
+    logger: console,
+  }),
+);
+
+// Default 404 Handler for everything else
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Requested resource not found",
+  });
+});
+
 // Database connection with feedback
 dbConnection()
   .then(() => {
@@ -134,29 +179,5 @@ dbConnection()
     console.error("Database connection failed:", error);
     process.exit(1);
   });
-
-// Serve uploaded files statically
-// Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-
-// Main API routes
-app.use("/api", mainRoutes);
-
-// 404 Handler for /api
-app.use("/api", (req, res) => {
-  console.log(`[404] No route found for ${req.method} ${req.originalUrl}`);
-  res.status(404).json({
-    success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-  });
-});
-
-// Default 404 Handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Requested resource not found",
-  });
-});
 
 // TART - force nodemon restart 1774859050855
