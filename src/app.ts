@@ -96,7 +96,7 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 
 // Explicit OPTIONS handler for all routes (important for preflights in some environments)
-app.options("(.*)", cors(corsOptions));
+app.options(":path*", cors(corsOptions));
 
 console.log(`CORS initialized with dynamic origin checking and credentials support`);
 
