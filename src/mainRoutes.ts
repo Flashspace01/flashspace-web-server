@@ -20,6 +20,7 @@ import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes"
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
+import { leadRoutes } from "./flashspaceWeb/leadModule/lead.routes";
 export const mainRoutes = Router();
 
 
@@ -91,3 +92,6 @@ mainRoutes.use("/visit", visitRoutes);
 
 // /api/chat
 mainRoutes.use("/chat", chatRoutes);
+
+// /api/leads
+mainRoutes.use("/leads", leadRoutes);
