@@ -11,7 +11,9 @@ export interface EmailOptions {
 
 export class EmailUtil {
   private static transporter: nodemailer.Transporter | null = null;
+  private static contactTransporter: nodemailer.Transporter | null = null;
   private static isInitialized = false;
+  private static isContactInitialized = false;
 
   static initialize() {
     const service = process.env.EMAIL_SERVICE?.toLowerCase();
@@ -35,9 +37,39 @@ export class EmailUtil {
       });
       console.log('✅ Gmail email service initialized');
       this.isInitialized = true;
+    } else if (service === 'smtp') {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      console.log('✅ SMTP email service initialized');
+      this.isInitialized = true;
     } else {
       console.log('📧 Email service disabled - emails will be logged only');
-      this.isInitialized = true; // Mark as initialized to prevent repeated attempts
+      this.isInitialized = true;
+    }
+
+    this.initializeContact();
+  }
+
+  static initializeContact() {
+    if (process.env.SMTP_CONTACT_HOST) {
+      this.contactTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_CONTACT_HOST,
+        port: parseInt(process.env.SMTP_CONTACT_PORT || '587'),
+        secure: process.env.SMTP_CONTACT_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_CONTACT_USER,
+          pass: process.env.SMTP_CONTACT_PASS,
+        },
+      });
+      console.log('✅ Contact SMTP email service initialized');
+      this.isContactInitialized = true;
     }
   }
 
@@ -61,19 +93,19 @@ export class EmailUtil {
         const result = await sgMail.send(msg);
         console.log('✅ Email sent successfully via SendGrid to:', options.to);
         return;
-      } else if (service === 'gmail') {
+      } else if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
-          throw new Error('Gmail transporter not initialized');
+          throw new Error(`${service} transporter not initialized`);
         }
 
         await this.transporter.sendMail({
-          from: `"FlashSpace" <${process.env.EMAIL_USER}>`,
+          from: process.env.EMAIL_FROM || `"FlashSpace" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
           to: options.to,
           subject: options.subject,
           text: options.text,
           html: options.html,
         });
-        console.log('✅ Email sent successfully via Gmail');
+        console.log(`✅ Email sent successfully via ${service}`);
       } else {
         // Log email instead of sending (for development/when no service configured)
         console.log('📧 Email logged (sending disabled):');
@@ -481,6 +513,108 @@ export class EmailUtil {
     });
   }
 
+  static async sendContactFormNotification(contactData: {
+    fullName: string;
+    email: string;
+    phoneNumber: string;
+    companyName?: string;
+    serviceInterest?: string;
+    message: string;
+  }): Promise<void> {
+    const receiverEmail = process.env.CONTACT_RECEIVER_EMAIL || 'team@flashspace.co';
+    
+    const html = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 24px; letter-spacing: 1px;">New Contact Inquiry</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">FlashSpace Contact Form</p>
+        </div>
+        
+        <div style="padding: 30px; background-color: #ffffff;">
+          <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;">
+            <p style="color: #666; margin: 0 0 5px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Full Name</p>
+            <p style="color: #333; margin: 0; font-size: 16px; font-weight: 500;">${contactData.fullName}</p>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+            <div>
+              <p style="color: #666; margin: 0 0 5px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Email Address</p>
+              <p style="color: #1e3c72; margin: 0; font-size: 16px; font-weight: 500;">${contactData.email}</p>
+            </div>
+            <div>
+              <p style="color: #666; margin: 0 0 5px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Phone Number</p>
+              <p style="color: #333; margin: 0; font-size: 16px; font-weight: 500;">${contactData.phoneNumber}</p>
+            </div>
+          </div>
+          
+          <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;">
+            <p style="color: #666; margin: 0 0 5px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Company Name</p>
+            <p style="color: #333; margin: 0; font-size: 16px; font-weight: 500;">${contactData.companyName || 'Not Provided'}</p>
+          </div>
+          
+          <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;">
+            <p style="color: #666; margin: 0 0 5px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Service Interest</p>
+            <p style="color: #333; margin: 0; font-size: 16px; font-weight: 500;">${contactData.serviceInterest || 'Not Provided'}</p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #1e3c72;">
+            <p style="color: #666; margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; font-weight: bold;">Message</p>
+            <p style="color: #333; margin: 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${contactData.message}</p>
+          </div>
+        </div>
+        
+        <div style="background-color: #f1f3f5; padding: 20px; text-align: center; color: #777; font-size: 12px;">
+          <p style="margin: 0;">This email was sent from the FlashSpace Contact Form.</p>
+          <p style="margin: 5px 0 0 0;">&copy; 2024 FlashSpace Tech. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    const text = `
+      NEW CONTACT INQUIRY
+      -------------------
+      Full Name: ${contactData.fullName}
+      Email: ${contactData.email}
+      Phone: ${contactData.phoneNumber}
+      Company: ${contactData.companyName || 'N/A'}
+      Service Interest: ${contactData.serviceInterest || 'N/A'}
+      
+      Message:
+      ${contactData.message}
+      
+      - FlashSpace Team
+    `;
+
+    // Try to use dedicated contact transporter first
+    if (!this.isContactInitialized) {
+      this.initializeContact();
+    }
+
+    if (this.contactTransporter) {
+      try {
+        await this.contactTransporter.sendMail({
+          from: process.env.SMTP_CONTACT_FROM || process.env.EMAIL_FROM || `"FlashSpace Contact" <${process.env.SMTP_CONTACT_USER}>`,
+          to: receiverEmail,
+          subject: `📧 New Contact: ${contactData.fullName} - ${contactData.serviceInterest || 'Query'}`,
+          html,
+          text,
+        });
+        console.log('✅ Contact notification sent via dedicated SMTP');
+        return;
+      } catch (error) {
+        console.error('❌ Failed to send contact notification via dedicated SMTP, falling back to primary:', error);
+      }
+    }
+
+    // Fallback to primary email service
+    await this.sendEmail({
+      to: receiverEmail,
+      subject: `📧 New Contact: ${contactData.fullName} - ${contactData.serviceInterest || 'Query'}`,
+      html,
+      text,
+    });
+  }
+
   static async testConnection(): Promise<boolean> {
     const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
@@ -493,12 +627,12 @@ export class EmailUtil {
         // SendGrid doesn't have a verify method, we'll try to send a test
         console.log('✅ SendGrid connection configured');
         return true;
-      } else if (service === 'gmail') {
+      } else if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
-          throw new Error('Gmail transporter not initialized');
+          throw new Error(`${service} transporter not initialized`);
         }
         await this.transporter.verify();
-        console.log('✅ Gmail connection verified!');
+        console.log(`✅ ${service} connection verified!`);
         return true;
       } else {
         console.warn('⚠️ No email service configured');
