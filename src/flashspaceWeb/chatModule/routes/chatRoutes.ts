@@ -6,7 +6,7 @@ const router = Router();
 
 // ============ CHAT MESSAGING (PUBLIC/OPTIONAL AUTH) ============
 router.post("/guest/send", sendGuestMessage);
-router.post("/send", AuthMiddleware.optionalAuth, sendMessage);
+router.post(["/send", "/send/"], AuthMiddleware.optionalAuth, sendMessage);
 
 // Protect subsequent chat routes (sessions, history) with mandatory authentication
 router.use(AuthMiddleware.authenticate);
