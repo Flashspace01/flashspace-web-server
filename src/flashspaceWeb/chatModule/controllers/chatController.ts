@@ -18,34 +18,52 @@ export const sendMessage = async (req: Request, res: Response) => {
     }
 
     console.log(`[CHAT] Running message for identifier: ${userIdentifier} (IsMember: ${!!userId})`);
+    
+    // Ensure URL is clean
+    const targetUrl = AI_BACKEND_URL.trim().replace(/\/$/, "") + "/"; // Ensure it ends in a slash
+    console.log(`[CHAT] Connecting to AI via: ${targetUrl}`);
 
     // Call AI backend
     const response = await axios.post(
-      AI_BACKEND_URL,
+      targetUrl,
       {
         query: message,
         conversation_id: conversationId || "default",
         session_id: userIdentifier
       },
-      { timeout: 60000 }
+      { 
+        timeout: 90000, // Increase to 90s for slower Render connections
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
     );
 
     const aiResponse = response.data;
-    console.log(`[CHAT] AI backend response:`, aiResponse);
+    console.log(`[CHAT] AI replied successfully:`, JSON.stringify(aiResponse).substring(0, 50) + "...");
 
-    // Extract reply from response
-    const reply = aiResponse.reply || aiResponse.message || aiResponse.response || "No response from AI";
+    // Extract reply from response (flexible mapping for different AI response formats)
+    const reply = aiResponse.reply || aiResponse.message || aiResponse.response || (typeof aiResponse === 'string' ? aiResponse : "No response from AI");
 
     res.status(200).json({
       success: true,
       reply,
-      sessionId: aiResponse.session_id || userId
+      sessionId: aiResponse.session_id || userIdentifier
     });
   } catch (error: any) {
-    console.error("[CHAT] Error calling AI backend:", error.message || error);
-    res.status(500).json({
+    const status = error.response?.status || 500;
+    const errorMsg = error.response?.data?.message || error.message || "Unknown error";
+    
+    console.error(`[CHAT] Error calling AI backend (${status}):`, errorMsg);
+    if (error.response?.data) {
+      console.error("[CHAT] Error details:", JSON.stringify(error.response.data));
+    }
+
+    res.status(status).json({
       success: false,
-      message: "Failed to get response from AI assistant"
+      message: "Failed to get response from AI assistant",
+      error: errorMsg
     });
   }
 };
