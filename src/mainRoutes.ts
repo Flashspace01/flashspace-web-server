@@ -64,7 +64,7 @@ mainRoutes.use("/spacePartner", spacePartnerRoutes);
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupons
 mainRoutes.use("/coupons", couponRoutes);
-// /api/mail
+// /api/mail 
 mainRoutes.use("/mail", mailRoutes);
 // /api/meetingRoom
 mainRoutes.use("/meetingRoom", meetingRoomRoutes);

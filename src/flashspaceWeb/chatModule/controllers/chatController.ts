@@ -27,7 +27,10 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     // ✅ SMART URL CLEANER (prevents duplicate /chat paths)
     const base = AI_BASE_URL.replace(/\/chat\/guest\/?$/, "").replace(/\/chat\/?$/, "").replace(/\/$/, "");
-    const targetUrl = `${base}/chat`;
+    const targetUrl = `${base}/chat/guest`;
+
+    // Extract Access Token from cookies or auth header to pass to AI
+    const apiToken = req.cookies?.accessToken || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.substring(7) : req.headers.authorization);
 
     const response = await axios.post(
       targetUrl,
@@ -41,6 +44,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          ...(apiToken ? { "Authorization": `Bearer ${apiToken}` } : {})
         },
       }
     );
