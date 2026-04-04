@@ -25,8 +25,9 @@ export const sendMessage = async (req: Request, res: Response) => {
       `[CHAT] Identifier: ${userIdentifier} | Member: ${!!userId}`
     );
 
-    // ✅ FIXED endpoint
-    const targetUrl = `${AI_BASE_URL}/chat`;
+    // ✅ SMART URL CLEANER (prevents duplicate /chat paths)
+    const base = AI_BASE_URL.replace(/\/chat\/guest\/?$/, "").replace(/\/chat\/?$/, "").replace(/\/$/, "");
+    const targetUrl = `${base}/chat`;
 
     const response = await axios.post(
       targetUrl,
@@ -89,22 +90,24 @@ export const sendGuestMessage = async (req: Request, res: Response) => {
         .json({ success: false, message: "Message is required" });
     }
 
-    // ✅ FIXED endpoint (THIS WAS YOUR MAIN BUG)
-    const targetUrl = `${AI_BASE_URL}/chat/guest`;
-
-    console.log(`[CHAT-GUEST] Calling: ${targetUrl}`);
+    // ✅ SMART URL CLEANER (prevents duplicate /chat/guest paths)
+    const base = AI_BASE_URL.replace(/\/chat\/guest\/?$/, "").replace(/\/chat\/?$/, "").replace(/\/$/, "");
+    const targetUrl = `${base}/chat/guest`;
+    
+    console.log(`[CHAT-GUEST] Final Target URL: ${targetUrl}`);
 
     const response = await axios.post(
       targetUrl,
       {
-        query: message, // ✅ IMPORTANT (not "message")
+        query: message,
         conversation_id: conversationId || "guest_web",
         session_id: sessionId || `guest_${Date.now()}`,
       },
       {
-        timeout: 60000,
+        timeout: 90000,
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json"
         },
       }
     );
