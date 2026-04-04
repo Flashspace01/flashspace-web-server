@@ -20,6 +20,8 @@ import { SeatBookingRoutes } from "./flashspaceWeb/seatingModule/seating.routes"
 import { reviewRoutes } from "./flashspaceWeb/reviewsModule/review.routes";
 import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
+import { leadRoutes } from "./flashspaceWeb/leadModule/lead.routes";
+import { sendGuestMessage } from "./flashspaceWeb/chatModule/controllers/chatController";
 export const mainRoutes = Router();
 
 
@@ -27,21 +29,17 @@ import mongoose from "mongoose";
 
 mainRoutes.get("/health", (req, res) => {
   const dbStatus = mongoose.connection.readyState;
-  const statusMap = {
-    0: "Disconnected",
-    1: "Connected",
-    2: "Connecting",
-    3: "Disconnecting",
-  };
   res.json({
     success: true,
     message: "Server is running",
-    // dbStatus: statusMap[dbStatus] || "Unknown",
     dbReadyState: dbStatus,
     envPort: process.env.PORT,
     timestamp: new Date(),
   });
 });
+
+// /api/guest-chat-send (Public AI Chat)
+mainRoutes.post("/guest-chat-send", sendGuestMessage);
 
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
@@ -91,3 +89,6 @@ mainRoutes.use("/visit", visitRoutes);
 
 // /api/chat
 mainRoutes.use("/chat", chatRoutes);
+
+// /api/leads
+mainRoutes.use("/leads", leadRoutes);

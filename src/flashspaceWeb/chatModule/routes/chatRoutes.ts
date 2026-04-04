@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
-import { sendMessage, getSessions, saveSession, deleteSession } from "../controllers/chatController";
+import { sendMessage, sendGuestMessage, getSessions, saveSession, deleteSession } from "../controllers/chatController";
 
 const router = Router();
 
-// Protect all chat routes with authentication middleware
-router.use(AuthMiddleware.authenticate);
+// ============ CHAT MESSAGING (PUBLIC/OPTIONAL AUTH) ============
+router.post("/guest/send", sendGuestMessage);
+router.post(["/send", "/send/"], AuthMiddleware.optionalAuth, sendMessage);
 
-// ============ CHAT MESSAGING ============
-router.post("/send", sendMessage);
+// Protect subsequent chat routes (sessions, history) with mandatory authentication
+router.use(AuthMiddleware.authenticate);
 
 // ============ CHAT SESSIONS ============
 router.get("/", getSessions);

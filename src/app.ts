@@ -40,7 +40,7 @@ const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key", "X-API-Key"],
   exposedHeaders: ["Set-Cookie"],
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -90,6 +90,8 @@ app.use(
     },
   }),
 );
+
+// CORS is already handled by the app.use(cors(...)) middleware below
 console.log(
   `CORS enabled for origin: ${corsOptions.origin} with credentials support`,
 );
