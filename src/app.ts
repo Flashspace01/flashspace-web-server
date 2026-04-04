@@ -91,7 +91,8 @@ app.use(
   }),
 );
 
-app.options("*", cors(corsOptions));
+// Express 5 compatible wildcard for CORS preflight
+app.options("(.*)", cors(corsOptions));
 console.log(
   `CORS enabled for origin: ${corsOptions.origin} with credentials support`,
 );
