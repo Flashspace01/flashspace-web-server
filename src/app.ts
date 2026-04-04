@@ -91,7 +91,7 @@ app.use(
   }),
 );
 
-
+app.options("*", cors(corsOptions));
 console.log(
   `CORS enabled for origin: ${corsOptions.origin} with credentials support`,
 );
