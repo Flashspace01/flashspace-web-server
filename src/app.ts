@@ -36,6 +36,16 @@ initSocket(server);
 
 // CORS configuration with credentials support (MUST be FIRST)
 // Updated to fix wildcard CORS issue
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key", "X-API-Key"],
+  exposedHeaders: ["Set-Cookie"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
 const allowedOrigins = [
   "https://flash-space-web-client.vercel.app",
   "https://flash-space-web-client-jb2vq5x0x-darkopers-projects.vercel.app",
@@ -51,36 +61,6 @@ const allowedOrigins = [
   "http://72.60.219.115",
 ];
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.error("CORS blocked origin:", origin);
-      callback(new Error("CORS not allowed"), false);
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "Cookie",
-    "x-api-key",
-    "X-API-Key",
-    "Origin",
-    "Accept",
-  ],
-  exposedHeaders: ["Set-Cookie"],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
-
 // Middleware to handle Private Network Access (PNA) preflight requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
@@ -92,13 +72,29 @@ app.use((req, res, next) => {
   next();
 });
 
-// App-wide CORS middleware
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    ...corsOptions,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) {
+        return callback(null, true);
+      }
 
-// Explicit OPTIONS handler for all routes (important for preflights in some environments)
-// app.options(":path*", cors(corsOptions));
+      if (allowedOrigins.includes(origin)) {
+        callback(null, origin);
+      } else {
+        console.error("CORS blocked origin:", origin);
+        callback(new Error("CORS not allowed"), false);
+      }
+    },
+  }),
+);
 
-console.log(`CORS initialized with dynamic origin checking and credentials support`);
+
+console.log(
+  `CORS enabled for origin: ${corsOptions.origin} with credentials support`,
+);
 
 // Middleware
 app.use(express.json());

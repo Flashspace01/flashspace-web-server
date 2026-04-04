@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { google } from "googleapis";
+import { LeadModel } from "./lead.model";
+import { EmailUtil } from "../authModule/utils/email.util";
 
 export const createLead = async (req: Request, res: Response) => {
   try {
@@ -15,80 +17,130 @@ export const createLead = async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, message: "Missing required fields (name, email, phone)" });
     }
 
+    // 1. Save to MongoDB (Primary Storage)
+    let savedLead: any = null;
+    try {
+      savedLead = await LeadModel.create({
+        name,
+        email,
+        phone,
+        city,
+        businessType,
+        budget,
+        message,
+        source,
+        page,
+        utm,
+      });
+      console.log("✅ Lead saved to MongoDB:", savedLead._id);
+    } catch (dbError: any) {
+      console.error("❌ Failed to save lead to MongoDB:", dbError.message);
+      // We continue even if DB fails, to try Google Sheets/Email
+    }
+
+    // 2. Send Admin Email Notification
+    try {
+      const adminEmail = process.env.ADMIN_EMAIL || "yogeshbisht12122005@gmail.com";
+      const subject = `🚀 New Lead: ${name} (${city || "General"})`;
+      const html = `
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #EDB003; padding-bottom: 10px;">New Website Lead</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <tr><td style="padding: 8px; font-weight: bold; width: 120px;">Name:</td><td style="padding: 8px;">${name}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Email:</td><td style="padding: 8px;"><a href="mailto:${email}">${email}</a></td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Phone:</td><td style="padding: 8px;"><a href="tel:${phone}">${phone}</a></td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">City:</td><td style="padding: 8px;">${city || "N/A"}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Interest:</td><td style="padding: 8px;">${businessType || "N/A"}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Budget:</td><td style="padding: 8px;">${budget || "N/A"}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Page:</td><td style="padding: 8px;"><small>${page || "N/A"}</small></td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Message:</td><td style="padding: 8px; background: #f9f9f9;">${message || "No message provided"}</td></tr>
+          </table>
+          <div style="margin-top: 30px; font-size: 12px; color: #7f8c8d; text-align: center;">
+            Sent from FlashSpace Website Lead System
+          </div>
+        </div>
+      `;
+      
+      await EmailUtil.sendEmail({ to: adminEmail, subject, html });
+      console.log("✅ Admin notification email sent");
+    } catch (emailError: any) {
+      console.error("⚠️ Failed to send admin notification email:", emailError.message);
+    }
+
+    // 3. Append to Google Sheets (Optional Connector)
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-
-    // Robust private key parsing
     let serviceAccountPrivateKey = process.env.GOOGLE_PRIVATE_KEY || "";
-    // 1. Remove wrapping quotes if dotenv didn't handle them
-    if (serviceAccountPrivateKey.startsWith('"') && serviceAccountPrivateKey.endsWith('"')) {
-      serviceAccountPrivateKey = serviceAccountPrivateKey.substring(1, serviceAccountPrivateKey.length - 1);
-    }
-    // 2. Convert literal \n strings to real newlines
-    serviceAccountPrivateKey = serviceAccountPrivateKey.replace(/\\n/g, "\n");
-
-    const sheetName = process.env.GOOGLE_SHEET_NAME || "Leads";
 
     if (!spreadsheetId || !serviceAccountEmail || !serviceAccountPrivateKey) {
-      return res.status(500).json({ ok: false, message: "Google Sheets credentials are not configured" });
+      console.warn("⚠️ Google Sheets credentials are not fully configured. Skipping sheet update.");
+      // Return success because DB and Email are handled
+      return res.status(201).json({ 
+        ok: true, 
+        message: "Lead submitted successfully",
+        id: savedLead?._id 
+      });
     }
 
-    const auth = new google.auth.JWT({
-      email: serviceAccountEmail,
-      key: serviceAccountPrivateKey,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    });
-
-    const sheets = google.sheets({ version: "v4", auth });
-
-    // Robust sheet discovery
-    let targetSheet = sheetName;
     try {
-      const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-      const firstSheetName = spreadsheet.data.sheets?.[0]?.properties?.title;
-      // If the provided sheetName is not found or empty, fallback to the first sheet
-      const exists = spreadsheet.data.sheets?.some(s => s.properties?.title === sheetName);
-      if (!exists || !sheetName) {
-        if (firstSheetName) {
-            targetSheet = firstSheetName;
-            console.log(`DEBUG - Sheet "${sheetName}" not found. Falling back to first sheet: "${targetSheet}"`);
-        }
+      // Private key parsing
+      if (serviceAccountPrivateKey.startsWith('"') && serviceAccountPrivateKey.endsWith('"')) {
+        serviceAccountPrivateKey = serviceAccountPrivateKey.substring(1, serviceAccountPrivateKey.length - 1);
       }
-    } catch (e: any) {
-      console.error("DEBUG - Failed to fetch spreadsheet metadata:", e.message);
+      serviceAccountPrivateKey = serviceAccountPrivateKey.replace(/\\n/g, "\n");
+
+      const auth = new google.auth.JWT({
+        email: serviceAccountEmail,
+        key: serviceAccountPrivateKey,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      });
+
+      const sheets = google.sheets({ version: "v4", auth });
+      const sheetName = process.env.GOOGLE_SHEET_NAME || "Leads";
+
+      // Discovery
+      let targetSheet = sheetName;
+      try {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+        const exists = spreadsheet.data.sheets?.some(s => s.properties?.title === sheetName);
+        if (!exists) {
+          const firstSheetName = spreadsheet.data.sheets?.[0]?.properties?.title;
+          if (firstSheetName) targetSheet = firstSheetName;
+        }
+      } catch (e: any) {
+        console.warn("DEBUG - Sheet discovery failed, using default name:", e.message);
+      }
+
+      const row = [
+        new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+        String(name).trim(),
+        String(email).trim(),
+        String(phone).trim(),
+        page ? String(page).trim() : (source || "Website"),
+        message ? String(message).trim() : (businessType ? `Interested in ${businessType}` : ""),
+        "Received",
+      ];
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `'${targetSheet}'!A:A`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+      console.log("✅ Lead appended to Google Sheets");
+    } catch (sheetError: any) {
+      console.error("❌ Google Sheets append failed:", sheetError.message);
+      // We don't fail the request if only the sheet fails
     }
 
-    // Construct a descriptive info field if city is missing
-    let info = city ? String(city).trim() : "";
-    if (!info && businessType) {
-      info = `${businessType}${budget ? ` (${budget})` : ""}`;
-    }
-
-    const row = [
-      new Date().toISOString(),
-      String(name).trim(),
-      String(email).trim(),
-      String(phone).trim(),
-      page ? String(page).trim() : "", // source column (now URL only)
-      message ? String(message).trim() : "", // next column (message)
-      "received",
-    ];
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: `'${targetSheet}'!A:A`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [row],
-      },
+    return res.status(201).json({ 
+      ok: true, 
+      message: "Lead submitted successfully",
+      id: savedLead?._id 
     });
 
-    return res.status(201).json({ ok: true });
   } catch (error: any) {
-    console.error("DEBUG - Lead submission failed:", error.message);
-    if (error.response?.data) {
-      console.error("Google API Error Data:", error.response.data);
-    }
-    return res.status(500).json({ ok: false, message: "Lead submission failed: " + error.message });
+    console.error("CRITICAL - Lead submission loop failed:", error.message);
+    return res.status(500).json({ ok: false, message: "Submission failed: " + error.message });
   }
 };
