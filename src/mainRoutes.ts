@@ -38,9 +38,6 @@ mainRoutes.get("/health", (req, res) => {
   });
 });
 
-// /api/guest-chat-send (Public AI Chat)
-mainRoutes.post("/guest-chat-send", sendGuestMessage);
-
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
