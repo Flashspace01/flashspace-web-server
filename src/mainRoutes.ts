@@ -38,9 +38,6 @@ mainRoutes.get("/health", (req, res) => {
   });
 });
 
-// /api/guest-chat-send (Public AI Chat)
-mainRoutes.post("/guest-chat-send", sendGuestMessage);
-
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
 // /api/contactForm
@@ -67,7 +64,7 @@ mainRoutes.use("/spacePartner", spacePartnerRoutes);
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupons
 mainRoutes.use("/coupons", couponRoutes);
-// /api/mail
+// /api/mail 
 mainRoutes.use("/mail", mailRoutes);
 // /api/meetingRoom
 mainRoutes.use("/meetingRoom", meetingRoomRoutes);
