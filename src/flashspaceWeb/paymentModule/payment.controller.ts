@@ -545,7 +545,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
 
     // DEV MODE: Skip signature verification for development
     if (devMode === true) {
-      const devPayment = await PaymentModel.findOneAndUpdate(
+      let devPayment = await PaymentModel.findOneAndUpdate(
         { razorpayOrderId: razorpay_order_id },
         {
           razorpayPaymentId: razorpay_payment_id || `pay_dev_${Date.now()}`,
@@ -555,12 +555,46 @@ export const verifyPayment = async (req: Request, res: Response) => {
         { new: true },
       );
 
+      // --- FIX for External Proxy Orders during Simulation ---
+      // If payment not found, create a mock one to allow the simulation flow to continue
       if (!devPayment) {
-        return res.status(404).json({
-          success: false,
-          message: "Payment order not found",
+        console.log(`[SIMULATION] Creating recovery payment for external order: ${razorpay_order_id}`);
+        
+        const { recoveryData } = validation.data.body;
+
+        // Find existing documents for fallback if recoveryData is missing
+        const user = !recoveryData?.userId ? await UserModel.findOne({ isDeleted: { $ne: true } }) : null;
+        const space = !recoveryData?.spaceId ? await CoworkingSpaceModel.findOne({ isActive: true }) : null;
+
+        const derivedSpaceModel = recoveryData?.spaceModel || (
+          recoveryData?.paymentType === "virtual_office" ? "VirtualOffice" :
+            recoveryData?.paymentType === "meeting_room" ? "MeetingRoom" :
+              "CoworkingSpace"
+        );
+
+        devPayment = await PaymentModel.create({
+          user: recoveryData?.userId || user?._id || (req as any).user?.id || "64fbefbefbefbefbefbefbef",
+          userEmail: recoveryData?.userEmail || user?.email || "guest@example.com",
+          userName: recoveryData?.userName || (user as any)?.fullName || "Dev Guest",
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id || `pay_dev_${Date.now()}`,
+          razorpaySignature: razorpay_signature || "dev_signature",
+          amount: (recoveryData?.totalAmount || 1000) * 100, // paise
+          currency: "INR",
+          status: PaymentStatus.COMPLETED,
+          paymentType: (recoveryData?.paymentType || PaymentType.COWORKING_SPACE) as any,
+          space: recoveryData?.spaceId || space?._id || "64fbefbefbefbefbefbefbee",
+          spaceModel: derivedSpaceModel,
+          spaceName: recoveryData?.spaceName || "Development Space",
+          planName: recoveryData?.planName || "Trial Plan",
+          planKey: recoveryData?.planKey || "trial-plan",
+          tenure: recoveryData?.tenure || 1,
+          yearlyPrice: recoveryData?.yearlyPrice || recoveryData?.totalAmount || 1000,
+          totalAmount: recoveryData?.totalAmount || 1000,
+          startDate: recoveryData?.startDate ? new Date(recoveryData.startDate) : new Date(),
         });
       }
+      // -----------------------------------------------------
 
       // Create booking and invoice
       let devBookingData: any = null;
@@ -576,7 +610,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
           message: `Your booking for ${devPayment.spaceName} has been successfully confirmed.`,
           read: false,
           metadata: {
-            bookingId: devBookingData?.booking?._id,
+            bookingId: devBookingData?.booking?._id || devPayment._id,
             paymentId: devPayment._id,
             type: "booking_confirmation",
           },
@@ -701,7 +735,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
     }
 
     // Update payment to completed
-    const prodPayment = await PaymentModel.findOneAndUpdate(
+    let prodPayment = await PaymentModel.findOneAndUpdate(
       { razorpayOrderId: razorpay_order_id },
       {
         razorpayPaymentId: razorpay_payment_id,
@@ -711,12 +745,50 @@ export const verifyPayment = async (req: Request, res: Response) => {
       { new: true },
     );
 
+    // --- RECOVERY FOR PROXIED ORDERS (PRODUCTION) ---
+    if (!prodPayment && validation.data.body.recoveryData) {
+      console.log(`[PRODUCTION] Recovering proxied order record: ${razorpay_order_id}`);
+      const { recoveryData } = validation.data.body;
+      
+      const user = !recoveryData?.userId ? await UserModel.findOne({ isDeleted: { $ne: true } }) : null;
+      const space = !recoveryData?.spaceId ? await CoworkingSpaceModel.findOne({ isActive: true }) : null;
+
+      const derivedSpaceModel = recoveryData?.spaceModel || (
+        recoveryData?.paymentType === "virtual_office" ? "VirtualOffice" :
+          recoveryData?.paymentType === "meeting_room" ? "MeetingRoom" :
+            "CoworkingSpace"
+      );
+
+      prodPayment = await PaymentModel.create({
+        user: recoveryData?.userId || user?._id || (req as any).user?.id || "64fbefbefbefbefbefbefbef",
+        userEmail: recoveryData?.userEmail || user?.email || "guest@example.com",
+        userName: recoveryData?.userName || (user as any)?.fullName || "Guest",
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+        amount: (recoveryData?.totalAmount || 1000) * 100, // paise
+        currency: "INR",
+        status: PaymentStatus.COMPLETED,
+        paymentType: (recoveryData?.paymentType || PaymentType.COWORKING_SPACE) as any,
+        space: recoveryData?.spaceId || space?._id || "64fbefbefbefbefbefbefbee",
+        spaceModel: derivedSpaceModel,
+        spaceName: recoveryData?.spaceName || "Development Space",
+        planName: recoveryData?.planName || "Trial Plan",
+        planKey: recoveryData?.planKey || "trial-plan",
+        tenure: recoveryData?.tenure || 1,
+        yearlyPrice: recoveryData?.yearlyPrice || recoveryData?.totalAmount || 1000,
+        totalAmount: recoveryData?.totalAmount || 1000,
+        startDate: recoveryData?.startDate ? new Date(recoveryData.startDate) : new Date(),
+      });
+    }
+
     if (!prodPayment) {
       return res.status(404).json({
         success: false,
-        message: "Payment order not found",
+        message: "Payment order not found and no recovery data provided",
       });
     }
+    // ------------------------------------------------
 
     // Create booking and invoice
     let prodBookingData: any = null;
