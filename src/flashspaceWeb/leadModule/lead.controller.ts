@@ -144,3 +144,13 @@ export const createLead = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, message: "Submission failed: " + error.message });
   }
 };
+
+export const getLeads = async (req: Request, res: Response) => {
+  try {
+    const leads = await LeadModel.find().sort({ createdAt: -1 });
+    return res.status(200).json({ ok: true, data: leads });
+  } catch (error: any) {
+    console.error("CRITICAL - Failed to fetch leads:", error.message);
+    return res.status(500).json({ ok: false, message: "Failed to fetch leads: " + error.message });
+  }
+};
