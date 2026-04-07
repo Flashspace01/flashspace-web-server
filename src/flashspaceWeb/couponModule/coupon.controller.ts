@@ -28,6 +28,14 @@ export const couponController = {
                 });
             }
 
+            const userRole = req.user?.role;
+            if (userRole === "sales" && discountValue > 15) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Sales users can only provide a maximum discount of 15%.",
+                });
+            }
+
             let code;
             if (manualCode) {
                 code = manualCode.toUpperCase().trim();
