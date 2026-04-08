@@ -337,7 +337,7 @@ export class EmailUtil {
           .otp-code { font-size: 36px; font-weight: bold; color: #f5576c; letter-spacing: 8px; font-family: 'Courier New', monospace; }
           .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
           .info-box { background: #e3f2fd; border: 1px solid #90caf9; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        </style>
+        </style>0.0
       </head>
       <body>
         <div class="container">
