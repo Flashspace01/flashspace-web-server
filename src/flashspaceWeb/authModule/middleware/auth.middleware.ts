@@ -67,6 +67,7 @@ export class AuthMiddleware {
           id: user._id.toString(),
           email: user.email,
           role: user.role,
+          kycVerified: user.kycVerified,
         } as AuthUser;
 
         next();
@@ -173,6 +174,7 @@ export class AuthMiddleware {
             id: user._id.toString(),
             email: user.email,
             role: user.role,
+            kycVerified: user.kycVerified,
           };
           console.log("✅ User authenticated:", user.email);
         } else {

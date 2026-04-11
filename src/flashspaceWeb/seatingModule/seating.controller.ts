@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { UserRole } from "../authModule/models/user.model";
 import { BookingService } from "./seating.service";
 import {
   getAvailabilitySchema,
@@ -63,6 +64,12 @@ export const createHold = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) return sendError(res, 401, "Unauthorized");
+
+    // KYC check for seat holds
+    const isSpecialRole = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SUPPORT, UserRole.SALES].includes((req as any).user?.role);
+    if (!isSpecialRole && !(req as any).user?.kycVerified) {
+      return sendError(res, 403, "KYC verification is required to hold seats. Please verify your profile first.");
+    }
 
     const validation = createHoldSchema.safeParse(req);
     if (!validation.success) {
