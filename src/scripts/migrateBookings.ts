@@ -29,7 +29,7 @@ const migrate = async () => {
       { partnerId: { $exists: false } },
       { $set: { partnerId: new mongoose.Types.ObjectId(partnerId) } },
     );
-
+    
     console.log(
       `✅ Successfully updated ${result.modifiedCount} bookings with partnerId: ${partnerId}`,
     );
