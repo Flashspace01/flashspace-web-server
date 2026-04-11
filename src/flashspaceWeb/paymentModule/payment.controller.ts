@@ -148,6 +148,9 @@ async function createBookingAndInvoice(payment: any) {
     // Create booking
     let booking: any = null;
     if (payment.paymentType !== "seat_booking") {
+      const user = await UserModel.findById(payment.user);
+      const isKycApproved = user?.kycVerified === true;
+
       booking = await BookingModel.create({
         bookingNumber,
         user: payment.user,
@@ -163,7 +166,9 @@ async function createBookingAndInvoice(payment: any) {
         plan: {
           name: payment.planName,
           price: payment.totalAmount,
-          originalPrice: (payment.yearlyPrice || payment.totalAmount) * (payment.tenure || 1),
+          originalPrice:
+            (payment.yearlyPrice || payment.totalAmount) *
+            (payment.tenure || 1),
           discount: payment.discountAmount || 0,
           tenure: (payment.tenure || 1) * 12,
           tenureUnit: "months",
@@ -171,8 +176,8 @@ async function createBookingAndInvoice(payment: any) {
         payment: payment._id,
         razorpayOrderId: payment.razorpayOrderId,
         razorpayPaymentId: payment.razorpayPaymentId,
-        status: "pending_kyc",
-        kycStatus: "not_started",
+        status: isKycApproved ? "active" : "pending_kyc",
+        kycStatus: isKycApproved ? "approved" : "not_started",
         timeline: [
           {
             status: "payment_received",
@@ -367,6 +372,41 @@ export const createOrder = async (req: Request, res: Response) => {
         success: false,
         message: "Authentication required",
       });
+    }
+
+    // Verify KYC status
+    const user = await UserModel.findById(resolvedUserId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Allow Admins, Staff, and Partners to skip KYC check for their own/managed bookings if needed
+    // But typically customers (role: USER) MUST have KYC approved.
+    if (user.role === UserRole.USER && !user.kycVerified) {
+      // Check if they have an approved KYC document just in case user model is not in sync
+      const kycDoc = await KYCDocumentModel.findOne({
+        user: resolvedUserId,
+        kycStatus: "approved",
+      });
+
+      if (!kycDoc) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Your KYC has not been approved yet. Please complete your KYC verification to book a space.",
+          errorCode: "KYC_NOT_APPROVED",
+        });
+      } else {
+        // Sync user model if kycDoc is approved but user.kycVerified is false
+        if (!user.kycVerified) {
+          await UserModel.findByIdAndUpdate(resolvedUserId, {
+            kycVerified: true,
+          });
+        }
+      }
     }
 
     // Verify credits if being used
