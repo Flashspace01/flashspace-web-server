@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { ContactFormModel } from "./contactForm.model";
+import { EmailUtil } from "../authModule/utils/email.util";
 
 export const createContactForm = async (req: Request, res: Response) => {
   try {
@@ -12,18 +13,7 @@ export const createContactForm = async (req: Request, res: Response) => {
       serviceInterest,
       message,
     } = req.body;
-    // const user = await ContactFormModel.findOne({
-    //     email,
-    //     phoneNumber
-    // })
-    // if (user) {
-    //     return res.status(400).json({
-    //         success: false,
-    //         message: "User Already Exist in database",
-    //         data: {},
-    //         error: "User Already Exist in database",
-    //     });
-    // }
+    
     const createdContact = await ContactFormModel.create({
       fullName,
       email,
@@ -32,6 +22,7 @@ export const createContactForm = async (req: Request, res: Response) => {
       serviceInterest,
       message,
     });
+
     if (!createdContact) {
       return res.status(400).json({
         success: false,
@@ -40,6 +31,16 @@ export const createContactForm = async (req: Request, res: Response) => {
         error: "Issue with Database",
       });
     }
+
+    // Send email notification (don't await to avoid delaying response)
+    EmailUtil.sendContactFormNotification({
+      fullName,
+      email,
+      phoneNumber,
+      companyName,
+      serviceInterest,
+      message,
+    }).catch(err => console.error("Error sending contact form email:", err));
 
     res.status(201).json({
       success: true,

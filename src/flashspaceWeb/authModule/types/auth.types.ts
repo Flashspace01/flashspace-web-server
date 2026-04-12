@@ -103,6 +103,7 @@ export interface AuthUser {
   role: string;
   fullName?: string;
   credits?: number;
+  kycVerified?: boolean;
 }
 
 // Extend Express Request globally

@@ -369,6 +369,16 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
+    // Server-side KYC Check: Only allow verified users to book (Admins bypass check)
+    const isSpecialRole = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SUPPORT, UserRole.SALES].includes(req.user?.role as any);
+    if (!isSpecialRole && !req.user?.kycVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "KYC verification is required to book a space. Please complete your profile verification first.",
+        kycRequired: true
+      });
+    }
+
     // Verify credits if being used
     let adjustedTotalAmount = totalAmount;
     if (creditsToUse > 0) {
