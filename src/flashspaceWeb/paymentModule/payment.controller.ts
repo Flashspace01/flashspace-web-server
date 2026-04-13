@@ -145,6 +145,10 @@ async function createBookingAndInvoice(payment: any) {
       endDate.setHours(endDate.getHours() + (payment.tenure || 1)); // tenure as hours
     }
 
+    // Check User KYC status before creating booking
+    const bookingUser = await UserModel.findById(payment.user);
+    const isUserVerified = bookingUser?.kycVerified === true;
+
     // Create booking
     let booking: any = null;
     if (payment.paymentType !== "seat_booking") {
@@ -171,8 +175,8 @@ async function createBookingAndInvoice(payment: any) {
         payment: payment._id,
         razorpayOrderId: payment.razorpayOrderId,
         razorpayPaymentId: payment.razorpayPaymentId,
-        status: "pending_kyc",
-        kycStatus: "not_started",
+        status: isUserVerified ? "active" : "pending_kyc",
+        kycStatus: isUserVerified ? "approved" : "not_started",
         timeline: [
           {
             status: "payment_received",
