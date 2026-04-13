@@ -1149,6 +1149,42 @@ export const getAllBookings = async (req: Request, res: Response) => {
     const limitNum = Number(limit) || 100;
     const skip = (Number(page) - 1) * limitNum;
 
+    // 0. AUTO-FIX: Transition pending_kyc to active if user is already verified
+    try {
+      const user = await UserModel.findById(userId);
+      if (user?.kycVerified) {
+        // Find bookings that need activation
+        const needsActivation = await BookingModel.find({
+          user: userId,
+          status: "pending_kyc",
+          isDeleted: { $ne: true }
+        });
+
+        if (needsActivation.length > 0) {
+          await BookingModel.updateMany(
+            { user: userId, status: "pending_kyc", isDeleted: { $ne: true } },
+            { 
+              $set: { 
+                status: "active", 
+                kycStatus: "approved",
+                updatedAt: new Date()
+              },
+              $push: {
+                timeline: {
+                  status: "activated_automatically",
+                  date: new Date(),
+                  note: "Booking activated automatically as user KYC is already verified.",
+                  by: "System"
+                }
+              }
+            }
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[getAllBookings] Auto-activation error:", err);
+    }
+
     // Prepare seat filter if applicable
     let seatFilter: any = null;
     if (!normalizedType || normalizedType === "CoworkingSpace") {
@@ -1352,6 +1388,24 @@ export const getBookingById = async (req: Request, res: Response) => {
     });
 
     if (booking) {
+      // AUTO-FIX: Transition pending_kyc to active if user is already verified
+      const user = await UserModel.findById(userId);
+      if (user?.kycVerified && booking.status === "pending_kyc") {
+        booking.status = "active";
+        booking.kycStatus = "approved";
+        
+        // Add timeline entry for the automatic activation
+        booking.timeline = booking.timeline || [];
+        booking.timeline.push({
+          status: "activated_automatically",
+          date: new Date(),
+          note: "Booking activated automatically as user KYC is already verified.",
+          by: "System"
+        });
+
+        await booking.save();
+      }
+
       const bookingObj = booking.toObject() as any;
       if (bookingObj.endDate) {
         const now = new Date();
