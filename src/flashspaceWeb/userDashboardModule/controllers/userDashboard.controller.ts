@@ -1560,6 +1560,19 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
         .json({ success: false, message: "Booking not found" });
     }
 
+    // Send Notification
+    try {
+      await NotificationService.notifyUser(
+        userId as string,
+        "Auto-Renewal Update",
+        `Auto-renewal for booking #${booking.bookingNumber} has been ${autoRenew ? "enabled" : "disabled"}.`,
+        NotificationType.SUCCESS,
+        { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+      );
+    } catch (notifError) {
+      console.error("[toggleAutoRenew] Notification failed:", notifError);
+    }
+
     res.status(200).json({
       success: true,
       message: `Auto-renewal ${autoRenew ? "enabled" : "disabled"}`,
