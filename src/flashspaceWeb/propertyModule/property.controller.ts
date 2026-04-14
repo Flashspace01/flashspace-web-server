@@ -32,9 +32,11 @@ export const createProperty = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized: No partner found");
     }
 
+    const region = req.headers['x-region'] || 'IN';
     const property = new PropertyModel({
       ...req.body,
       partner: partnerId,
+      countryCode: req.body.countryCode || region,
     });
 
     await property.save();
@@ -450,6 +452,8 @@ export const getAvailableCities = async (req: Request, res: Response) => {
       MeetingRoomModel.distinct("property", { isDeleted: false }),
     ]);
 
+    const region = req.headers['x-region'] || 'IN';
+
     // Also check properties for cities (for any spaces that use property references)
     const activePropertyIds = [
       ...new Set([
@@ -463,6 +467,7 @@ export const getAvailableCities = async (req: Request, res: Response) => {
     if (activePropertyIds.length > 0) {
       propertyCities = await PropertyModel.distinct("city", {
         _id: { $in: activePropertyIds },
+        countryCode: region,
       });
     }
 

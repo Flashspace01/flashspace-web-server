@@ -21,6 +21,9 @@ export class Lead {
   @prop({ trim: true })
   public city?: string;
 
+  @prop({ required: true, trim: true, default: "IN" })
+  public countryCode!: string;
+
   @prop({ trim: true })
   public businessType?: string;
 

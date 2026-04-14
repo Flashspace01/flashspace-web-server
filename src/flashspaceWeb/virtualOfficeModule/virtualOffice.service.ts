@@ -78,33 +78,38 @@ export class VirtualOfficeService {
       filter.isDeleted = false;
     }
 
-    // Handle queries on property fields (like city)
-    if (filter.city || filter.name || filter.area) {
-      const legacyFieldFilter: any = {};
-      if (filter.city) legacyFieldFilter.city = filter.city;
-      if (filter.name) legacyFieldFilter.name = filter.name;
-      if (filter.area) legacyFieldFilter.area = filter.area;
+    // Handle queries on property fields (like city, countryCode)
+    const propertyFields = ['city', 'name', 'area', 'countryCode'];
+    const hasPropertyFilters = propertyFields.some(field => filter[field] !== undefined);
 
+    if (hasPropertyFilters) {
       const propertyQuery: any = {};
-      if (filter.city) propertyQuery.city = filter.city;
-      if (filter.name) propertyQuery.name = filter.name;
-      if (filter.area) propertyQuery.area = filter.area;
+      const legacyFieldFilter: any = {};
 
-      const matchedProperties =
-        await PropertyModel.find(propertyQuery).select("_id");
-      const propertyIds = matchedProperties.map((p) => p._id);
+      propertyFields.forEach(field => {
+        if (filter[field] !== undefined) {
+          propertyQuery[field] = filter[field];
+          if (field !== 'countryCode') {
+            legacyFieldFilter[field] = filter[field];
+          }
+          delete filter[field];
+        }
+      });
 
-      delete filter.city;
-      delete filter.name;
-      delete filter.area;
+      const matchedProperties = await PropertyModel.find(propertyQuery).select("_id");
+      const propertyIds = matchedProperties.map((p: any) => p._id);
 
       if (propertyIds.length > 0) {
-        filter.$or = [
-          { property: { $in: propertyIds } },
-          legacyFieldFilter,
-        ];
+        if (Object.keys(legacyFieldFilter).length > 0) {
+          filter.$or = [
+            { property: { $in: propertyIds } },
+            legacyFieldFilter,
+          ];
+        } else {
+          filter.property = { $in: propertyIds };
+        }
       } else {
-        Object.assign(filter, legacyFieldFilter);
+         Object.assign(filter, legacyFieldFilter);
       }
     }
 
