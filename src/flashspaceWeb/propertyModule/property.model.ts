@@ -104,6 +104,9 @@ export class Property {
   @prop({ default: false })
   public isDeleted!: boolean; // For soft deletes
 
+  @prop({ required: true, trim: true, default: "IN" })
+  public countryCode!: string;
+
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;
 }
