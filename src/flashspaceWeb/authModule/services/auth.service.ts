@@ -84,6 +84,7 @@ export class AuthService {
         lastOTPRequestTime: new Date(),
         otpRequestCount: 1,
         refreshTokens: [],
+        isDeleted: false,
       };
 
       const user = await this.userRepository.create(userData);

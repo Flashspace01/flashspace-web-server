@@ -21,7 +21,7 @@ services:
       - PORT=5000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - DB_URI=mongodb://mongo:27017/myapp # Use fixed mongo container URI inside docker network
+      - DB_URI=mongodb://mongo:27017/flash # Use fixed mongo container URI inside docker network
 
       # Redis & DB URIs now come from .env (REDIS_URL, DB_URI)
 
