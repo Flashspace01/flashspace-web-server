@@ -61,6 +61,27 @@ const allowedOrigins = [
   "http://72.60.219.115",
 ];
 
+// Middleware to handle CORS Preflight and PNA
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    
+    if (req.headers["access-control-request-private-network"]) {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, x-api-key, X-API-Key, x-region, X-Region, Accept, Origin");
+      return res.sendStatus(204);
+    }
+  }
+  next();
+});
+
 // Middleware to handle Private Network Access (PNA) preflight requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
