@@ -111,7 +111,8 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean(),
       TicketModel.countDocuments({ user: new Types.ObjectId(userId) }),
     ]);
@@ -133,7 +134,8 @@ export class TicketService {
 
       return await TicketModel.findOne(query)
         .populate("user", "fullName email phoneNumber")
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean();
     } catch (error) {
       console.error("Error in getTicketById:", error);
@@ -214,7 +216,8 @@ export class TicketService {
         .skip(skip)
         .limit(limit)
         .populate("user", "fullName email phoneNumber")
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean(),
       TicketModel.countDocuments(query),
     ]);
@@ -272,7 +275,7 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
     return ticket;
@@ -304,7 +307,7 @@ export class TicketService {
 
     return await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email")
+      .populate("assignee", "fullName email role")
       .lean();
   }
 
@@ -315,9 +318,34 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
+
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
+    // Notify the user about the assignment
+    try {
+      NotificationService.notifyUser(
+        targetUserId,
+        `Ticket Assigned: ${ticket.ticketNumber}`,
+        `Your ticket has been assigned to ${(ticket.assignee as any).fullName || 'a specialist'}. They will assist you shortly.`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+
+      // Notify the assignee about their new task
+      NotificationService.notifyUser(
+        assigneeId,
+        `New Ticket Assignment: ${ticket.ticketNumber}`,
+        `You have been assigned to handle ticket: ${ticket.subject}`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+    } catch (err) {
+      console.error("Failed to send assignment notifications:", err);
+    }
+
     return ticket;
   }
 
@@ -328,7 +356,7 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
     return ticket;
@@ -341,12 +369,14 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
 
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
     NotificationService.notifyUser(
-      ticket.user._id.toString(),
+      targetUserId,
       `Ticket Resolved: ${ticket.ticketNumber}`,
       `Your ticket has been marked as resolved.`,
       NotificationType.SUCCESS,
@@ -363,12 +393,14 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
 
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
     NotificationService.notifyUser(
-      ticket.user._id.toString(),
+      targetUserId,
       `Ticket Closed: ${ticket.ticketNumber}`,
       `Your ticket has been closed.`,
       NotificationType.INFO,
@@ -392,27 +424,36 @@ export class TicketService {
 
   private static async validatePartnerOwnership(ticketId: string, partnerId: string) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
-    if (bookingIds.length === 0) return null;
 
-    return TicketModel.findOne({
+    const query: any = {
       _id: new Types.ObjectId(ticketId),
-      bookingId: { $in: bookingIds },
-    });
+      $or: [
+        { partnerId: new Types.ObjectId(partnerId) },
+        { assignee: new Types.ObjectId(partnerId) }
+      ]
+    };
+
+    if (bookingIds.length > 0) {
+      query.$or.push({ bookingId: { $in: bookingIds } });
+    }
+
+    return TicketModel.findOne(query);
   }
 
   static async getPartnerTickets(partnerId: string, page: number = 1, limit: number = 20) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
-    if (bookingIds.length === 0) {
-      return { tickets: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false };
-    }
 
     const skip = (page - 1) * limit;
-    const query = {
-      $or: [
-        { bookingId: { $in: bookingIds } },
-        { partnerId: new Types.ObjectId(partnerId) }
-      ]
-    };
+    const orConditions: any[] = [
+      { partnerId: new Types.ObjectId(partnerId) },
+      { assignee: new Types.ObjectId(partnerId) }
+    ];
+
+    if (bookingIds.length > 0) {
+      orConditions.push({ bookingId: { $in: bookingIds } });
+    }
+
+    const query = { $or: orConditions };
 
     const [tickets, total] = await Promise.all([
       TicketModel.find(query)
@@ -420,6 +461,7 @@ export class TicketService {
         .skip(skip)
         .limit(limit)
         .populate("user", "fullName email phoneNumber")
+        .populate("assignee", "fullName email role")
         .populate("bookingId", "bookingNumber spaceSnapshot type")
         .lean(),
       TicketModel.countDocuments(query),

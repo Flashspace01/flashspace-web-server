@@ -227,6 +227,8 @@ export class AdminService {
       if (role && role !== "all") {
         if (role === "team") {
           query.role = { $in: STAFF_ROLES };
+        } else if (role.includes(",")) {
+          query.role = { $in: role.split(",") };
         } else {
           query.role = role;
         }
