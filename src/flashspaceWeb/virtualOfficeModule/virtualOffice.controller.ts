@@ -180,11 +180,9 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
-    const region = req.headers['x-region'] || 'IN';
     const result = await VirtualOfficeService.getOffices(
       {
         city: new RegExp(`^${city}$`, "i"),
-        countryCode: region,
       },
       _limit,
       _page,

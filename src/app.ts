@@ -40,7 +40,7 @@ const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key", "X-API-Key", "x-region", "X-Region"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie", "x-api-key", "X-API-Key"],
   exposedHeaders: ["Set-Cookie"],
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -133,8 +133,7 @@ app.use(
 
 // Request Logger
 app.use((req, res, next) => {
-  const region = req.headers['x-region'] || 'IN';
-  console.log(`[REQUEST] ${req.method} ${req.url} [REGION: ${region}]`);
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
   next();
 });
 
