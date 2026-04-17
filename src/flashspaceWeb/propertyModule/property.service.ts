@@ -12,7 +12,6 @@ export class PropertyService {
       images: data.images || [],
       partner: partnerId,
       spaceId: data.spaceId,
-      countryCode: data.countryCode || "IN",
     };
     const property = new PropertyModel(propertyData);
     return await property.save();
@@ -34,7 +33,6 @@ export class PropertyService {
     if (data.kycRejectionReason)
       updateData.kycRejectionReason = data.kycRejectionReason;
     if (data.spaceId) updateData.spaceId = data.spaceId;
-    if (data.countryCode) updateData.countryCode = data.countryCode;
 
     if (Object.keys(updateData).length === 0) return null;
 

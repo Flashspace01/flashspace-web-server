@@ -93,9 +93,6 @@ export class User extends TimeStamps {
   @prop({ trim: true })
   public phoneNumber?: string;
 
-  @prop({ required: true, trim: true, default: "IN" })
-  public countryCode!: string;
-
   @prop()
   public profilePicture?: string;
 
@@ -185,7 +182,6 @@ export class User extends TimeStamps {
       timeZone: "ist",
       darkMode: false,
       compactView: false,
-      countryCode: "IN",
     },
   })
   public preferences!: {
@@ -195,7 +191,6 @@ export class User extends TimeStamps {
     timeZone: string;
     darkMode: boolean;
     compactView: boolean;
-    countryCode: string;
   };
 
   // Notification Preferences
