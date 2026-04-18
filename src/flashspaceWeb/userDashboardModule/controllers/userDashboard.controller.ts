@@ -1916,6 +1916,7 @@ export const getBusinessInfo = async (req: Request, res: Response) => {
 export const updateBusinessInfo = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    let kyc: any = null;
     const {
       companyName,
       companyType,
@@ -1928,6 +1929,11 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       profileName,
       kycType,
       partners,
+      businessNature,
+      pincode,
+      city,
+      state,
+      country,
       personalPhone,
       personalDob,
       personalAadhaar,
@@ -1988,6 +1994,19 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
           businessInfo.registeredAddress = registeredAddress;
         if (industry) businessInfo.industry = industry;
         if (profileName) businessInfo.profileName = profileName;
+        if (businessNature) businessInfo.businessNature = businessNature;
+        if (pincode) businessInfo.pincode = pincode;
+
+        // Sync to KYC.personalInfo for unified display in Dashboard Profile
+        kyc = await KYCDocumentModel.findOne({ user: userId });
+        if (kyc && kyc.personalInfo) {
+          if (city) kyc.personalInfo.city = city;
+          if (state) kyc.personalInfo.state = state;
+          if (country) kyc.personalInfo.country = country;
+          if (pincode) kyc.personalInfo.pincode = pincode;
+          kyc.markModified("personalInfo");
+          await kyc.save();
+        }
 
         // Ensure status is in_progress if it was not started, but don't revert pending/approved
         if (!businessInfo.status || businessInfo.status === "not_started") {
@@ -2071,7 +2090,6 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       "[updateBusinessInfo] Processing as Individual/Main Profile (Legacy)",
     );
 
-    let kyc;
     if (profileId && profileId !== "new") {
       kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
       if (!kyc) {
@@ -2116,6 +2134,7 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
         registeredAddress:
           registeredAddress || kyc.businessInfo?.registeredAddress,
         industry: industry || kyc.businessInfo?.industry,
+        businessNature: businessNature || kyc.businessInfo?.businessNature,
         partners: partners || kyc.businessInfo?.partners || [],
         verified: false,
       };
@@ -2144,6 +2163,13 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
       if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
       if (personalPan) kyc.personalInfo.panNumber = personalPan;
+      if (country) kyc.personalInfo.country = country;
+      if (state) kyc.personalInfo.state = state;
+      if (city) kyc.personalInfo.city = city;
+      if (pincode) kyc.personalInfo.pincode = pincode;
+
+      kyc.markModified("personalInfo"); // Explicitly mark as modified
+
       if (personalFullName) {
         kyc.personalInfo.fullName = personalFullName;
         // Update isPartner flag if changing fullName on existing individual profile

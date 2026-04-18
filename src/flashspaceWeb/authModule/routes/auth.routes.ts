@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { AuthMiddleware } from '../middleware/auth.middleware';
+import { uploadProfilePic } from '../config/multer.config';
 
 const router = Router();
 const authController = new AuthController();
@@ -59,7 +60,7 @@ router.post('/change-password', authController.changePassword);
 router.post('/logout', authController.logout);
 router.post('/logout-all', authController.logoutAll);
 
-// Profile routes (requires email verification)
+
 router.get(
   "/profile",
   AuthMiddleware.requireVerifiedEmail,

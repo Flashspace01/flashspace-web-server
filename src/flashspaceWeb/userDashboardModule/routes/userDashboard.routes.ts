@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../config/multer.config";
+import { AuthController } from "../../authModule/controllers/auth.controller";
+import { uploadProfilePic } from "../../authModule/config/multer.config";
+const authController = new AuthController();
 import {
   getDashboardOverview,
   getAllBookings,
@@ -139,6 +142,13 @@ router.post("/support/tickets/:ticketId/reply", replyToTicket);
 // ============ CREDITS & REWARDS ============
 router.get("/credits", getCredits);
 router.post("/credits/redeem", redeemReward);
+
+// ============ PROFILE ============
+router.post(
+  "/upload-avatar",
+  uploadProfilePic.single("profilePicture"),
+  authController.uploadProfilePicture,
+);
 
 // ============ PARTNER KYC ============
 import {
