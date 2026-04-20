@@ -28,6 +28,24 @@ class PersonalInfo {
 
   @prop()
   panNumber?: string;
+
+  @prop()
+  country?: string;
+
+  @prop()
+  state?: string;
+
+  @prop()
+  city?: string;
+
+  @prop()
+  pincode?: string;
+
+  @prop()
+  address?: string;
+
+  @prop()
+  registeredAddress?: string;
 }
 
 class BusinessInfo {
@@ -51,6 +69,9 @@ class BusinessInfo {
 
   @prop()
   industry?: string;
+
+  @prop()
+  businessNature?: string;
 
   @prop({ default: false })
   verified?: boolean;

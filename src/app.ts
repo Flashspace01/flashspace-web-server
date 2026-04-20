@@ -163,6 +163,9 @@ dbConnection()
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Main API routes
+app.get("/api/test-route", (req, res) => {
+  res.json({ success: true, message: "GOT IT - Server is running the latest code" });
+});
 app.use("/api", mainRoutes);
 
 // 404 Handler for /api
@@ -182,4 +185,4 @@ app.use((req, res) => {
   });
 });
 
-// TART - force nodemon restart 1774859050855
+// TART - force nodemon restart 2555159050855

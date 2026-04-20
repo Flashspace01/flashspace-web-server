@@ -835,4 +835,65 @@ export class AuthController {
       });
     }
   };
+
+  // Upload profile picture
+  uploadProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: "Authentication required",
+          data: {},
+          error: "Not authenticated",
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+          data: {},
+          error: "Missing file",
+        });
+        return;
+      }
+
+      const { UserModel } = await import("../models/user.model");
+      const imageUrl = `/uploads/profile-pictures/${req.file.filename}`;
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        req.user.id,
+        { $set: { profilePicture: imageUrl } },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+          data: {},
+          error: "User not found",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Profile picture uploaded successfully",
+        data: {
+          profilePicture: updatedUser.profilePicture,
+        },
+        error: {},
+      });
+    } catch (error) {
+      console.error("Upload profile picture controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        data: {},
+        error: "Internal server error",
+      });
+    }
+  };
 }

@@ -16,9 +16,12 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   user?: {
+    _id?: string;
     id: string;
     email: string;
     fullName: string;
+    phoneNumber?: string;
+    profilePicture?: string;
     role: string;
     isEmailVerified: boolean;
     kycVerified: boolean;

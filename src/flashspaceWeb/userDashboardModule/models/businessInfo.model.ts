@@ -40,6 +40,12 @@ export class BusinessInfo {
   @prop()
   industry?: string;
 
+  @prop()
+  businessNature?: string;
+
+  @prop()
+  pincode?: string;
+
   @prop({ default: false })
   isDeleted?: boolean;
 
