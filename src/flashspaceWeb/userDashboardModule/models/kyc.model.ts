@@ -40,6 +40,12 @@ class PersonalInfo {
 
   @prop()
   pincode?: string;
+
+  @prop()
+  address?: string;
+
+  @prop()
+  registeredAddress?: string;
 }
 
 class BusinessInfo {
