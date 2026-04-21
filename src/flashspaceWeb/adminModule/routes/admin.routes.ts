@@ -174,6 +174,16 @@ adminRoutes.get(
   AdminController.getClients,
 );
 
+adminRoutes.get(
+  "/clients/:clientId",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.MANAGE_OWN_SPACES,
+    Permission.VIEW_ALL_SPACES,
+  ]),
+  AdminController.getClientDetails,
+);
+
 // 5. KYC Management
 adminRoutes.get(
   "/kyc/pending",

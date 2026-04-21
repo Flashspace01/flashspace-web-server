@@ -104,6 +104,19 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/clients/:clientId
+  static async getClientDetails(req: Request, res: Response) {
+    const clientId = req.params.clientId as string;
+    const result = await adminService.getClientDetails(req.user, clientId);
+
+    if (result.success) {
+      return res.status(200).json(result);
+    }
+
+    const statusCode = result.message === "Client not found" ? 404 : 500;
+    return res.status(statusCode).json(result);
+  }
+
   // PUT /api/admin/kyc/:id/review
   static async reviewKYC(req: Request, res: Response) {
     const id = req.params.id as string;
