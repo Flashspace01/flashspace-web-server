@@ -22,6 +22,8 @@ import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
 import { leadRoutes } from "./flashspaceWeb/leadModule/lead.routes";
 import { sendGuestMessage } from "./flashspaceWeb/chatModule/controllers/chatController";
+import partnerInvoiceRoutes from "./flashspaceWeb/partnerInvoiceModule/partnerInvoice.routes";
+
 export const mainRoutes = Router();
 
 
@@ -89,3 +91,5 @@ mainRoutes.use("/chat", chatRoutes);
 
 // /api/leads
 mainRoutes.use("/leads", leadRoutes);
+
+mainRoutes.use("/partnerInvoices", partnerInvoiceRoutes);
