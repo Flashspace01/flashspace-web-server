@@ -433,7 +433,33 @@ export class AdminService {
     }
   }
 
-  // Get all clients (mapped from bookings)
+  private resolveClientStatus(bookings: any[]): "Active" | "At Risk" | "Churned" {
+    if (!bookings.length) return "At Risk";
+
+    const hasActive = bookings.some((b) => b.status === "active");
+    if (hasActive) return "Active";
+
+    const hasPending = bookings.some((b) =>
+      ["pending_payment", "pending_kyc"].includes(b.status),
+    );
+    if (hasPending) return "At Risk";
+
+    const allClosed = bookings.every((b) =>
+      ["expired", "cancelled"].includes(b.status),
+    );
+    if (allClosed) return "Churned";
+
+    return "At Risk";
+  }
+
+  private normalizeBookingType(type?: string): string {
+    if (type === "VirtualOffice") return "Virtual Office";
+    if (type === "CoworkingSpace") return "Coworking Space";
+    if (type === "MeetingRoom") return "Meeting Room";
+    return type || "Unknown";
+  }
+
+  // Get all clients (derived from bookings)
   async getClients(
     user: any,
     page: number = 1,
@@ -442,9 +468,7 @@ export class AdminService {
     statusFilter?: string,
   ): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrSales = STAFF_ROLES.includes(user.role);
       const query: any = { isDeleted: false };
 
       if (!isAdminOrSales) {
@@ -463,127 +487,106 @@ export class AdminService {
         query.spaceId = { $in: spaceIds };
       }
 
-      // We need to fetch all relevant bookings to aggregate correctly
-      // In a very large scale app, this should be an aggregation pipeline.
       const allBookings = await BookingModel.find(query)
-        .populate("user", "fullName email phoneNumber company")
-        .populate("spaceSnapshot", "name city")
+        .populate("user", "fullName email phoneNumber")
         .sort({ createdAt: -1 });
 
       const clientMap = new Map<string, any>();
 
       allBookings.forEach((booking: any) => {
-        if (!booking.user) return;
+        if (!booking.user?._id) return;
+
         const userId = booking.user._id.toString();
+        const bookingAmount = Number(booking.amount || booking.plan?.price || 0);
+        const bookingDate = new Date(booking.createdAt);
         const existing = clientMap.get(userId);
-        const amount = Number(booking.amount || booking.plan?.price || 0);
-        const date = new Date(booking.createdAt);
 
-        // Date fallbacks
-        let startDate = booking.startDate ? new Date(booking.startDate) : date;
-        let endDate = booking.endDate ? new Date(booking.endDate) : null;
-
-        if (!endDate && booking.plan?.tenure) {
-          endDate = new Date(startDate);
-          const tenure = Number(booking.plan.tenure) || 12;
-          const unit = booking.plan.tenureUnit || "months";
-          if (unit === "year" || unit === "years")
-            endDate.setFullYear(endDate.getFullYear() + tenure);
-          else endDate.setMonth(endDate.getMonth() + tenure);
-        }
-
-        if (existing) {
-          existing.revenue += amount;
-          existing.bookingCount += 1;
-          if (date > existing.lastActivityDate) {
-            existing.lastActivityDate = date;
-            existing.plan = booking.plan?.name || booking.type;
-            existing.spaceName =
-              booking.spaceSnapshot?.name ||
-              booking.location ||
-              existing.spaceName;
-          }
-          if (startDate < existing.startDate) {
-            existing.startDate = startDate;
-          }
-          if (endDate && (!existing.endDate || endDate > existing.endDate)) {
-            existing.endDate = endDate;
-          }
-        } else {
+        if (!existing) {
           clientMap.set(userId, {
             id: userId,
-            clientId: `CL-${userId.substring(userId.length - 4).toUpperCase()}`,
-            name: booking.user.email || "Unknown Email",
-            companyName:
-              booking.user.company || booking.user.fullName || "Individual",
-            email: booking.user.email,
-            phone: booking.user.phoneNumber || "+91 98765 43210",
-            plan: booking.plan?.name || booking.type || "Standard Access",
-            spaceName:
-              booking.spaceSnapshot?.name || booking.location || "Main Hub",
-            revenue: amount,
+            name: booking.user.fullName || booking.user.email || "Unknown Client",
+            email: booking.user.email || "",
+            phone: booking.user.phoneNumber || "",
+            totalRevenue: bookingAmount,
             bookingCount: 1,
-            lastActivityDate: date,
-            startDate: startDate,
-            endDate: endDate,
-            initials: (booking.user.fullName || "CL")
-              .substring(0, 2)
-              .toUpperCase(),
+            activeBookings: booking.status === "active" ? 1 : 0,
+            firstBookingDate: bookingDate,
+            lastBookingDate: bookingDate,
+            bookings: [booking],
           });
+          return;
+        }
+
+        existing.totalRevenue += bookingAmount;
+        existing.bookingCount += 1;
+        existing.activeBookings += booking.status === "active" ? 1 : 0;
+        existing.bookings.push(booking);
+
+        if (bookingDate > existing.lastBookingDate) {
+          existing.lastBookingDate = bookingDate;
+        }
+        if (bookingDate < existing.firstBookingDate) {
+          existing.firstBookingDate = bookingDate;
         }
       });
 
-      let clients = Array.from(clientMap.values());
-
-      // Search filter
-      if (search) {
-        const lowerSearch = search.toLowerCase();
-        clients = clients.filter(
-          (c) =>
-            c.name.toLowerCase().includes(lowerSearch) ||
-            c.companyName.toLowerCase().includes(lowerSearch) ||
-            c.email.toLowerCase().includes(lowerSearch),
-        );
-      }
-
-      // Calculate health & status
-      const stats = { total: clients.length, active: 0, atRisk: 0, churned: 0 };
-
-      clients = clients.map((client) => {
-        const daysSinceActive =
-          (new Date().getTime() - client.lastActivityDate.getTime()) /
-          (1000 * 3600 * 24);
-
-        // Instead of random, use a stable health score based on recency & bookings
-        let healthScore = 100 - Math.min(daysSinceActive, 50); // Decay up to 50
-        healthScore = Math.max(
-          50,
-          Math.min(100, Math.floor(healthScore + client.bookingCount * 2)),
-        );
-
-        let statusLabel = "Active";
-        if (daysSinceActive > 60) statusLabel = "Churned";
-        else if (daysSinceActive > 30) statusLabel = "At Risk";
-        else if (healthScore < 60) statusLabel = "At Risk";
-
-        if (statusLabel === "Active") stats.active++;
-        else if (statusLabel === "At Risk") stats.atRisk++;
-        else stats.churned++;
-
+      let clients = Array.from(clientMap.values()).map((client) => {
+        const statusLabel = this.resolveClientStatus(client.bookings);
         return {
-          ...client,
-          displayName: client.companyName,
-          health: healthScore,
-          statusLabel: statusLabel,
+          id: client.id,
+          name: client.name,
+          email: client.email || "-",
+          phone: client.phone || "-",
+          bookingCount: client.bookingCount,
+          activeBookings: client.activeBookings,
+          totalRevenue: client.totalRevenue,
+          firstBookingDate: client.firstBookingDate?.toISOString?.() || null,
+          lastBookingDate: client.lastBookingDate?.toISOString?.() || null,
+          statusLabel,
+          initials: client.name
+            .split(" ")
+            .slice(0, 2)
+            .map((part: string) => part[0] || "")
+            .join("")
+            .toUpperCase(),
         };
       });
 
-      // Status filter
-      if (statusFilter && statusFilter !== "All Clients") {
-        clients = clients.filter((c) => c.statusLabel === statusFilter);
+      if (search) {
+        const lower = search.trim().toLowerCase();
+        clients = clients.filter(
+          (client) =>
+            client.name.toLowerCase().includes(lower) ||
+            client.email.toLowerCase().includes(lower) ||
+            client.phone.toLowerCase().includes(lower),
+        );
       }
 
-      // Pagination
+      const stats = { total: clients.length, active: 0, atRisk: 0, churned: 0 };
+      clients.forEach((client) => {
+        if (client.statusLabel === "Active") stats.active += 1;
+        else if (client.statusLabel === "At Risk") stats.atRisk += 1;
+        else stats.churned += 1;
+      });
+
+      if (statusFilter && statusFilter !== "all") {
+        const normalized =
+          statusFilter === "at_risk"
+            ? "At Risk"
+            : statusFilter === "active"
+              ? "Active"
+              : statusFilter === "churned"
+                ? "Churned"
+                : statusFilter;
+        clients = clients.filter((client) => client.statusLabel === normalized);
+      }
+
+      clients.sort(
+        (a, b) =>
+          new Date(b.lastBookingDate || 0).getTime() -
+          new Date(a.lastBookingDate || 0).getTime(),
+      );
+
       const total = clients.length;
       const skip = (page - 1) * limit;
       const paginatedClients = clients.slice(skip, skip + limit);
@@ -606,6 +609,85 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch clients",
+        error: error.message,
+      };
+    }
+  }
+
+  async getClientDetails(user: any, clientId: string): Promise<ApiResponse<any>> {
+    try {
+      const isAdminOrSales = STAFF_ROLES.includes(user.role);
+      const query: any = {
+        user: clientId,
+        isDeleted: false,
+      };
+
+      if (!isAdminOrSales) {
+        const spaceIds = await this.getManagedSpaceIds(user.id);
+        if (spaceIds.length === 0) {
+          return { success: false, message: "Client not found" };
+        }
+        query.spaceId = { $in: spaceIds };
+      }
+
+      const bookings = await BookingModel.find(query)
+        .populate("user", "fullName email phoneNumber")
+        .sort({ createdAt: -1 });
+
+      if (!bookings.length || !bookings[0].user) {
+        return { success: false, message: "Client not found" };
+      }
+
+      const clientUser: any = bookings[0].user;
+      const totalRevenue = bookings.reduce(
+        (sum: number, booking: any) =>
+          sum + Number(booking.amount || booking.plan?.price || 0),
+        0,
+      );
+
+      const statusLabel = this.resolveClientStatus(bookings);
+      const activeBookings = bookings.filter((booking: any) => booking.status === "active").length;
+
+      return {
+        success: true,
+        message: "Client details fetched successfully",
+        data: {
+          client: {
+            id: clientUser._id?.toString?.() || clientId,
+            name: clientUser.fullName || clientUser.email || "Unknown Client",
+            email: clientUser.email || "-",
+            phone: clientUser.phoneNumber || "-",
+            totalBookings: bookings.length,
+            activeBookings,
+            totalRevenue,
+            firstBookingDate: bookings[bookings.length - 1]?.createdAt || null,
+            lastBookingDate: bookings[0]?.createdAt || null,
+            statusLabel,
+          },
+          bookings: bookings.map((booking: any) => ({
+            id: booking._id?.toString?.() || "",
+            bookingNumber: booking.bookingNumber || "-",
+            type: this.normalizeBookingType(booking.type),
+            status: booking.status || "pending_payment",
+            planName: booking.plan?.name || "-",
+            planTenure:
+              booking.plan?.tenure && booking.plan?.tenureUnit
+                ? `${booking.plan.tenure} ${booking.plan.tenureUnit}`
+                : null,
+            amount: Number(booking.amount || booking.plan?.price || 0),
+            spaceName: booking.spaceSnapshot?.name || "Unknown Space",
+            spaceCity: booking.spaceSnapshot?.city || null,
+            startDate: booking.startDate || null,
+            endDate: booking.endDate || null,
+            createdAt: booking.createdAt || null,
+          })),
+        },
+      };
+    } catch (error: any) {
+      console.error("Error in getClientDetails:", error);
+      return {
+        success: false,
+        message: "Failed to fetch client details",
         error: error.message,
       };
     }
