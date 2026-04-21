@@ -3,6 +3,11 @@ import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../config/multer.config";
 import { AuthController } from "../../authModule/controllers/auth.controller";
 import { uploadProfilePic } from "../../authModule/config/multer.config";
+import {
+  createTeamMember,
+  deleteTeamMember,
+  getTeamMembers,
+} from "../../spacePartnerModule/controllers/teamMember.controller";
 const authController = new AuthController();
 import {
   getDashboardOverview,
@@ -71,6 +76,9 @@ router.get(
 );
 router.get("/partner/clients", getPartnerClients);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
+router.get("/partner/team-members", getTeamMembers);
+router.post("/partner/team-members", createTeamMember);
+router.delete("/partner/team-members/:memberId", deleteTeamMember);
 
 // ============ BOOKINGS ============
 router.get("/bookings", getAllBookings);
