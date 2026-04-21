@@ -74,6 +74,7 @@ export class UserPreferences {
 @index({ googleId: 1 }, { sparse: true, unique: true })
 @index({ isDeleted: 1, isActive: 1 }) // Filter active users efficiently
 @index({ role: 1 }) // Role-based access queries
+@index({ parentPartnerId: 1, isTeamMember: 1, isDeleted: 1 }) // Team member queries
 @index({ authProvider: 1 }) // Provider-specific queries
 @index({ lastLogin: -1 }) // Recent activity tracking
 @index(
@@ -92,6 +93,26 @@ export class User extends TimeStamps {
 
   @prop({ trim: true })
   public phoneNumber?: string;
+
+  // If present, this account belongs to a partner's internal team
+  @prop({ ref: () => User, type: () => Types.ObjectId })
+  public parentPartnerId?: Types.ObjectId;
+
+  @prop({ default: false })
+  public isTeamMember!: boolean;
+
+  @prop({ trim: true, default: "team_member" })
+  public teamMemberAccessRole!: string;
+
+  // Encrypted login password (for partner-side credential visibility)
+  @prop({ select: false })
+  public teamMemberPasswordEncrypted?: string;
+
+  @prop({ select: false })
+  public teamMemberPasswordIv?: string;
+
+  @prop({ select: false })
+  public teamMemberPasswordTag?: string;
 
   @prop()
   public profilePicture?: string;

@@ -8,6 +8,11 @@ import {
   acceptSpaceDetails,
   rejectSpaceDetails,
 } from "../controllers/spaceDetails.controller";
+import {
+  createTeamMember,
+  deleteTeamMember,
+  getTeamMembers,
+} from "../controllers/teamMember.controller";
 
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../../userDashboardModule/config/multer.config";
@@ -41,6 +46,12 @@ spacePartnerRoutes.get("/invoices", partnerFinancialsController.getInvoices);
 
 spacePartnerRoutes.post("/payments", partnerFinancialsController.createPayment);
 spacePartnerRoutes.get("/payments", partnerFinancialsController.getPayments);
+
+// Team member management routes
+spacePartnerRoutes.get("/team-members", getTeamMembers);
+spacePartnerRoutes.post("/team-members", createTeamMember);
+spacePartnerRoutes.delete("/team-members/:memberId", deleteTeamMember);
+
 // Space user KYC routes (for partners to submit their own KYC)
 spacePartnerRoutes.get("/kyc", spaceKycController.getMySpaceUserKyc);
 
