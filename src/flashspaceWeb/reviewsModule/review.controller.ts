@@ -6,6 +6,8 @@ import { PropertyModel } from "../propertyModule/property.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
+import { TicketModel } from "../ticketModule/models/Ticket";
+import { UserRole } from "../authModule/models/user.model";
 import mongoose from "mongoose";
 
 const sendError = (
@@ -270,44 +272,64 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
 
     const skip = (page - 1) * limit;
 
-    // 4. Get paginated and filtered reviews
-    const [reviews, totalCount] = await Promise.all([
+    // 4. Get all reviews (not paginated yet to allow merging)
+    const [reviews, ticketFeedback] = await Promise.all([
       ReviewModel.find(query)
         .populate("user", "fullName firstName lastName email profilePicture")
         .populate({
           path: "space",
           populate: { path: "property", select: "name area city" },
         })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      ReviewModel.countDocuments(query),
+        .lean(),
+      TicketModel.find({ 
+        partnerId: new mongoose.Types.ObjectId(partnerId), 
+        rating: { $ne: null } 
+      })
+      .populate("user", "fullName firstName lastName email profilePicture")
+      .populate({
+        path: "bookingId",
+        select: "bookingNumber spaceSnapshot type"
+      })
+      .lean()
     ]);
 
-    const transformed = reviews.map((r: any) => ({
+    // 5. Transform Reviews (Removed support tickets from list as requested)
+    const transformedReviews = reviews.map((r: any) => ({
       _id: r._id,
-      company:
-        r.user?.fullName ||
-        `${r.user?.firstName || ""} ${r.user?.lastName || ""}`.trim() ||
-        "Anonymous",
+      company: r.user?.fullName || `${r.user?.firstName || ""} ${r.user?.lastName || ""}`.trim() || "Anonymous",
       rating: r.rating,
       npsScore: r.npsScore,
-      location:
-        r.space?.property?.area ||
-        r.space?.property?.city ||
-        r.space?.name ||
-        "Unknown",
+      location: r.space?.property?.area || r.space?.property?.city || r.space?.name || "Unknown",
       spaceName: r.space?.name || r.space?.property?.name || "",
+      spaceId: r.space?._id || "",
       spaceType: r.spaceModel || "",
       review: r.comment,
       createdAt: r.createdAt,
+      source: 'space_review'
     }));
+
+    // Combine and apply filters (Only reviews now)
+    let combined = [...transformedReviews];
+    
+    if (ratingFilter) {
+      combined = combined.filter(item => item.rating === ratingFilter);
+    }
+    if (spaceTypeFilter) {
+      combined = combined.filter(item => item.spaceType === spaceTypeFilter);
+    }
+
+    // Sort by date
+    combined.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Paginate manually
+    const totalCount = combined.length;
+    const paginated = combined.slice(skip, skip + limit);
 
     res.status(200).json({
       success: true,
-      message: "Partner reviews fetched successfully",
+      message: "Partner feedback fetched successfully",
       data: {
-        reviews: transformed,
+        reviews: paginated,
         pagination: {
           total: totalCount,
           page,
@@ -350,42 +372,57 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
 
     const allSpaceIds = [...coworkingIds, ...virtualIds, ...meetingIds];
 
-    const reviews = await ReviewModel.find({
-      space: { $in: allSpaceIds },
-      npsScore: { $exists: true },
-    });
+    // NPS Calculation
+    const [reviews, ticketFeedback] = await Promise.all([
+      ReviewModel.find({
+        space: { $in: allSpaceIds }
+      }).lean(),
+      TicketModel.find({
+        partnerId: new mongoose.Types.ObjectId(partnerId),
+        rating: { $ne: null }
+      }).lean()
+    ]);
 
-    const total = reviews.length;
-    const promoters = reviews.filter((r) => (r.npsScore || 0) >= 9).length;
-    const detractors = reviews.filter((r) => (r.npsScore || 0) <= 6).length;
-    const passives = total - promoters - detractors;
-    const nps =
-      total > 0
-        ? Math.round((promoters / total) * 100 - (detractors / total) * 100)
-        : 0;
+    const totalResponses = reviews.filter(r => r.npsScore !== undefined).length + ticketFeedback.length;
+    
+    // Promoters (9-10 for reviews, 5 for tickets)
+    const reviewPromoters = reviews.filter(r => (r.npsScore || 0) >= 9).length;
+    const ticketPromoters = ticketFeedback.filter(t => (t.rating || 0) >= 5).length;
+    const promoters = reviewPromoters + ticketPromoters;
 
-    // Average rating across all reviews (with or without npsScore)
-    const allReviews = await ReviewModel.find({ space: { $in: allSpaceIds } });
-    const avgRating =
-      allReviews.length > 0
-        ? Math.round(
-          (allReviews.reduce((acc, r) => acc + r.rating, 0) /
-            allReviews.length) *
-          10,
-        ) / 10
-        : 0;
+    // Detractors (0-6 for reviews, 1-3 for tickets)
+    const reviewDetractors = reviews.filter(r => r.npsScore !== undefined && (r.npsScore || 0) <= 6).length;
+    const ticketDetractors = ticketFeedback.filter(t => (t.rating || 0) <= 3).length;
+    const detractors = reviewDetractors + ticketDetractors;
+
+    const passives = totalResponses - promoters - detractors;
+
+    const nps = totalResponses > 0
+      ? Math.round((promoters / totalResponses) * 100 - (detractors / totalResponses) * 100)
+      : 0;
+
+    // Average rating calculation (combine all reviews and tickets)
+    const allRatings = [
+      ...reviews.map(r => r.rating),
+      ...ticketFeedback.map(t => t.rating || 0)
+    ];
+
+    const totalReviewsCount = allRatings.length;
+    const avgRating = totalReviewsCount > 0
+      ? Math.round((allRatings.reduce((acc, r) => acc + r, 0) / totalReviewsCount) * 10) / 10
+      : 0;
 
     res.status(200).json({
       success: true,
       message: "Partner NPS stats calculated",
       data: {
         nps,
-        totalResponses: total,
+        totalResponses,
         promoters,
         passives,
         detractors,
         avgRating,
-        totalReviews: allReviews.length,
+        totalReviews: totalReviewsCount,
       },
     });
   } catch (err: any) {
