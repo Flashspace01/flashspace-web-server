@@ -11,6 +11,7 @@ import { UserModel } from "../../authModule/models/user.model";
 import Mail from "../../mailModule/models/mail.model";
 import Visit from "../../visitModule/models/visit.model";
 import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
+import { TicketService } from "../../ticketModule/services/ticket.service";
 import {
   CreditLedgerModel,
   CreditType,
@@ -3042,31 +3043,22 @@ export const getInvoiceById = async (req: Request, res: Response) => {
 
 export const getAllTickets = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { status, page = 1, limit = 100 } = req.query;
+    const userId = req.user?.id || (req.user as any)?._id;
+    const { status, page = 1, limit = 10 } = req.query;
 
-    const filter: any = { user: userId, isDeleted: false };
-    if (status) filter.status = status;
-
-    const limitNum = Number(limit) || 100;
-    const skip = (Number(page) - 1) * limitNum;
-
-    const [tickets, total] = await Promise.all([
-      SupportTicketModel.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .select("-messages"),
-      SupportTicketModel.countDocuments(filter),
-    ]);
+    const result = await TicketService.getUserTickets(
+      userId,
+      Number(page),
+      Number(limit),
+    );
 
     res.status(200).json({
       success: true,
-      data: tickets,
+      data: result.tickets,
       pagination: {
-        total,
-        page: Number(page),
-        pages: Math.ceil(total / limitNum),
+        total: result.total,
+        page: result.page,
+        pages: result.totalPages,
       },
     });
   } catch (error) {
@@ -3079,8 +3071,8 @@ export const getAllTickets = async (req: Request, res: Response) => {
 
 export const createTicket = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { subject, category, priority, description, bookingId } = req.body;
+    const userId = req.user?.id || (req.user as any)?._id;
+    const { subject, category, priority, description, bookingId, attachments } = req.body;
 
     if (!subject || !category || !description) {
       return res.status(400).json({
@@ -3089,43 +3081,30 @@ export const createTicket = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate ticket number
-    const count = await SupportTicketModel.countDocuments();
-    const ticketNumber = `TKT-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
-    const ticket = await SupportTicketModel.create({
-      ticketNumber,
-      user: userId,
-      bookingId,
+    // Use the robust TicketService instead of direct model creation
+    const ticket = await TicketService.createTicket(userId, {
       subject,
-      category,
-      priority: priority || "medium",
-      status: "open",
-      messages: [
-        {
-          sender: "user",
-          senderName: req.user?.email || "User",
-          senderId: userId,
-          message: description,
-          createdAt: new Date(),
-        },
-      ],
+      description,
+      category: category as any,
+      priority: priority as any,
+      attachments,
+      bookingId,
     });
+
+    // Notify admins (already handled in TicketService, but controller usually emits specifically)
+    // If not already in Service, we add it here or verify. 
+    // In ticket.controller.ts it emits: getIO().to("admin_feed").emit("new_ticket_created", ticket);
 
     res.status(201).json({
       success: true,
-      message: "Support ticket created",
-      data: {
-        _id: ticket._id,
-        ticketNumber: ticket.ticketNumber,
-        status: ticket.status,
-      },
+      message: "Support ticket created successfully",
+      data: ticket,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create ticket error:", error);
     res
-      .status(500)
-      .json({ success: false, message: "Failed to create ticket" });
+      .status(400)
+      .json({ success: false, message: error.message || "Failed to create ticket" });
   }
 };
 
@@ -3155,48 +3134,28 @@ export const getTicketById = async (req: Request, res: Response) => {
 
 export const replyToTicket = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id || (req.user as any)?._id;
     const { ticketId } = req.params;
-    const { message } = req.body;
+    const { message, attachments } = req.body;
 
     if (!message) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Message is required" });
+      return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const ticket = await SupportTicketModel.findOne({
-      _id: ticketId,
-      user: userId,
-      isDeleted: false,
-    });
-
-    if (!ticket) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Ticket not found" });
-    }
-
-    ticket.messages = ticket.messages || [];
-    ticket.messages.push({
+    const ticket = await TicketService.replyToTicket({
+      ticketId,
+      userId,
       sender: "user",
-      senderName: req.user?.email || "User",
-      senderId: userId as any,
       message,
-      createdAt: new Date(),
+      attachments,
     });
 
-    if (ticket.status === "waiting_customer") {
-      ticket.status = "in_progress";
-    }
-
-    ticket.updatedAt = new Date();
-    await ticket.save();
-
-    res.status(200).json({ success: true, message: "Reply sent" });
-  } catch (error) {
+    res.status(200).json({ success: true, message: "Reply sent successfully", data: ticket });
+  } catch (error: any) {
     console.error("Reply to ticket error:", error);
-    res.status(500).json({ success: false, message: "Failed to send reply" });
+    res
+      .status(400)
+      .json({ success: false, message: error.message || "Failed to send reply" });
   }
 };
 

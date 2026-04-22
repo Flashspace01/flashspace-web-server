@@ -229,6 +229,48 @@ export const replyToTicket = async (
   }
 };
 
+export const submitTicketFeedback = async (
+  req: AuthenticatedRequest,
+  res: Response,
+) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const ticketId = req.params.ticketId as string;
+    const { rating, remarks } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a rating between 1 and 5",
+      });
+    }
+
+    const ticket = await TicketService.submitFeedback(ticketId, userId, rating, remarks);
+
+    // Emit socket event to notify participants
+    getIO().to(ticketId).emit("ticket_updated", { ticketId, ticket });
+
+    res.status(200).json({
+      success: true,
+      message: "Feedback submitted successfully",
+      data: ticket,
+    });
+  } catch (error: any) {
+    console.error("Error submitting feedback:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to submit feedback",
+    });
+  }
+};
+
 // Admin Controllers
 export const getAllTickets = async (req: Request, res: Response) => {
   try {
