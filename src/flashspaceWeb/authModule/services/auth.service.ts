@@ -154,7 +154,7 @@ export class AuthService {
         console.log(`⚠️ Login failed: User not found with email ${email}`);
         return {
           success: false,
-          message: `DEBUG: User not found for ${email}`,
+          message: "Invalid email or password",
         };
       }
 
@@ -162,7 +162,7 @@ export class AuthService {
       if (user.authProvider !== AuthProvider.LOCAL) {
         return {
           success: false,
-          message: `DEBUG: AuthProvider is ${user.authProvider}, expected local`,
+          message: `Please login using ${user.authProvider.toLowerCase()}`,
         };
       }
 
@@ -170,7 +170,7 @@ export class AuthService {
       if (!user.password) {
         return {
           success: false,
-          message: "DEBUG: Password field is missing in DB",
+          message: "Invalid email or password",
         };
       }
 
@@ -179,12 +179,11 @@ export class AuthService {
         password,
         user.password,
       );
-      
       if (!isPasswordValid) {
         console.log(`⚠️ Login failed: Invalid password for ${email}`);
         return {
           success: false,
-          message: `DEBUG: Password mismatch. Role: ${user.role}, ID: ${user._id}`,
+          message: "Invalid email or password",
         };
       }
 
