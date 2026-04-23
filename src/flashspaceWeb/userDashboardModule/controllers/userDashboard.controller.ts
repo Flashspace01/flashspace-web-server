@@ -2744,6 +2744,33 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       );
     }
 
+    // Notify User (KYC submitted/pending)
+    try {
+      const profileType = isPartner
+        ? "partner"
+        : isBusinessInfoDoc
+          ? "business"
+          : "individual";
+
+      await NotificationService.notifyUser(
+        userId as string,
+        "KYC Submitted for Review",
+        "Your KYC has been submitted and is now pending review by our team.",
+        NotificationType.INFO,
+        {
+          kycId: profileId,
+          type: profileType,
+          status: "pending",
+        },
+        { preferenceKey: "reminders" },
+      );
+    } catch (notifError) {
+      console.error(
+        "[submitKYCForReview] Failed to notify user:",
+        notifError,
+      );
+    }
+
     res.status(200).json({
       success: true,
       message:

@@ -128,6 +128,7 @@ router.delete("/kyc/profile/:profileId", deleteKYCProfile);
 router.delete("/kyc/business-info/:profileId", deleteKYCProfile);
 router.post(
   "/kyc/submit",
+  
   (req, res, next) => {
     console.log(
       `[DEBUG_ROUTE] POST /kyc/submit hit at ${new Date().toISOString()}`,
