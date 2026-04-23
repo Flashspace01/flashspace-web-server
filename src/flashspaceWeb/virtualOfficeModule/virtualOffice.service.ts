@@ -4,6 +4,7 @@ import { PropertyModel } from "../propertyModule/property.model";
 import { PropertyService } from "../propertyModule/property.service";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 export class VirtualOfficeService {
   static async createOffice(data: any, partnerId: string) {
     let property;
@@ -48,10 +49,19 @@ export class VirtualOfficeService {
       query.partner = userId;
     }
 
+    const updateData: any = { ...data };
+
     // Check if office exists and user is authorized
     const officeToUpdate = await VirtualOfficeModel.findOne(query);
     if (!officeToUpdate) {
       throw new Error("Virtual office not found or unauthorized");
+    }
+
+    if (userRole !== UserRole.ADMIN && updateData.isActive === true) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        officeToUpdate.property.toString(),
+      );
     }
 
     // Update Property Fields

@@ -10,6 +10,7 @@ import {
   getPartnerVirtualOfficesSchema,
 } from "./virtualOffice.validation";
 import { UserRole } from "../authModule/models/user.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 const sendError = (
   res: Response,
@@ -41,8 +42,22 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
     }
 
     const partnerId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
+
+    const createBody: any = validation.data.body;
+
+    if (
+      userRole !== UserRole.ADMIN &&
+      (createBody.isActive === true || createBody.approvalStatus === "active")
+    ) {
+      return sendError(
+        res,
+        403,
+        "Admin approval is required before publishing a virtual office.",
+      );
+    }
 
     const createdOffice = await VirtualOfficeService.createOffice(
       {
@@ -115,7 +130,13 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
     const _limit = limit ? Math.min(limit, 100) : 12; // paginate by default
     const _page = page ? Math.max(page, 1) : 1;
 
-    const query: any = deleted === "true" ? { isDeleted: true } : {};
+    const isDeleted = String(deleted) === "true";
+    const query: any = { isDeleted };
+
+    if (!isDeleted) {
+      query.isActive = true;
+      query.approvalStatus = SpaceApprovalStatus.ACTIVE;
+    }
 
     if (property) {
       query.property = property;
@@ -158,6 +179,23 @@ export const getVirtualOfficeById = async (req: Request, res: Response) => {
 
     if (!office) return sendError(res, 404, "Virtual office not found");
 
+    const isPublished =
+      office.isActive && office.approvalStatus === SpaceApprovalStatus.ACTIVE;
+
+    if (!isPublished) {
+      const user = (req as any).user;
+      const isPartner = user && user.id && office.partner.toString() === user.id;
+      const isAdmin = user && user.role === UserRole.ADMIN;
+
+      if (!isPartner && !isAdmin) {
+        return sendError(
+          res,
+          404,
+          "Virtual office not found",
+        );
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Virtual office retrieved successfully",
@@ -183,6 +221,9 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     const result = await VirtualOfficeService.getOffices(
       {
         city: new RegExp(`^${city}$`, "i"),
+        isActive: true,
+        isDeleted: false,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
       },
       _limit,
       _page,

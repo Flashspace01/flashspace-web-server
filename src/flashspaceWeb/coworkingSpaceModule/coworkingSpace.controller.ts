@@ -9,6 +9,7 @@ import {
 import { CoworkingSpaceModel } from "./coworkingSpace.model";
 import { PropertyModel } from "../propertyModule/property.model";
 import { UserRole } from "../authModule/models/user.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 const sendError = (
   res: Response,
@@ -59,8 +60,22 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
     } = validation.data.body;
 
     const partnerId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
+
+    const createBody: any = validation.data.body;
+
+    if (
+      userRole !== UserRole.ADMIN &&
+      (createBody.isActive === true || createBody.approvalStatus === "active")
+    ) {
+      return sendError(
+        res,
+        403,
+        "Admin approval is required before publishing a coworking space.",
+      );
+    }
 
     const createdSpace = await CoworkingSpaceService.createSpace(
       {
@@ -150,7 +165,14 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
     const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
-    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const isDeleted = String(deleted) === "true";
+    const query: any = { isDeleted };
+
+    // Public listing should only show active spaces
+    if (!isDeleted) {
+      query.isActive = true;
+      query.approvalStatus = SpaceApprovalStatus.ACTIVE;
+    }
 
     if (property) {
       query.property = property;
@@ -207,7 +229,10 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
     );
     if (!space) return sendError(res, 404, "Coworking space not found");
 
-    if (!space.isActive) {
+    const isPublished =
+      space.isActive && space.approvalStatus === SpaceApprovalStatus.ACTIVE;
+
+    if (!isPublished) {
       const user = (req as any).user;
       const isPartner = user && user.id && space.partner.toString() === user.id;
       const isAdmin = user && user.role === UserRole.ADMIN;
@@ -251,6 +276,9 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
     const result = await CoworkingSpaceService.getSpaces(
       {
         city: new RegExp(`^${city}$`, "i"),
+        isActive: true,
+        isDeleted: false,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
       },
       { limit: _limit, page: _page },
     );

@@ -8,6 +8,8 @@ import {
   getMeetingRoomByIdSchema,
   getMeetingRoomsByCitySchema,
 } from "./meetingRoom.validation";
+import { UserRole } from "../authModule/models/user.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 
 // --- HELPERS ---
 const sendError = (
@@ -52,9 +54,23 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
     // Data already contains partnerPricePerHour/partnerPricePerDay from validation schema
 
     const partnerId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
 
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
+
+    const createBody: any = validation.data.body;
+
+    if (
+      userRole !== "admin" &&
+      (createBody.isActive === true || createBody.approvalStatus === "active")
+    ) {
+      return sendError(
+        res,
+        403,
+        "Admin approval is required before publishing a meeting room.",
+      );
+    }
 
     const createdRoom = await MeetingRoomService.createRoom(
       MEETING_ROOM_DATA,
@@ -162,7 +178,14 @@ export const getAllMeetingRooms = async (req: Request, res: Response) => {
 
     const { deleted, type, minPrice, maxPrice, limit, property } =
       validation.data.query;
-    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const query: any =
+      String(deleted) === "true"
+        ? { isDeleted: true }
+        : {
+            isDeleted: false,
+            isActive: true,
+            approvalStatus: SpaceApprovalStatus.ACTIVE,
+          };
 
     if (property) {
       query.property = property;
@@ -207,6 +230,19 @@ export const getMeetingRoomById = async (req: Request, res: Response) => {
 
     if (!room) return sendError(res, 404, "Meeting room not found");
 
+    const isPublished =
+      room.isActive && room.approvalStatus === SpaceApprovalStatus.ACTIVE;
+
+    if (!isPublished) {
+      const user = (req as any).user;
+      const isPartner = user && user.id && room.partner.toString() === user.id;
+      const isAdmin = user && user.role === UserRole.ADMIN;
+
+      if (!isPartner && !isAdmin) {
+        return sendError(res, 404, "Meeting room not found");
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Meeting room retrieved successfully",
@@ -227,7 +263,12 @@ export const getMeetingRoomsByCity = async (req: Request, res: Response) => {
     const { city } = validation.data.params;
     const { type, minPrice, maxPrice, limit } = validation.data.query;
 
-    const query: any = { city: new RegExp(`^${city}$`, "i") };
+    const query: any = {
+      city: new RegExp(`^${city}$`, "i"),
+      isActive: true,
+      isDeleted: false,
+      approvalStatus: SpaceApprovalStatus.ACTIVE,
+    };
 
     if (type) query.type = type;
 
