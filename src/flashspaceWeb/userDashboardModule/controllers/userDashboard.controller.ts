@@ -675,18 +675,23 @@ export const getPartnerPropertyBookings = async (
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
+    const partnerId = new mongoose.Types.ObjectId(userId);
+
     // 1. Find all spaces belonging to this property
     const [coworking, virtual, meeting] = await Promise.all([
       CoworkingSpaceModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
       VirtualOfficeModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
       MeetingRoomModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
     ]);
