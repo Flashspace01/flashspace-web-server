@@ -17,27 +17,27 @@ router.use(AuthMiddleware.authenticate);
 // --- Partner Routes ---
 router.post(
   "/", 
-  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
   uploadInvoiceFile.single("invoiceFile"),
   uploadInvoice
 );
 
 router.get(
   "/partner",
-  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN),
+  AuthMiddleware.requireRole(UserRole.PARTNER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
   getPartnerInvoices
 );
 
 // --- Admin Routes ---
 router.get(
   "/admin",
-  AuthMiddleware.requireRole(UserRole.ADMIN),
+  AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
   getAllInvoicesAdmin
 );
 
 router.patch(
   "/:id/pay",
-  AuthMiddleware.requireRole(UserRole.ADMIN),
+  AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
   markInvoicePaid
 );
 
