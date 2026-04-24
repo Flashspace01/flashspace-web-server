@@ -409,7 +409,7 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
             : "Unknown",
           kycStatus: b.kycStatus || "pending",
           status: b.status,
-          category: "Booking"
+          category: b.type === "VirtualOffice" ? "Virtual Office" : b.type === "CoworkingSpace" ? "Coworking" : b.type === "MeetingRoom" ? "Meeting Room" : b.type || "Booking"
         };
       }),
       ...meetings.map((m: any) => {
@@ -479,6 +479,8 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
         };
       }),
       ...supportTickets.map((t: any) => {
+        console.log(`[DEBUG] Ticket ${t.ticketNumber} raw keys:`, Object.keys(t));
+        console.log(`[DEBUG] Ticket ${t.ticketNumber} category:`, t.category);
         const name = t.user?.fullName || "Unknown";
         const initials =
           name
@@ -509,10 +511,13 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
             : "Unknown",
           kycStatus: "approved",
           status: t.status,
-          category: "Ticket"
+          category: t.category || "General",
+          rawTicket: t // For debugging
         };
       })
     ];
+
+    console.log(`[DEBUG] Sending ${combinedRequests.length} combined requests. Categories:`, combinedRequests.map(r => r.category));
 
     return res.status(200).json({
       success: true,
@@ -757,7 +762,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
       businessInfos.map((info) => [info.user.toString(), info]),
     );
 
-    // 3. Group bookings by user and select the best representative booking
+    // Group bookings by user and select the best representative booking
     const clientMap = new Map<string, any>();
 
     bookings.forEach((booking: any) => {
@@ -796,14 +801,15 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         status,
         kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
         dealValue: booking.plan?.finalPrice || booking.plan?.price || 0,
+        category: booking.type === "VirtualOffice" ? "Virtual Office" : booking.type === "CoworkingSpace" ? "Coworking" : booking.type === "MeetingRoom" ? "Meeting Room" : booking.type || "Booking",
         createdAt: booking.createdAt,
       };
 
-      // If user already exists in map, decide which booking to keep
-      // Priority: ACTIVE > EXPIRING_SOON > INACTIVE
-      const existing = clientMap.get(userIdStr);
+      // Use composite key to allow same user with different categories (e.g. Booking and Ticket)
+      const mapKey = `${userIdStr}_${clientData.category}`;
+      const existing = clientMap.get(mapKey);
       if (!existing) {
-        clientMap.set(userIdStr, clientData);
+        clientMap.set(mapKey, clientData);
       } else {
         const priority: Record<string, number> = {
           ACTIVE: 3,
@@ -811,8 +817,61 @@ export const getPartnerClients = async (req: Request, res: Response) => {
           INACTIVE: 1,
         };
         if (priority[status] > priority[existing.status]) {
-          clientMap.set(userIdStr, clientData);
+          clientMap.set(mapKey, clientData);
         }
+      }
+    });
+
+    // 4. Fetch resolved support tickets for this partner
+    const allPartnerBookings = await BookingModel.find({
+      partner: userId,
+      isDeleted: false,
+    }).distinct("_id");
+    const resolvedTickets = await TicketModel.find({
+      $or: [
+        { bookingId: { $in: allPartnerBookings } },
+        { partnerId: userId },
+        { assignee: userId }
+      ],
+      status: { $in: ["resolved", "closed"] },
+    }).populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "spaceSnapshot")
+      .lean();
+
+    console.log(`[DEBUG getPartnerClients] Found ${resolvedTickets.length} resolved/closed tickets for partner ${userId}. All booking IDs: ${allPartnerBookings.length}`);
+    if (resolvedTickets.length > 0) {
+      console.log(`[DEBUG getPartnerClients] First resolved ticket:`, resolvedTickets[0]._id, resolvedTickets[0].status, resolvedTickets[0].category);
+    }
+
+    resolvedTickets.forEach((ticket: any) => {
+      const user = ticket.user;
+      const userIdStr = user?._id?.toString() || user?.toString();
+      if (!userIdStr) return;
+
+      const business = businessMap.get(userIdStr);
+      const category = ticket.category || "Ticket";
+
+      const clientData = {
+        id: ticket.ticketNumber,
+        userId: userIdStr,
+        companyName: business?.companyName || user?.fullName || "N/A",
+        contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phoneNumber || "N/A",
+        plan: "Support",
+        space: ticket.bookingId?.spaceSnapshot?.name || ticket.subject || "Query",
+        startDate: "N/A",
+        endDate: "N/A",
+        status: "RESOLVED",
+        kycStatus: "VERIFIED",
+        dealValue: 0,
+        category,
+        createdAt: ticket.createdAt,
+      };
+
+      const mapKey = `${userIdStr}_${category}`;
+      if (!clientMap.has(mapKey)) {
+        clientMap.set(mapKey, clientData);
       }
     });
 
@@ -1853,6 +1912,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
         panNumber: b.panNumber,
         cinNumber: b.cinNumber,
         registeredAddress: b.registeredAddress,
+        address: b.registeredAddress,
         industry: b.industry,
         verified: b.status === "approved",
       },
@@ -1957,23 +2017,21 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     // ============================================
     // CASE 1: BUSINESS PROFILE (Using BusinessInfoModel)
     // ============================================
-    if (kycType === "business" || (profileId && profileId !== "new")) {
-      let businessInfo = null;
-      // Check if profileId is valid business info
-      if (profileId && profileId !== "new") {
-        if (!mongoose.Types.ObjectId.isValid(profileId as string)) {
-          return res
-            .status(400)
-            .json({ success: false, message: "Invalid Profile ID format" });
-        }
-        businessInfo = await BusinessInfoModel.findOne({
-          _id: profileId,
-          user: userId,
-        });
-      }
+    // We only enter Case 1 if kycType is explicitly 'business' 
+    // OR if we are updating an existing BusinessInfo record.
+    let isExplicitBusiness = kycType === "business";
+    let existingBusiness = null;
 
-      if (businessInfo || kycType === "business") {
-        console.log("[updateBusinessInfo] Processing as Business Profile");
+    if (profileId && profileId !== "new" && mongoose.Types.ObjectId.isValid(profileId as string)) {
+      existingBusiness = await BusinessInfoModel.findOne({
+        _id: profileId,
+        user: userId,
+      });
+    }
+
+    if (isExplicitBusiness || existingBusiness) {
+      let businessInfo = existingBusiness;
+      console.log("[updateBusinessInfo] Processing as Business Profile");
 
         if (!businessInfo) {
           const mainProfile = await KYCDocumentModel.findOne({
@@ -2091,12 +2149,12 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
               panNumber: businessInfo.panNumber,
               cinNumber: businessInfo.cinNumber,
               registeredAddress: businessInfo.registeredAddress,
+              address: businessInfo.registeredAddress,
               industry: businessInfo.industry,
             },
             overallStatus: businessInfo.status,
           },
         });
-      }
     }
 
     // ============================================
@@ -2153,6 +2211,12 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
         partners: partners || kyc.businessInfo?.partners || [],
         verified: false,
       };
+      kyc.markModified("businessInfo");
+
+      // Update profile name if it was generic and we now have a company name
+      if (companyName && (!kyc.profileName || kyc.profileName === "Personal Profile" || kyc.profileName === "Individual Profile")) {
+        kyc.profileName = companyName;
+      }
     }
 
     // Update personal info logic (Legacy support)
@@ -3362,6 +3426,9 @@ export const redeemReward = async (req: Request, res: Response) => {
 export const getUserMails = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
 
     const user = await UserModel.findById(userId);
 
@@ -3372,22 +3439,54 @@ export const getUserMails = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
-    const mails = await Mail.find({
-      $or: [
-        { email: { $regex: userEmailRegex } },
-        { clientEmail: { $regex: userEmailRegex } },
-      ],
-    })
-      .lean()
-      .sort({ createdAt: -1 });
+    const emailRegex = new RegExp(`^${userEmail}$`, "i");
+    const baseFilter = {
+      $or: [{ email: emailRegex }, { clientEmail: emailRegex }],
+    };
+
+    const [mails, total, allUserMails] =
+      await Promise.all([
+        Mail.find(baseFilter)
+          .lean()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Mail.countDocuments(baseFilter),
+        Mail.find(baseFilter).lean(),
+      ]);
+
+    const stats = {
+      pending: allUserMails.filter(m => m.status?.toLowerCase() === 'pending action').length,
+      forwarded: allUserMails.filter(m => m.status?.toLowerCase() === 'forwarded').length,
+      collected: allUserMails.filter(m => m.status?.toLowerCase() === 'collected').length
+    };
 
     const formattedMails = mails.map((m: any) => ({
       ...m,
       mailId: m.mailId || m._id?.toString(),
     }));
 
-    res.status(200).json({ success: true, data: formattedMails });
+    const finalResponse = {
+      success: true,
+      data: formattedMails,
+      pagination: {
+        total: total || 0,
+        page: Number(page) || 1,
+        limit: Number(limit) || 10,
+        pages: Math.ceil((total || 0) / (Number(limit) || 10)),
+      },
+      stats: {
+        pending: stats.pending || 0,
+        forwarded: stats.forwarded || 0,
+        collected: stats.collected || 0,
+      },
+      debug_v: "2.1", // To verify code update
+    };
+
+    console.log("=== GET USER MAILS RESPONSE V2.1 ===");
+    console.log("Stats to send:", finalResponse.stats);
+
+    res.status(200).json(finalResponse);
   } catch (error) {
     console.error("Get user mails error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch mails" });

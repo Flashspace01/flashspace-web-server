@@ -637,15 +637,15 @@ export class TicketService {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) throw new Error("Ticket not found or access denied");
 
-    ticket.status = TicketStatus.CLOSED;
-    ticket.closedAt = new Date();
+    ticket.status = TicketStatus.RESOLVED;
+    ticket.resolvedAt = new Date();
     await ticket.save();
 
     NotificationService.notifyUser(
       ticket.user.toString(),
-      `Query Closed: ${ticket.ticketNumber}`,
-      `Your query has been closed by the partner.`,
-      NotificationType.INFO,
+      `Query Resolved: ${ticket.ticketNumber}`,
+      `Your query has been marked as resolved by the partner.`,
+      NotificationType.SUCCESS,
       { ticketId: ticket._id },
     );
 
