@@ -60,6 +60,10 @@ spacePartnerRoutes.put(
   "/kyc/business-info",
   spaceKycController.upsertSpaceUserKycBusinessInfo,
 );
+spacePartnerRoutes.put(
+  "/kyc/bank-info",
+  spaceKycController.upsertSpaceUserKycBankInfo,
+);
 spacePartnerRoutes.put("/kyc", spaceKycController.upsertSpaceUserKyc);
 
 spacePartnerRoutes.post(
