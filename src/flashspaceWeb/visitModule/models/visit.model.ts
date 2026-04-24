@@ -9,7 +9,7 @@ export interface IVisit extends Document {
     purpose: string;
     space: string;
     date: Date;
-    status: 'Pending' | 'Completed';
+    status: 'Pending' | 'Forwarded' | 'Completed';
     createdAt: Date;
     updatedAt: Date;
 }
@@ -25,7 +25,7 @@ const VisitSchema: Schema = new Schema({
     date: { type: Date, default: Date.now },
     status: {
         type: String,
-        enum: ['Pending', 'Completed'],
+        enum: ['Pending', 'Forwarded', 'Completed'],
         default: 'Pending'
     },
 }, { timestamps: true });

@@ -1,3 +1,18 @@
+import { Request, Response } from "express";
+import fs from "fs";
+import path from "path";
+import {
+  SpaceUserKycModel,
+  KycDecisionStatus,
+} from "../models/spaceUserKyc.model";
+import { getFileUrl as getMulterFileUrl } from "../../userDashboardModule/config/multer.config";
+import { PropertyModel } from "../../propertyModule/property.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
+import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
+import { UserModel } from "../../authModule/models/user.model";
+
 // Create or update space user KYC business information
 export const upsertSpaceUserKycBusinessInfo = async (
   req: Request,
@@ -18,63 +33,98 @@ export const upsertSpaceUserKycBusinessInfo = async (
       gstNumber,
       cinRegistrationNumber,
       registeredAddress,
+      contactPhone,
       companyPartners,
+      panNumber,
     } = req.body;
 
-    // At least one business field must be present
-    if (
-      !companyName &&
-      !companyType &&
-      !industry &&
-      !gstNumber &&
-      !cinRegistrationNumber &&
-      !registeredAddress &&
-      !companyPartners
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one business information field is required",
-      });
-    }
-
-    let kyc = await SpaceUserKycModel.findOne({ userId });
-    if (!kyc) {
+    // Find the first property to save these details
+    let property = await PropertyModel.findOne({ partner: userId });
+    
+    if (!property) {
       return res.status(404).json({
         success: false,
-        message:
-          "KYC record not found. Please submit personal information first.",
+        message: "[DEBUG-404] No property found for this user. Business details must be linked to a property. Please add a space first.",
       });
     }
 
-    if (companyName !== undefined) kyc.companyName = companyName;
-    if (companyType !== undefined) kyc.companyType = companyType;
-    if (industry !== undefined) kyc.industry = industry;
-    if (gstNumber !== undefined) kyc.gstNumber = gstNumber;
-    if (cinRegistrationNumber !== undefined)
-      kyc.cinRegistrationNumber = cinRegistrationNumber;
+    if (companyName !== undefined) property.companyName = companyName;
+    if (gstNumber !== undefined) property.gstNumber = gstNumber;
+    if (panNumber !== undefined) property.panNumber = panNumber;
     if (registeredAddress !== undefined)
-      kyc.registeredAddress = registeredAddress;
-    if (companyPartners !== undefined) kyc.companyPartners = companyPartners;
+      property.registeredAddress = registeredAddress;
+    if (contactPhone !== undefined) property.contactPhone = contactPhone;
+    
+    // We can still store other non-property fields in KYC if needed, 
+    // but the request says GST, PAN, and Bank details should go to Property.
 
-    // Whenever business info changes, we reset status to not_started if it was rejected
-    if (kyc.overallStatus === "rejected") {
-      kyc.overallStatus = "not_started";
-      kyc.kycStatus = "not_started";
-      kyc.overallRejectMessage = undefined;
-    }
-
-    await kyc.save();
+    await property.save();
 
     return res.status(200).json({
       success: true,
-      message: "KYC business information saved successfully",
-      data: kyc,
+      message: "Business information saved to property successfully (v2)",
+      data: property,
     });
   } catch (error) {
     console.error("[spaceKYC] upsertSpaceUserKycBusinessInfo error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to save KYC business information",
+      message: "Failed to save business information",
+    });
+  }
+};
+
+// Create or update space user KYC bank information
+export const upsertSpaceUserKycBankInfo = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = (req as any).user?.id as string | undefined;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Unauthorized: user not found" });
+    }
+
+    const {
+      accountHolderName,
+      bankName,
+      accountNumber,
+      ifscCode,
+      branch,
+      accountType,
+    } = req.body;
+
+    // Find the first property to save these details
+    let property = await PropertyModel.findOne({ partner: userId });
+    
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "No property found to associate these details with.",
+      });
+    }
+
+    if (accountHolderName !== undefined) property.accountHolderName = accountHolderName;
+    if (bankName !== undefined) property.bankName = bankName;
+    if (accountNumber !== undefined) property.accountNumber = accountNumber;
+    if (ifscCode !== undefined) property.ifscCode = ifscCode;
+    if (branch !== undefined) property.branch = branch;
+    if (accountType !== undefined) property.accountType = accountType;
+
+    await property.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Bank information saved to property successfully",
+      data: property,
+    });
+  } catch (error) {
+    console.error("[spaceKYC] upsertSpaceUserKycBankInfo error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save bank information",
     });
   }
 };
@@ -117,14 +167,7 @@ export const getSpacePartnerKycById = async (req: any, res: any) => {
     });
   }
 };
-import { Request, Response } from "express";
-import fs from "fs";
-import path from "path";
-import {
-  SpaceUserKycModel,
-  KycDecisionStatus,
-} from "../models/spaceUserKyc.model";
-import { getFileUrl as getMulterFileUrl } from "../../userDashboardModule/config/multer.config";
+
 
 // Get current authenticated space user's KYC record
 export const getMySpaceUserKyc = async (req: Request, res: Response) => {
@@ -137,19 +180,55 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     }
 
     const kyc = await SpaceUserKycModel.findOne({ userId });
+    const user = await UserModel.findById(userId);
+    const firstProperty = await PropertyModel.findOne({ partner: userId });
 
-    if (!kyc) {
-      return res.status(200).json({
-        success: true,
-        message: "No KYC record found for user",
-        data: null,
-      });
-    }
+    // Construct the data object as requested:
+    // 1. Business & Bank details from Property
+    // 2. Documents & Status from SpaceUserKyc
+    
+    const data = {
+      // Basic Info from User/Property
+      fullName: user?.fullName || kyc?.fullName || "",
+      email: user?.email || kyc?.email || "",
+      phoneNumber: user?.phoneNumber || kyc?.phoneNumber || "",
+
+      // Business Details from Property
+      companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
+      gstNumber: firstProperty?.gstNumber || kyc?.gstNumber || "",
+      panNumber: firstProperty?.panNumber || kyc?.panNumber || "",
+      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kyc?.registeredAddress || "",
+      contactPhone: firstProperty?.contactPhone || user?.phoneNumber || kyc?.contactPhone || "",
+      
+      // Bank Details from Property
+      accountHolderName: firstProperty?.accountHolderName || kyc?.accountHolderName || "",
+      bankName: firstProperty?.bankName || kyc?.bankName || "",
+      accountNumber: firstProperty?.accountNumber || kyc?.accountNumber || "",
+      ifscCode: firstProperty?.ifscCode || kyc?.ifscCode || "",
+      branch: firstProperty?.branch || kyc?.branch || "",
+      accountType: firstProperty?.accountType || kyc?.accountType || "Current Account",
+
+      // Document URLs & Statuses from SpaceUserKyc (keep original object structure if kyc exists)
+      ...(kyc ? kyc.toObject() : {}),
+      
+      // Ensure Property fields take precedence over KYC fields for business/bank
+      companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
+      gstNumber: firstProperty?.gstNumber || kyc?.gstNumber || "",
+      panNumber: firstProperty?.panNumber || kyc?.panNumber || "",
+      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kyc?.registeredAddress || "",
+      contactPhone: firstProperty?.contactPhone || user?.phoneNumber || kyc?.contactPhone || "",
+      accountHolderName: firstProperty?.accountHolderName || kyc?.accountHolderName || "",
+      bankName: firstProperty?.bankName || kyc?.bankName || "",
+      accountNumber: firstProperty?.accountNumber || kyc?.accountNumber || "",
+      ifscCode: firstProperty?.ifscCode || kyc?.ifscCode || "",
+      branch: firstProperty?.branch || kyc?.branch || "",
+      accountType: firstProperty?.accountType || kyc?.accountType || "Current Account",
+    };
 
     return res.status(200).json({
       success: true,
       message: "KYC record fetched successfully",
-      data: kyc,
+      data: data,
     });
   } catch (error) {
     console.error("[spaceKYC] getMySpaceUserKyc error:", error);
@@ -267,12 +346,20 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
     }
 
     let kyc = await SpaceUserKycModel.findOne({ userId });
+    const user = await UserModel.findById(userId);
+
     if (!kyc) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "KYC record not found. Please submit personal information first.",
+      // Auto-create a skeleton KYC record if it doesn't exist during upload
+      kyc = new SpaceUserKycModel({
+        userId,
+        fullName: user?.fullName || "Partner",
+        email: user?.email || "",
+        phoneNumber: user?.phoneNumber || "",
+        dateOfBirth: new Date(),
+        aadhaarNumber: "DRAFT",
+        panNumber: "DRAFT"
       });
+      await kyc.save();
     }
 
     // Build public URL using existing helper (reuses uploads/kyc-documents & uploads/video-kyc)
@@ -313,11 +400,31 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
       kyc.videoKycUrl = fileUrl;
       kyc.videoKycStatus = "pending";
       kyc.videoKycRejectMessage = undefined;
+    } else if (documentType === "company_registration") {
+      deleteOldFile(kyc.companyRegistrationUrl, false);
+      kyc.companyRegistrationUrl = fileUrl;
+      kyc.companyRegistrationStatus = "pending";
+      kyc.companyRegistrationRejectMessage = undefined;
+    } else if (documentType === "gst_certificate") {
+      deleteOldFile(kyc.gstCertificateUrl, false);
+      kyc.gstCertificateUrl = fileUrl;
+      kyc.gstCertificateStatus = "pending";
+      kyc.gstCertificateRejectMessage = undefined;
+    } else if (documentType === "address_proof") {
+      deleteOldFile(kyc.addressProofUrl, false);
+      kyc.addressProofUrl = fileUrl;
+      kyc.addressProofStatus = "pending";
+      kyc.addressProofRejectMessage = undefined;
+    } else if (documentType === "bank_details_proof") {
+      deleteOldFile(kyc.bankDetailsProofUrl, false);
+      kyc.bankDetailsProofUrl = fileUrl;
+      kyc.bankDetailsProofStatus = "pending";
+      kyc.bankDetailsProofRejectMessage = undefined;
     } else {
       return res.status(400).json({
         success: false,
         message:
-          "Invalid documentType. Use 'aadhaar_image', 'pan_image', or 'video_kyc'",
+          "Invalid documentType. Use 'aadhaar_image', 'pan_image', 'video_kyc', 'company_registration', 'gst_certificate', 'address_proof' or 'bank_details_proof'",
       });
     }
 
@@ -380,6 +487,22 @@ export const reviewSpaceUserKycDocument = async (
       kyc.panImageStatus = status;
       kyc.panImageRejectMessage =
         status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "company_registration") {
+      kyc.companyRegistrationStatus = status;
+      kyc.companyRegistrationRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "gst_certificate") {
+      kyc.gstCertificateStatus = status;
+      kyc.gstCertificateRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "address_proof") {
+      kyc.addressProofStatus = status;
+      kyc.addressProofRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "bank_details_proof") {
+      kyc.bankDetailsProofStatus = status;
+      kyc.bankDetailsProofRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
     } else if (documentType === "video_kyc") {
       kyc.videoKycStatus = status;
       kyc.videoKycRejectMessage =
@@ -388,7 +511,7 @@ export const reviewSpaceUserKycDocument = async (
       return res.status(400).json({
         success: false,
         message:
-          "Invalid documentType. Use 'aadhaar_image', 'pan_image', or 'video_kyc'",
+          "Invalid documentType. Use 'aadhaar_image', 'pan_image', 'video_kyc', 'company_registration', 'gst_certificate', 'address_proof' or 'bank_details_proof'",
       });
     }
 
@@ -539,11 +662,7 @@ export const submitSpaceUserKyc = async (req: Request, res: Response) => {
   }
 };
 
-import { PropertyModel } from "../../propertyModule/property.model";
-import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
-import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
-import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
-import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
+
 
 export const getSpacePartnerPropertiesByKycId = async (
   req: Request,

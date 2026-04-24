@@ -643,4 +643,67 @@ export class EmailUtil {
       return false;
     }
   }
+  static async sendMailRecordEmail(email: string, fullName: string, mailData: { sender: string; type: string; office: string }): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+        <div style="background: #35503F; color: #FEF8C3; padding: 25px; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px;">New Mail Received</h1>
+        </div>
+        <div style="padding: 30px; background: #ffffff;">
+          <p>Hello ${fullName},</p>
+          <p>A new mail item has been received at your virtual office.</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Sender:</strong> ${mailData.sender}</p>
+            <p style="margin: 5px 0;"><strong>Type:</strong> ${mailData.type}</p>
+            <p style="margin: 5px 0;"><strong>Office:</strong> ${mailData.office}</p>
+          </div>
+          <p>You can view more details and request forwarding from your dashboard.</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/mail-records" style="background: #35503F; color: #FEF8C3; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Mail Records</a>
+          </div>
+        </div>
+        <div style="background: #f1f3f5; padding: 15px; text-align: center; color: #777; font-size: 12px;">
+          <p>&copy; 2024 FlashSpace Tech. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `📧 New Mail: ${mailData.sender} - FlashSpace`,
+      html,
+    });
+  }
+
+  static async sendVisitRecordEmail(email: string, fullName: string, visitData: { visitor: string; purpose: string; office: string }): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+        <div style="background: #35503F; color: #FEF8C3; padding: 25px; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px;">New Visitor Logged</h1>
+        </div>
+        <div style="padding: 30px; background: #ffffff;">
+          <p>Hello ${fullName},</p>
+          <p>A new visitor entry has been logged at your virtual office.</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Visitor:</strong> ${visitData.visitor}</p>
+            <p style="margin: 5px 0;"><strong>Purpose:</strong> ${visitData.purpose}</p>
+            <p style="margin: 5px 0;"><strong>Office:</strong> ${visitData.office}</p>
+          </div>
+          <p>Please log in to your dashboard to acknowledge/verify this visit.</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/visit-records" style="background: #35503F; color: #FEF8C3; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Visit Records</a>
+          </div>
+        </div>
+        <div style="background: #f1f3f5; padding: 15px; text-align: center; color: #777; font-size: 12px;">
+          <p>&copy; 2024 FlashSpace Tech. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `🤝 New Visitor: ${visitData.visitor} - FlashSpace`,
+      html,
+    });
+  }
 }
