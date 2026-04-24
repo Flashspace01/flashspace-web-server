@@ -193,24 +193,9 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
       email: user?.email || kyc?.email || "",
       phoneNumber: user?.phoneNumber || kyc?.phoneNumber || "",
 
-      // Business Details from Property
-      companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
-      gstNumber: firstProperty?.gstNumber || kyc?.gstNumber || "",
-      panNumber: firstProperty?.panNumber || kyc?.panNumber || "",
-      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kyc?.registeredAddress || "",
-      contactPhone: firstProperty?.contactPhone || user?.phoneNumber || kyc?.contactPhone || "",
-      
-      // Bank Details from Property
-      accountHolderName: firstProperty?.accountHolderName || kyc?.accountHolderName || "",
-      bankName: firstProperty?.bankName || kyc?.bankName || "",
-      accountNumber: firstProperty?.accountNumber || kyc?.accountNumber || "",
-      ifscCode: firstProperty?.ifscCode || kyc?.ifscCode || "",
-      branch: firstProperty?.branch || kyc?.branch || "",
-      accountType: firstProperty?.accountType || kyc?.accountType || "Current Account",
-
       // Document URLs & Statuses from SpaceUserKyc (keep original object structure if kyc exists)
       ...(kyc ? kyc.toObject() : {}),
-      
+
       // Ensure Property fields take precedence over KYC fields for business/bank
       companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
       gstNumber: firstProperty?.gstNumber || kyc?.gstNumber || "",
