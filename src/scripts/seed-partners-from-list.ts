@@ -96,7 +96,7 @@ async function seed() {
             console.log(`\nProcessing: ${p.space_name} (${p.email})`);
             
             // 1. Find or Create User
-            let user = await mongoose.connection.db.collection('users').findOne({ email: p.email.toLowerCase() });
+            let user = await mongoose.connection.db!.collection('users').findOne({ email: p.email.toLowerCase() });
             
             if (!user) {
                 const newUser = {
@@ -111,7 +111,7 @@ async function seed() {
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
-                const res = await mongoose.connection.db.collection('users').insertOne(newUser);
+                const res = await mongoose.connection.db!.collection('users').insertOne(newUser);
                 user = { ...newUser, _id: res.insertedId };
                 console.log(`- Created User: ${user._id}`);
             } else {
@@ -119,7 +119,7 @@ async function seed() {
             }
 
             // 2. Find Property and Link
-            const property = await mongoose.connection.db.collection('properties').findOne({ 
+            const property = await mongoose.connection.db!.collection('properties').findOne({ 
                 $or: [
                     { name: p.space_name },
                     { name: new RegExp(p.space_name.split(' - ')[0], 'i') },
@@ -128,26 +128,26 @@ async function seed() {
             });
 
             if (property) {
-                await mongoose.connection.db.collection('properties').updateOne(
+                await mongoose.connection.db!.collection('properties').updateOne(
                     { _id: property._id },
                     { $set: { partner: user._id } }
                 );
                 console.log(`- Linked to Property: ${property.name} (${property._id})`);
                 
                 // 3. Link Spaces belonging to this property
-                const coworkingRes = await mongoose.connection.db.collection('coworkingspaces').updateMany(
+                const coworkingRes = await mongoose.connection.db!.collection('coworkingspaces').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );
                 console.log(`- Updated ${coworkingRes.modifiedCount} CoworkingSpaces`);
 
-                const virtualRes = await mongoose.connection.db.collection('virtualoffices').updateMany(
+                const virtualRes = await mongoose.connection.db!.collection('virtualoffices').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );
                 console.log(`- Updated ${virtualRes.modifiedCount} VirtualOffices`);
                 
-                const meetingRes = await mongoose.connection.db.collection('meetingrooms').updateMany(
+                const meetingRes = await mongoose.connection.db!.collection('meetingrooms').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );

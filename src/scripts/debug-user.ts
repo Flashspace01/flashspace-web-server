@@ -10,7 +10,7 @@ async function debug() {
         await mongoose.connect(process.env.DB_URI || '');
         console.log('Connected!');
 
-        const user = await mongoose.connection.db.collection('users').findOne({ email: 'alpineabhishek@gmail.com' });
+        const user = await mongoose.connection.db!.collection('users').findOne({ email: 'alpineabhishek@gmail.com' });
         
         if (user) {
             console.log('USER FOUND:');
@@ -21,9 +21,9 @@ async function debug() {
             console.log('- isActive:', user.isActive);
         } else {
             console.log('USER NOT FOUND IN CURRENT DATABASE!');
-            const dbs = await mongoose.connection.db.admin().listDatabases();
+            const dbs = await mongoose.connection.db!.admin().listDatabases();
             console.log('Available Databases:', dbs.databases.map(d => d.name));
-            console.log('Current DB Name:', mongoose.connection.db.databaseName);
+            console.log('Current DB Name:', mongoose.connection.db!.databaseName);
         }
 
         process.exit(0);

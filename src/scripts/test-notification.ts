@@ -36,7 +36,7 @@ const runTest = async () => {
             "Hello User! Your booking is confirmed.",
             NotificationType.SUCCESS
         );
-        console.log("✅ User Notification Created:", userNotif._id);
+        console.log("✅ User Notification Created:", userNotif!._id);
 
         console.log("Phase 1 Verification Successful: DB persistence works.");
         console.log("Socket emission would happen here if server was fully listening.");
