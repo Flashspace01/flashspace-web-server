@@ -1,4 +1,5 @@
 import { Router } from "express";
+console.log("[DEBUG] mainRoutes.ts is being loaded...");
 import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes";
 // import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtualOffice.routes";
@@ -26,6 +27,8 @@ import partnerInvoiceRoutes from "./flashspaceWeb/partnerInvoiceModule/partnerIn
 
 export const mainRoutes = Router();
 
+// DEBUG: Catch all routes for partnerInvoices
+mainRoutes.use("/partnerInvoices", partnerInvoiceRoutes);
 
 import mongoose from "mongoose";
 
@@ -42,6 +45,13 @@ mainRoutes.get("/health", (req, res) => {
 
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
+
+// /api/partnerInvoices
+// Already moved to top for priority
+
+mainRoutes.get("/test-invoices", (req, res) => {
+  res.json({ success: true, message: "Partner invoices route is reachable" });
+});
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/affiliate (Affiliate Portal APIs)
@@ -92,4 +102,5 @@ mainRoutes.use("/chat", chatRoutes);
 // /api/leads
 mainRoutes.use("/leads", leadRoutes);
 
-mainRoutes.use("/partnerInvoices", partnerInvoiceRoutes);
+console.log("[DEBUG] mainRoutes.ts registration complete.");
+
