@@ -98,6 +98,9 @@ export class SpaceUserKyc {
 
   // ------------------- PER-DOCUMENT REVIEW STATUS -------------------
   // Existing
+  @prop({ trim: true })
+  public aadhaarImageUrl?: string;
+
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],
     default: "not_started",
@@ -106,6 +109,9 @@ export class SpaceUserKyc {
 
   @prop({ trim: true })
   public aadhaarImageRejectMessage?: string;
+
+  @prop({ trim: true })
+  public panImageUrl?: string;
 
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],
@@ -188,12 +194,6 @@ export class SpaceUserKyc {
 
   @prop({ trim: true })
   public overallRejectMessage?: string;
-
-  @prop({
-    enum: ["not_started", "pending", "approved", "rejected"],
-    default: "not_started",
-  })
-  public kycStatus!: KycDecisionStatus;
 }
 
 export const SpaceUserKycModel = getModelForClass(SpaceUserKyc);
