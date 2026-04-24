@@ -5,6 +5,7 @@ import { PropertyService } from "../propertyModule/property.service";
 import { PropertyModel } from "../propertyModule/property.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 
 export class CoworkingSpaceService {
   static generateSeatsForFloors(floors?: any[]) {
@@ -89,6 +90,17 @@ export class CoworkingSpaceService {
       throw new Error("Space not found or unauthorized");
     }
 
+    if (
+      userRole !== UserRole.ADMIN &&
+      (updateData.isActive === true ||
+        updateData.approvalStatus === SpaceApprovalStatus.ACTIVE)
+    ) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        spaceToUpdate.property.toString(),
+      );
+    }
+
     // Update Property Fields
     await PropertyService.updateProperty(
       spaceToUpdate.property.toString(),
@@ -151,7 +163,7 @@ export class CoworkingSpaceService {
       }
     }
 
-    const finalQuery = { ...filter, isDeleted: false };
+    const finalQuery = { isDeleted: false, ...filter };
     const baseQuery = CoworkingSpaceModel.find(finalQuery)
       .populate({
         path: "property",

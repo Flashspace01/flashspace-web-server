@@ -7,6 +7,7 @@ import { getFileUrl as getMulterFileUrl } from "../userDashboardModule/config/mu
 import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 
 const sendError = (
   res: Response,
@@ -27,9 +28,21 @@ export const createProperty = async (req: Request, res: Response) => {
   try {
     console.log("🏨 CreateProperty hit by user:", (req as any).user);
     const partnerId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
     if (!partnerId) {
       console.log("❌ createProperty: No partner ID found in request");
       return sendError(res, 401, "Unauthorized: No partner found");
+    }
+
+    if (
+      userRole !== "admin" &&
+      (req.body?.isActive === true || req.body?.status === "active")
+    ) {
+      return sendError(
+        res,
+        403,
+        "Admin approval is required before publishing a property.",
+      );
     }
 
     const property = new PropertyModel({
@@ -80,6 +93,13 @@ export const updateProperty = async (req: Request, res: Response) => {
           "All property documents must be approved before approving property KYC",
         );
       }
+    }
+
+    if (
+      userRole !== "admin" &&
+      (req.body.isActive === true || req.body.status === "active")
+    ) {
+      await assertPartnerCanActivateSpace(partnerId, String(propertyId));
     }
 
     const updatedProperty = await PropertyModel.findOneAndUpdate(

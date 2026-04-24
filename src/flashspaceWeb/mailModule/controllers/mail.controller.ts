@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import Mail from "../models/mail.model";
+import { UserModel } from "../../authModule/models/user.model";
+import { NotificationType } from "../../notificationModule/models/Notification";
+import { NotificationService } from "../../notificationModule/services/notification.service";
 
 export const createMail = async (req: Request, res: Response) => {
   try {
@@ -34,6 +37,37 @@ export const createMail = async (req: Request, res: Response) => {
     });
 
     await newMail.save();
+
+    // Notify client user (if account exists for the provided email)
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const clientUser = await UserModel.findOne({
+        email: normalizedEmail,
+        isDeleted: { $ne: true },
+      })
+        .select("_id")
+        .lean();
+
+      if (clientUser?._id) {
+        await NotificationService.notifyUser(
+          clientUser._id.toString(),
+          "New Mail Record Added",
+          `A new mail item from ${sender} has been logged for ${space}.`,
+          NotificationType.INFO,
+          {
+            mailId: newMail._id,
+            type: "mail_record",
+            sender,
+            space,
+            actionUrl: "/dashboard/mail-records",
+          },
+          { preferenceKey: "push" },
+        );
+      }
+    } catch (notifError) {
+      console.error("[createMail] Failed to notify client user:", notifError);
+    }
+
     res.status(201).json({ success: true, data: newMail });
   } catch (error) {
     console.error("[createMail] Error:", error);

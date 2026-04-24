@@ -5,6 +5,7 @@ import { PropertyModel } from "../propertyModule/property.model";
 import { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 export class MeetingRoomService {
   static async createRoom(data: any, partnerId: string) {
     let property;
@@ -42,10 +43,19 @@ export class MeetingRoomService {
       query.partner = userId; // Enforce ownership for non-admins
     }
 
+    const updateData: any = { ...data };
+
     // Check if room exists and user is authorized
     const roomToUpdate = await MeetingRoomModel.findOne(query);
     if (!roomToUpdate) {
       throw new Error("Meeting room not found or unauthorized");
+    }
+
+    if (userRole !== UserRole.ADMIN && updateData.isActive === true) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        roomToUpdate.property.toString(),
+      );
     }
 
     // Update Property Fields
