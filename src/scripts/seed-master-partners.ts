@@ -366,7 +366,7 @@ async function seed() {
             const emailPasswordHash = await bcrypt.hash(cleanEmail, 12);
             
             // 1. Find or Create User
-            let user = await mongoose.connection.db.collection('users').findOne({ email: cleanEmail });
+            let user = await mongoose.connection.db!.collection('users').findOne({ email: cleanEmail });
             
             if (!user) {
                 const newUser = {
@@ -382,12 +382,12 @@ async function seed() {
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
-                const res = await mongoose.connection.db.collection('users').insertOne(newUser);
+                const res = await mongoose.connection.db!.collection('users').insertOne(newUser);
                 user = { ...newUser, _id: res.insertedId };
                 console.log(`- Created User: ${user._id}`);
             } else {
                 // Update existing user to ensure they are partner role, password is email, and authProvider is local
-                await mongoose.connection.db.collection('users').updateOne(
+                await mongoose.connection.db!.collection('users').updateOne(
                     { _id: user._id },
                     { 
                         $set: { 
@@ -405,7 +405,7 @@ async function seed() {
 
             // 2. Find Property and Link
             // Multi-stage matching: exact name -> regex name -> address regex
-            const property = await mongoose.connection.db.collection('properties').findOne({ 
+            const property = await mongoose.connection.db!.collection('properties').findOne({ 
                 $or: [
                     { name: p.space_name },
                     { name: new RegExp(p.space_name.split(' - ')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
@@ -414,22 +414,22 @@ async function seed() {
             });
 
             if (property) {
-                await mongoose.connection.db.collection('properties').updateOne(
+                await mongoose.connection.db!.collection('properties').updateOne(
                     { _id: property._id },
                     { $set: { partner: user._id } }
                 );
                 console.log(`- Linked to Property: ${property.name} (${property._id})`);
                 
                 // 3. Link Spaces belonging to this property
-                await mongoose.connection.db.collection('coworkingspaces').updateMany(
+                await mongoose.connection.db!.collection('coworkingspaces').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );
-                await mongoose.connection.db.collection('virtualoffices').updateMany(
+                await mongoose.connection.db!.collection('virtualoffices').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );
-                await mongoose.connection.db.collection('meetingrooms').updateMany(
+                await mongoose.connection.db!.collection('meetingrooms').updateMany(
                     { property: property._id },
                     { $set: { partnerId: user._id } }
                 );

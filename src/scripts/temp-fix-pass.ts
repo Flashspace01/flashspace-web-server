@@ -7,7 +7,7 @@ dotenv.config();
 async function run() {
     try {
         await mongoose.connect(process.env.DB_URI || '');
-        const res = await mongoose.connection.db.collection('users').updateOne(
+        const res = await mongoose.connection.db!.collection('users').updateOne(
             { email: 'testpartner@flashspace.co' },
             { $set: { role: 'user' } }
         );
