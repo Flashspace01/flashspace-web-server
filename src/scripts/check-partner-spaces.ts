@@ -90,7 +90,7 @@ async function checkNames() {
         console.log('Connected to DB...');
         
         for (const p of partners) {
-            const property = await mongoose.connection.db.collection('properties').findOne({ 
+            const property = await mongoose.connection.db!.collection('properties').findOne({ 
                 $or: [
                     { name: p.space_name },
                     { name: new RegExp(p.space_name.split(' - ')[0], 'i') }

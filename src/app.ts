@@ -163,6 +163,9 @@ dbConnection()
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Main API routes
+app.get("/api/super-test", (req, res) => {
+  res.json({ success: true, message: "SUPER TEST - app.ts is working" });
+});
 app.get("/api/test-route", (req, res) => {
   res.json({ success: true, message: "GOT IT - Server is running the latest code" });
 });
@@ -186,3 +189,5 @@ app.use((req, res) => {
 });
 
 // TART - force nodemon restart 2555159050858
+// TART - force nodemon restart 2555159050857
+// TART - force nodemon restart ${Date.now() + 1}
