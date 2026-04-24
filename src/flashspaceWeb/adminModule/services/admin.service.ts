@@ -23,6 +23,8 @@ import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
 import { PropertyModel } from "../../propertyModule/property.model";
+import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancials.model";
+import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
 export class AdminService {
   /**
@@ -1845,7 +1847,7 @@ export class AdminService {
     };
   }
 
-  // Get all invoices (payments)
+  // Get all invoices (payments and partner-uploaded invoices)
   async getAllInvoices(
     user: any,
     page: number = 1,
@@ -1861,90 +1863,211 @@ export class AdminService {
     try {
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       const skip = (page - 1) * limit;
-      const query: any = { isDeleted: { $ne: true } };
 
-      if (!isAdminOrStaff) {
-        const spaceIds = await this.getManagedSpaceIds(user.id);
-        if (spaceIds.length === 0) {
-          return {
-            success: true,
-            message: "Invoices fetched successfully",
-            data: {
-              invoices: [],
-              pagination: { total: 0, page, pages: 0 },
-            },
-          };
-        }
-        query.spaceId = { $in: spaceIds };
-      }
+      const fetchB2C = !filters.type || filters.type === "all" || filters.type === "b2c";
+      const fetchB2B = !filters.type || filters.type === "all" || filters.type === "b2b";
 
-      // Apply Filters
-      if (filters.type && filters.type !== "all") {
-        query.paymentType = filters.type;
-      }
+      console.log(`[AdminService] Fetching invoices. Page: ${page}, Limit: ${limit}, Type: ${filters.type}`);
 
-      if (filters.status && filters.status !== "all") {
-        query.status = filters.status;
-      }
-
-      if (filters.search) {
-        query.$or = [
-          { userName: { $regex: filters.search, $options: "i" } },
-          { userEmail: { $regex: filters.search, $options: "i" } },
-          { razorpayOrderId: { $regex: filters.search, $options: "i" } },
-          { spaceName: { $regex: filters.search, $options: "i" } },
-        ];
-      }
-
+      // Common Date Filter
+      const dateFilter: any = {};
       if (filters.startDate || filters.endDate) {
-        query.createdAt = {};
-        if (filters.startDate) {
-          query.createdAt.$gte = new Date(filters.startDate);
-        }
+        if (filters.startDate) dateFilter.$gte = new Date(filters.startDate);
         if (filters.endDate) {
-          const endDate = new Date(filters.endDate);
-          endDate.setHours(23, 59, 59, 999);
-          query.createdAt.$lte = endDate;
+          const end = new Date(filters.endDate);
+          end.setHours(23, 59, 59, 999);
+          dateFilter.$lte = end;
         }
       }
 
-      // Fetch payments (invoices)
-      const payments = await PaymentModel.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
+      // ── B2C Promise (PaymentModel) ────────────────────────────────
+      const b2cPromise = (async () => {
+        if (!fetchB2C) return { data: [], count: 0 };
 
-      // Get invoice details for these payments
-      const paymentIds = payments.map((p) => p._id.toString());
-      const invoices = await InvoiceModel.find({
-        payment: { $in: paymentIds },
-        isDeleted: { $ne: true },
-      }).lean();
+        const b2cQuery: any = { isDeleted: { $ne: true } };
+        if (!isAdminOrStaff) {
+          const spaceIds = await this.getManagedSpaceIds(user.id);
+          if (spaceIds.length === 0) return { data: [], count: 0 };
+          b2cQuery.spaceId = { $in: spaceIds };
+        }
 
-      // Merge invoice data (like invoiceNumber) into payment data
-      const mergedData = payments.map((payment) => {
-        const invoice = invoices.find(
-          (inv) => inv.payment?.toString() === payment._id.toString(),
-        );
-        return {
-          ...payment,
-          invoiceNumber: invoice?.invoiceNumber || "N/A",
-          invoiceId: invoice?._id || null,
-        };
-      });
+        if (filters.status && filters.status !== "all") {
+          b2cQuery.status = filters.status;
+        }
 
-      const total = await PaymentModel.countDocuments(query);
+        if (filters.search) {
+          b2cQuery.$or = [
+            { userName: { $regex: filters.search, $options: "i" } },
+            { userEmail: { $regex: filters.search, $options: "i" } },
+            { razorpayOrderId: { $regex: filters.search, $options: "i" } },
+            { spaceName: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          b2cQuery.createdAt = dateFilter;
+        }
+
+        const [payments, count] = await Promise.all([
+          PaymentModel.find(b2cQuery)
+            .sort({ createdAt: -1 })
+            .skip(fetchB2B ? 0 : skip)
+            .limit(fetchB2B ? 500 : limit) // Buffer for merging
+            .lean(),
+          PaymentModel.countDocuments(b2cQuery),
+        ]);
+
+        // Get invoice numbers for payments
+        const paymentIds = payments.map((p) => p._id.toString());
+        const invoices = await InvoiceModel.find({
+          payment: { $in: paymentIds },
+        }).select("payment invoiceNumber").lean();
+
+        const data = payments.map((p) => {
+          const inv = invoices.find((i) => i.payment?.toString() === p._id.toString());
+          return {
+            ...p,
+            _id: p._id,
+            invoiceNumber: inv?.invoiceNumber || "N/A",
+            invoiceType: "B2C",
+          };
+        });
+
+        return { data, count };
+      })();
+
+      // ── B2B Manual Promise (PartnerInvoice) ──────────────────────
+      const b2bManualPromise = (async () => {
+        if (!fetchB2B) return { data: [], count: 0 };
+
+        const b2bQuery: any = {};
+        // If not admin, filter by partnerId (current user)
+        if (!isAdminOrStaff) {
+          b2bQuery.partnerId = user.id;
+        }
+
+        if (filters.status && filters.status !== "all") {
+          // Map B2C statuses to B2B if needed, or assume they are similar
+          b2bQuery.status = filters.status.charAt(0).toUpperCase() + filters.status.slice(1);
+        }
+
+        if (filters.search) {
+          b2bQuery.$or = [
+            { invoiceId: { $regex: filters.search, $options: "i" } },
+            { client: { $regex: filters.search, $options: "i" } },
+            { space: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          b2bQuery.createdAt = dateFilter;
+        }
+
+        const [partnerInvoices, count] = await Promise.all([
+          PartnerInvoice.find(b2bQuery)
+            .sort({ createdAt: -1 })
+            .skip(fetchB2C ? 0 : skip)
+            .limit(fetchB2C ? 500 : limit)
+            .lean(),
+          PartnerInvoice.countDocuments(b2bQuery),
+        ]);
+
+        const data = partnerInvoices.map((inv) => ({
+          _id: inv._id,
+          invoiceNumber: inv.invoiceId,
+          userName: inv.client,
+          userEmail: "N/A",
+          totalAmount: inv.amount,
+          status: inv.status?.toLowerCase() || "pending",
+          paymentType: "partner_invoice",
+          spaceName: inv.space,
+          planName: inv.description,
+          createdAt: inv.createdAt,
+          razorpayOrderId: "MANUAL",
+          invoiceType: "B2B_MANUAL",
+        }));
+
+        return { data, count };
+      })();
+
+      // ── B2B Uploaded Promise (PartnerInvoiceModel) ────────────────
+      const b2bUploadedPromise = (async () => {
+        if (!fetchB2B) return { data: [], count: 0 };
+
+        const uploadedQuery: any = {};
+        if (!isAdminOrStaff) {
+          uploadedQuery.partnerId = user.id;
+        }
+
+        if (filters.status && filters.status !== "all") {
+          uploadedQuery.status = filters.status.charAt(0).toUpperCase() + filters.status.slice(1);
+        }
+
+        if (filters.search) {
+          uploadedQuery.$or = [
+            { invoiceNumber: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          uploadedQuery.createdAt = dateFilter;
+        }
+
+        const [uploadedInvoices, count] = await Promise.all([
+          PartnerInvoiceModel.find(uploadedQuery)
+            .populate("partnerId", "fullName email")
+            .sort({ createdAt: -1 })
+            .skip(fetchB2C ? 0 : skip)
+            .limit(fetchB2C ? 500 : limit)
+            .lean(),
+          PartnerInvoiceModel.countDocuments(uploadedQuery),
+        ]);
+
+        const data = uploadedInvoices.map((inv: any) => ({
+          _id: inv._id,
+          invoiceNumber: inv.invoiceNumber,
+          userName: inv.partnerId?.fullName || "Partner",
+          userEmail: inv.partnerId?.email || "N/A",
+          totalAmount: inv.amount,
+          status: inv.status?.toLowerCase() || "pending",
+          paymentType: "partner_invoice",
+          spaceName: "Partner Upload",
+          planName: "Physical Invoice",
+          createdAt: inv.createdAt,
+          razorpayOrderId: "UPLOADED",
+          invoiceType: "B2B_UPLOAD",
+          fileUrl: inv.fileUrl
+        }));
+
+        return { data, count };
+      })();
+
+      // ── Execute and Merge ────────────────────────────────────────
+      const [b2cRes, b2bManRes, b2bUpRes] = await Promise.all([
+        b2cPromise,
+        b2bManualPromise,
+        b2bUploadedPromise
+      ]);
+
+      let combined = [...b2cRes.data, ...b2bManRes.data, ...b2bUpRes.data];
+      combined.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const totalCount = b2cRes.count + b2bManRes.count + b2bUpRes.count;
+      
+      // If "all" or multiple types, slice from the merged result
+      const finalData = (!filters.type || filters.type === "all")
+        ? combined.slice(skip, skip + limit)
+        : combined;
 
       return {
         success: true,
         message: "Invoices fetched successfully",
         data: {
-          invoices: mergedData,
+          invoices: finalData,
           pagination: {
-            total,
+            total: totalCount,
             page,
-            pages: Math.ceil(total / limit),
+            pages: Math.ceil(totalCount / limit),
           },
         },
       };
