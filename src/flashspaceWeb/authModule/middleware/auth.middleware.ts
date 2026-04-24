@@ -16,6 +16,7 @@ export class AuthMiddleware {
     try {
       console.log("[AuthMiddleware.authenticate] Incoming request:", {
         path: req.path,
+        originalUrl: req.originalUrl,
         method: req.method,
       });
 
