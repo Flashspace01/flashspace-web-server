@@ -46,6 +46,16 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/partners
+  static async getPartnerUsers(req: Request, res: Response) {
+    const result = await adminService.getPartnerUsers();
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
   // GET /api/admin/kyc/pending
   static async getPendingKYC(req: Request, res: Response) {
     const result = await adminService.getPendingKYC(req.user);
@@ -361,7 +371,20 @@ export class AdminController {
     res.status(result.success ? 200 : 500).json(result);
   }
 
-  // --- B2B2C Space Onboarding ---
+  // GET /api/admin/spaces
+  static async getAllSpaces(req: Request, res: Response) {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const { city, partner, search, deleted } = req.query;
+
+    const result = await adminService.getAllSpaces(page, limit, {
+      city: city as string,
+      partner: partner as string,
+      search: search as string,
+      deleted: deleted as string,
+    });
+    res.status(result.success ? 200 : 500).json(result);
+  }
 
   // GET /api/admin/spaces/pending
   static async getPendingSpaces(req: Request, res: Response) {
@@ -395,5 +418,26 @@ export class AdminController {
     } else {
       res.status(500).json(result);
     }
+  }
+
+  // POST /api/admin/spaces/list-on-behalf
+  static async listSpaceOnBehalf(req: Request, res: Response) {
+    const { partnerId, spaceType, propertyData, spaceData } = req.body;
+
+    if (!partnerId || !spaceType || !propertyData || !spaceData) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: partnerId, spaceType, propertyData, and spaceData are required.",
+      });
+    }
+
+    const result = await adminService.listSpaceOnBehalf(
+      partnerId,
+      spaceType,
+      propertyData,
+      spaceData
+    );
+
+    res.status(result.success ? 201 : 500).json(result);
   }
 }

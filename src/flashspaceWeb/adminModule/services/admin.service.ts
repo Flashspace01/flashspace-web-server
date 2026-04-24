@@ -22,7 +22,7 @@ import { PaymentModel } from "../../paymentModule/payment.model";
 import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
-import { PropertyModel } from "../../propertyModule/property.model";
+import { PropertyModel, KYCStatus, PropertyStatus } from "../../propertyModule/property.model";
 import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancials.model";
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
@@ -287,6 +287,31 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch users",
+        error: error.message,
+      };
+    }
+  }
+
+  async getPartnerUsers(): Promise<ApiResponse<any>> {
+    try {
+      const partners = await UserModel.find({
+        role: UserRole.PARTNER,
+        isDeleted: { $ne: true },
+      })
+        .sort({ fullName: 1, createdAt: -1 })
+        .select("_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt");
+
+      return {
+        success: true,
+        message: "Partner users fetched successfully",
+        data: {
+          partners,
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to fetch partner users",
         error: error.message,
       };
     }
@@ -1703,6 +1728,88 @@ export class AdminService {
     }
   }
 
+  async getAllSpaces(
+    page: number = 1,
+    limit: number = 20,
+    filters: { city?: string; partner?: string; search?: string; deleted?: string } = {}
+  ): Promise<ApiResponse<any>> {
+    try {
+      const skip = (page - 1) * limit;
+      const baseFilter: any = { isDeleted: String(filters.deleted) === "true" };
+
+      if (filters.city) baseFilter.city = new RegExp(`^${filters.city}$`, "i");
+      if (filters.partner) baseFilter.partner = filters.partner;
+
+      const [vo, cs, mr] = await Promise.all([
+        VirtualOfficeModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+        CoworkingSpaceModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+        MeetingRoomModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+      ]);
+
+      const mapSpace = (space: any, type: string) => {
+        const obj = space.toObject();
+        return {
+          ...obj,
+          spaceType: type,
+          // Extract property fields for easier frontend consumption
+          propertyName: obj.property?.name,
+          propertyCity: obj.property?.city,
+          propertyAddress: obj.property?.address,
+        };
+      };
+
+      let allSpaces = [
+        ...vo.map((s) => mapSpace(s, "virtual_office")),
+        ...cs.map((s) => mapSpace(s, "coworking")),
+        ...mr.map((s) => mapSpace(s, "meeting_room")),
+      ];
+
+      // Manual search filter if search term provided
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        allSpaces = allSpaces.filter(
+          (s) =>
+            s.name?.toLowerCase().includes(search) ||
+            s.propertyName?.toLowerCase().includes(search) ||
+            s.propertyAddress?.toLowerCase().includes(search) ||
+            (s.partner as any)?.fullName?.toLowerCase().includes(search) ||
+             (s.partner as any)?.email?.toLowerCase().includes(search)
+        );
+      }
+
+      const totalCount = allSpaces.length;
+      const paginatedSpaces = allSpaces
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(skip, skip + limit);
+
+      return {
+        success: true,
+        message: "All spaces fetched successfully",
+        data: {
+          spaces: paginatedSpaces,
+          pagination: {
+            total: totalCount,
+            page,
+            pages: Math.ceil(totalCount / limit),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("Error fetching all spaces:", error);
+      return {
+        success: false,
+        message: "Failed to fetch spaces",
+        error: error.message,
+      };
+    }
+  }
+
   // --- B2B2C Space Onboarding ---
 
   async getPendingSpaces(): Promise<ApiResponse<any>> {
@@ -1834,6 +1941,75 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to approve space",
+        error: error.message,
+      };
+    }
+  }
+
+  // Admin listing space on behalf of partner
+  async listSpaceOnBehalf(
+    partnerId: string,
+    spaceType: "coworking" | "meeting_room" | "virtual_office",
+    propertyData: any,
+    spaceData: any
+  ): Promise<ApiResponse<any>> {
+    try {
+      // 1. Create Property with Approved Status
+      const property = new PropertyModel({
+        ...propertyData,
+        partner: partnerId,
+        kycStatus: KYCStatus.APPROVED,
+        status: PropertyStatus.ACTIVE,
+        isActive: true,
+      });
+      await property.save();
+
+      // 2. Create Space based on type
+      let space;
+      const commonData = {
+        ...spaceData,
+        property: property._id,
+        partner: partnerId,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
+        isActive: true,
+      };
+
+      if (spaceType === "coworking") {
+        space = new CoworkingSpaceModel({
+          ...commonData,
+          finalPricePerMonth: (spaceData.partnerPricePerMonth || 0) + (spaceData.adminMarkupPerMonth || 0),
+        });
+      } else if (spaceType === "meeting_room") {
+        space = new MeetingRoomModel({
+          ...commonData,
+          finalPricePerHour: (spaceData.partnerPricePerHour || 0) + (spaceData.adminMarkupPerHour || 0),
+          finalPricePerDay: (spaceData.partnerPricePerDay || 0) + (spaceData.adminMarkupPerDay || 0),
+        });
+      } else if (spaceType === "virtual_office") {
+        space = new VirtualOfficeModel({
+          ...commonData,
+          finalGstPricePerYear: (spaceData.partnerGstPricePerYear || 0) + (spaceData.adminMarkupGstPerYear || 0),
+          finalMailingPricePerYear: (spaceData.partnerMailingPricePerYear || 0) + (spaceData.adminMarkupMailingPerYear || 0),
+          finalBrPricePerYear: (spaceData.partnerBrPricePerYear || 0) + (spaceData.adminMarkupBrPerYear || 0),
+        });
+      }
+
+      if (!space) {
+        return { success: false, message: "Invalid space type" };
+      }
+
+      await space.save();
+
+      return {
+        success: true,
+        message: "Space listed and activated on behalf of partner successfully",
+        data: { property, space },
+      };
+    } catch (error: any) {
+      console.error("List space on behalf error:", error);
+      return {
+        success: false,
+        message: "Failed to list space on behalf",
         error: error.message,
       };
     }

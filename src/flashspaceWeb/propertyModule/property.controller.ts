@@ -27,26 +27,28 @@ const sendError = (
 export const createProperty = async (req: Request, res: Response) => {
   try {
     console.log("🏨 CreateProperty hit by user:", (req as any).user);
-    const partnerId = (req as any).user?.id;
+    const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
+    
+    // If admin is creating, they can specify a partner in the body
+    let partnerId = userId;
+    if (userRole === "admin" && req.body.partner) {
+      partnerId = req.body.partner;
+      console.log(`👑 Admin is assigning property to partner: ${partnerId}`);
+    } else if (userRole === "admin" && req.body.partnerId) {
+       partnerId = req.body.partnerId;
+       console.log(`👑 Admin is assigning property to partnerId: ${partnerId}`);
+    }
+
     if (!partnerId) {
-      console.log("❌ createProperty: No partner ID found in request");
+      console.log("❌ createProperty: No partner ID found in request or body");
       return sendError(res, 401, "Unauthorized: No partner found");
     }
 
-    if (
-      userRole !== "admin" &&
-      (req.body?.isActive === true || req.body?.status === "active")
-    ) {
-      return sendError(
-        res,
-        403,
-        "Admin approval is required before publishing a property.",
-      );
-    }
+    const { partner: _, partnerId: __, ...otherData } = req.body;
 
     const property = new PropertyModel({
-      ...req.body,
+      ...otherData,
       partner: partnerId,
     });
 
@@ -67,15 +69,29 @@ export const updateProperty = async (req: Request, res: Response) => {
     const { propertyId } = req.params;
     const partnerId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
+    const canManageAllSpaces =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "space_partner_manager";
 
     const query: any = { _id: propertyId };
-    if (userRole !== "admin") {
+    if (!canManageAllSpaces) {
       query.partner = partnerId;
+    }
+
+    const updateData: any = { ...req.body };
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
     }
 
     // 1. ADDED: Validation to ensure all documents are approved before KYC approval
     // Skip this check for admins as they may be manually publishing/overriding
-    if (req.body.kycStatus === "approved" && userRole !== "admin") {
+    if (updateData.kycStatus === "approved" && !canManageAllSpaces) {
       const property = await PropertyModel.findById(propertyId);
       if (!property) {
         return sendError(res, 404, "Property not found");
@@ -96,15 +112,15 @@ export const updateProperty = async (req: Request, res: Response) => {
     }
 
     if (
-      userRole !== "admin" &&
-      (req.body.isActive === true || req.body.status === "active")
+      !canManageAllSpaces &&
+      (updateData.isActive === true || updateData.status === "active")
     ) {
       await assertPartnerCanActivateSpace(partnerId, String(propertyId));
     }
 
     const updatedProperty = await PropertyModel.findOneAndUpdate(
       query,
-      { $set: req.body },
+      { $set: updateData },
       { new: true, runValidators: true },
     );
 

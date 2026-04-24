@@ -33,6 +33,7 @@ export class PropertyService {
     if (data.kycRejectionReason)
       updateData.kycRejectionReason = data.kycRejectionReason;
     if (data.spaceId) updateData.spaceId = data.spaceId;
+    if (data.partner) updateData.partner = data.partner;
 
     if (Object.keys(updateData).length === 0) return null;
 
