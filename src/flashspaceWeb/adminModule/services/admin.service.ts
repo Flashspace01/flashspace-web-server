@@ -214,6 +214,88 @@ export class AdminService {
     }
   }
 
+  // Get all partners and their details
+  async getPartners(
+    page: number = 1,
+    limit: number = 50,
+    search?: string,
+  ): Promise<ApiResponse<any>> {
+    try {
+      const skip = (page - 1) * limit;
+      const query: any = {
+        role: UserRole.PARTNER,
+        isDeleted: false,
+      };
+
+      if (search) {
+        query.$or = [
+          { fullName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { phoneNumber: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const partners = await UserModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const total = await UserModel.countDocuments(query);
+
+      // Fetch all active properties to map them to partners
+      const allProperties = await PropertyModel.find({
+        isDeleted: false,
+      })
+        .select("name city area partner")
+        .lean();
+
+      // Map properties to each partner
+      const partnerDetails = partners.map((partner: any) => {
+        const properties = allProperties.filter(
+          (p: any) => p.partner?.toString() === partner._id.toString(),
+        );
+
+        const spaces = properties.map((p: any) => ({
+          name: p.name,
+          type: "Property",
+          location: `${p.city}, ${p.area}`,
+        }));
+
+        return {
+          id: partner._id,
+          name: partner.fullName,
+          email: partner.email,
+          phone: partner.phoneNumber || "N/A",
+          totalSpaces: spaces.length,
+          spaces: spaces,
+          kycVerified: partner.kycVerified,
+          createdAt: partner.createdAt,
+        };
+      });
+
+      return {
+        success: true,
+        message: "Partners fetched successfully",
+        data: {
+          partners: partnerDetails,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("Error in getPartners:", error);
+      return {
+        success: false,
+        message: "Failed to fetch partners",
+        error: error.message,
+      };
+    }
+  }
+
   // Get all users (Admin only usually, but logic kept generic if needed)
   async getUsers(
     page: number = 1,

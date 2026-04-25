@@ -114,6 +114,21 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/partners
+  static async getPartners(req: Request, res: Response) {
+    console.log(`[DEBUG] Controller: getPartners hit. Search: ${req.query.search}`);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const search = req.query.search as string;
+
+    const result = await adminService.getPartners(page, limit, search);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
   // GET /api/admin/clients/:clientId
   static async getClientDetails(req: Request, res: Response) {
     const clientId = req.params.clientId as string;

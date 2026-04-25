@@ -145,6 +145,7 @@ app.use((req, res, next) => {
 dbConnection()
   .then(() => {
     console.log("Database connection established successfully.");
+    console.log(`[SERVER] Started/Restarted at: ${new Date().toISOString()}`);
 
     // Start server with feedback and explicit host binding
     const HOST = process.env.HOST || "0.0.0.0";

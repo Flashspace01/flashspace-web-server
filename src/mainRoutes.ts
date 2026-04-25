@@ -9,6 +9,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+console.log("[DEBUG] adminRoutes imported successfully");
 import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
@@ -43,11 +44,11 @@ mainRoutes.get("/health", (req, res) => {
   });
 });
 
+// /api/admin (Admin Dashboard APIs)
+mainRoutes.use("/admin", adminRoutes);
+
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
-
-// /api/partnerInvoices
-// Already moved to top for priority
 
 mainRoutes.get("/test-invoices", (req, res) => {
   res.json({ success: true, message: "Partner invoices route is reachable" });
@@ -68,8 +69,6 @@ mainRoutes.use("/partnerInquiry", partnerInquiryRoutes);
 mainRoutes.use("/payment", paymentRoutes);
 // /api/user (Dashboard APIs)
 mainRoutes.use("/user", userDashboardRoutes);
-// /api/admin (Admin Dashboard APIs)
-mainRoutes.use("/admin", adminRoutes);
 // /api/spacePartner
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
