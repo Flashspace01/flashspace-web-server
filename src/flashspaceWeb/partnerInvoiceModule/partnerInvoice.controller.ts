@@ -3,6 +3,7 @@ import { PartnerInvoiceModel } from "./partnerInvoice.model";
 import { UserModel, UserRole } from "../authModule/models/user.model";
 import path from "path";
 import { getIO } from "../../socket";
+import { backupUploadedFile } from "../shared/utils/uploadedFileStore";
 
 // Upload a new invoice (Partner)
 export const uploadInvoice = async (req: Request, res: Response): Promise<any> => {
@@ -27,6 +28,17 @@ export const uploadInvoice = async (req: Request, res: Response): Promise<any> =
     }
 
     const fileUrl = `/uploads/invoices/${req.file.filename}`;
+    const localFilePath = path.join(
+      __dirname,
+      "../../../uploads/invoices",
+      req.file.filename,
+    );
+
+    await backupUploadedFile(fileUrl, localFilePath, {
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+      source: "partner-invoice",
+    });
 
     const newInvoice = new PartnerInvoiceModel({
       partnerId: user.id,

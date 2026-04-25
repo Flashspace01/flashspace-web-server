@@ -13,6 +13,9 @@ dist-ssr
 *.local
 doc.json
 
+# Runtime user uploads - stored outside Git
+uploads/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
