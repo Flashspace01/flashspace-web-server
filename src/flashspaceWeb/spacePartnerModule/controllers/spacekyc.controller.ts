@@ -12,6 +12,7 @@ import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.mode
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { UserModel } from "../../authModule/models/user.model";
+import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
 
 // Create or update space user KYC business information
 export const upsertSpaceUserKycBusinessInfo = async (
@@ -182,19 +183,22 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     const kyc = await SpaceUserKycModel.findOne({ userId });
     const user = await UserModel.findById(userId);
     const firstProperty = await PropertyModel.findOne({ partner: userId });
+    const kycObject = kyc ? kyc.toObject() : {};
 
     // Construct the data object as requested:
     // 1. Business & Bank details from Property
     // 2. Documents & Status from SpaceUserKyc
     
     const data = {
+      userId,
+      overallStatus: "not_started",
+      kycStatus: "not_started",
+      ...kycObject,
+
       // Basic Info from User/Property
       fullName: user?.fullName || kyc?.fullName || "",
       email: user?.email || kyc?.email || "",
       phoneNumber: user?.phoneNumber || kyc?.phoneNumber || "",
-
-      // Document URLs & Statuses from SpaceUserKyc (keep original object structure if kyc exists)
-      ...(kyc ? kyc.toObject() : {}),
 
       // Ensure Property fields take precedence over KYC fields for business/bank
       companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
@@ -585,6 +589,17 @@ export const reviewSpaceUserKycOverall = async (
       status === "rejected" ? rejectMessage : undefined;
 
     await kyc.save();
+
+    if (status === "approved") {
+      const properties = await PropertyModel.find({ partner: userId }).select(
+        "_id",
+      );
+      await Promise.all(
+        properties.map((property) =>
+          checkAndAdvanceSpaceStatus(userId, property._id.toString()),
+        ),
+      );
+    }
 
     return res.status(200).json({
       success: true,
