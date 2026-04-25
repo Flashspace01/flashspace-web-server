@@ -400,7 +400,10 @@ export class AdminService {
   }
 
   // Get pending KYC requests
-  async getPendingKYC(user: any): Promise<ApiResponse<any>> {
+  async getPendingKYC(
+    user: any,
+    includeApproved: boolean = false,
+  ): Promise<ApiResponse<any>> {
     try {
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let bookingIds: string[] = [];
@@ -424,7 +427,9 @@ export class AdminService {
 
       const query: any = {
         isDeleted: false,
-        overallStatus: { $nin: ["in_progress", "not_started"] },
+        overallStatus: includeApproved
+          ? { $nin: ["in_progress", "not_started"] }
+          : { $in: ["pending", "resubmit"] },
       };
 
       // If partner, filter KYC docs by linkedBookings
@@ -433,12 +438,18 @@ export class AdminService {
       }
 
       const kycDocs = await KYCDocumentModel.find(query)
+        .select(
+          "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress partnerCount businessInfoCount createdAt updatedAt",
+        )
         .populate("user", "fullName email phoneNumber")
-        .sort({ updatedAt: -1 });
+        .sort({ updatedAt: -1 })
+        .lean();
 
       return {
         success: true,
-        message: "Pending KYC requests fetched successfully",
+        message: includeApproved
+          ? "KYC requests fetched successfully"
+          : "Pending KYC requests fetched successfully",
         data: kycDocs,
       };
     } catch (error: any) {
@@ -2258,7 +2269,14 @@ export class AdminService {
         }
 
         if (filters.status && filters.status !== "all") {
-          uploadedQuery.status = filters.status.charAt(0).toUpperCase() + filters.status.slice(1);
+          const normalizedStatus =
+            filters.status.toLowerCase() === "paid" ||
+            filters.status.toLowerCase() === "completed"
+              ? "Paid"
+              : "Pending";
+          uploadedQuery.status = {
+            $in: [normalizedStatus, normalizedStatus.toUpperCase()],
+          };
         }
 
         if (filters.search) {
@@ -2294,7 +2312,8 @@ export class AdminService {
           createdAt: inv.createdAt,
           razorpayOrderId: "UPLOADED",
           invoiceType: "B2B_UPLOAD",
-          fileUrl: inv.fileUrl
+          fileUrl: inv.fileUrl,
+          paymentDetails: inv.paymentDetails,
         }));
 
         return { data, count };

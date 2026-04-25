@@ -58,7 +58,9 @@ export class AdminController {
 
   // GET /api/admin/kyc/pending
   static async getPendingKYC(req: Request, res: Response) {
-    const result = await adminService.getPendingKYC(req.user);
+    const includeApproved =
+      String(req.query.includeApproved || "").toLowerCase() === "true";
+    const result = await adminService.getPendingKYC(req.user, includeApproved);
     if (result.success) {
       res.status(200).json(result);
     } else {

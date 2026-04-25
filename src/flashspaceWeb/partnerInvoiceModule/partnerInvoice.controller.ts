@@ -2,8 +2,89 @@ import { Request, Response } from "express";
 import { PartnerInvoiceModel } from "./partnerInvoice.model";
 import { UserModel, UserRole } from "../authModule/models/user.model";
 import path from "path";
+import fs from "fs/promises";
 import { getIO } from "../../socket";
 import { backupUploadedFile } from "../shared/utils/uploadedFileStore";
+import { createWorker } from "tesseract.js";
+
+const INVOICE_UPLOADS_DIR = path.join(__dirname, "../../../uploads/invoices");
+const TESSERACT_CACHE_DIR = path.join(process.cwd(), ".tesseract-cache");
+
+let paymentOcrWorkerPromise: ReturnType<typeof createWorker> | null = null;
+let paymentOcrQueue: Promise<void> = Promise.resolve();
+
+const getPaymentOcrWorker = () => {
+  if (!paymentOcrWorkerPromise) {
+    paymentOcrWorkerPromise = createWorker("eng", undefined, {
+      cachePath: TESSERACT_CACHE_DIR,
+    }).catch((error) => {
+      paymentOcrWorkerPromise = null;
+      throw error;
+    });
+  }
+
+  return paymentOcrWorkerPromise;
+};
+
+const recognizePaymentProof = (filePath: string) => {
+  const run = async () => {
+    const worker = await getPaymentOcrWorker();
+    return worker.recognize(filePath);
+  };
+
+  const task = paymentOcrQueue.then(run, run);
+  paymentOcrQueue = task.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return task;
+};
+
+const normalizeInvoiceStatus = (status?: string) =>
+  String(status || "").toUpperCase() === "PAID" ? "Paid" : "Pending";
+
+const normalizeFetchMode = (mode?: string) =>
+  String(mode || "").toUpperCase() === "AUTO" ? "AUTO" : "MANUAL";
+
+export const extractUtrFromText = (rawText = "") => {
+  const text = rawText.replace(/\s+/g, " ").trim();
+  const keywordPatterns = [
+    /\bUTR\b\s*(?:No\.?|Number|ID)?\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+    /\b(?:Ref|Reference)\.?\s*(?:No\.?|Number|ID)?\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+    /\bTransaction\s*(?:ID|No\.?|Number)?\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+    /\bTxn\.?\s*(?:ID|No\.?|Number)?\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+    /\bBank\s*(?:Ref|Reference)\.?\s*(?:No\.?|Number|ID)?\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+    /\bRRN\b\s*[:#.-]?\s*([A-Z0-9][A-Z0-9\s-]{7,40})/i,
+  ];
+
+  const cleanCandidate = (candidate?: string) => {
+    const cleaned = candidate?.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+    if (!cleaned || cleaned.length < 8 || cleaned.length > 30) return "";
+    if (!/\d/.test(cleaned)) return "";
+    return cleaned;
+  };
+
+  for (const pattern of keywordPatterns) {
+    const candidate = cleanCandidate(text.match(pattern)?.[1]);
+    if (candidate) return candidate;
+  }
+
+  const refLine = text
+    .split(/[|\n\r\u2022]+/)
+    .find((part) => /\b(ref|reference|utr|transaction|txn|rrn)\b/i.test(part));
+  const refLineCandidate = cleanCandidate(
+    refLine?.match(/[A-Z0-9][A-Z0-9\s-]{7,40}/i)?.[0],
+  );
+  if (refLineCandidate) return refLineCandidate;
+
+  const fallbackCandidates = text
+    .toUpperCase()
+    .match(/[A-Z0-9]{8,30}/g)
+    ?.filter((candidate) => /\d/.test(candidate)) || [];
+
+  return fallbackCandidates[0] || "";
+};
 
 // Upload a new invoice (Partner)
 export const uploadInvoice = async (req: Request, res: Response): Promise<any> => {
@@ -28,11 +109,7 @@ export const uploadInvoice = async (req: Request, res: Response): Promise<any> =
     }
 
     const fileUrl = `/uploads/invoices/${req.file.filename}`;
-    const localFilePath = path.join(
-      __dirname,
-      "../../../uploads/invoices",
-      req.file.filename,
-    );
+    const localFilePath = path.join(INVOICE_UPLOADS_DIR, req.file.filename);
 
     await backupUploadedFile(fileUrl, localFilePath, {
       originalName: req.file.originalname,
@@ -79,8 +156,8 @@ export const getPartnerInvoices = async (req: Request, res: Response): Promise<a
     let totalPending = 0;
 
     invoices.forEach(inv => {
-      if (inv.status === "Paid") totalPaid += inv.amount;
-      if (inv.status === "Pending") totalPending += inv.amount;
+      if (normalizeInvoiceStatus(inv.status) === "Paid") totalPaid += inv.amount;
+      if (normalizeInvoiceStatus(inv.status) === "Pending") totalPending += inv.amount;
     });
 
     const totalAmount = totalPaid + totalPending;
@@ -93,8 +170,8 @@ export const getPartnerInvoices = async (req: Request, res: Response): Promise<a
           totalAmount,
           totalPaid,
           totalPending,
-          countPaid: invoices.filter(i => i.status === "Paid").length,
-          countPending: invoices.filter(i => i.status === "Pending").length,
+          countPaid: invoices.filter(i => normalizeInvoiceStatus(i.status) === "Paid").length,
+          countPending: invoices.filter(i => normalizeInvoiceStatus(i.status) === "Pending").length,
           totalCount: totalInvoices
         }
       }
@@ -113,7 +190,12 @@ export const getAllInvoicesAdmin = async (req: Request, res: Response): Promise<
 
     let filter: any = {};
     if (partnerId) filter.partnerId = partnerId;
-    if (status) filter.status = status;
+    if (status) {
+      const normalizedStatus = normalizeInvoiceStatus(String(status));
+      filter.status = {
+        $in: [normalizedStatus, normalizedStatus.toUpperCase()],
+      };
+    }
 
     const invoices = await PartnerInvoiceModel.find(filter)
       .populate("partnerId", "fullName email phoneNumber")
@@ -126,7 +208,7 @@ export const getAllInvoicesAdmin = async (req: Request, res: Response): Promise<
     let countPending = 0;
 
     invoices.forEach((inv: any) => {
-      if (inv.status === "Paid") {
+      if (normalizeInvoiceStatus(inv.status) === "Paid") {
         totalPaid += inv.amount;
         countPaid++;
       } else {
@@ -156,15 +238,136 @@ export const getAllInvoicesAdmin = async (req: Request, res: Response): Promise<
   }
 };
 
+// OCR uploaded payment proof and attempt to extract UTR (Admin)
+export const extractPaymentUtr = async (req: Request, res: Response): Promise<any> => {
+  const file = req.file;
+
+  try {
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment proof file is required",
+      });
+    }
+
+    if (!file.mimetype.startsWith("image/")) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          utrNumber: "",
+          fetchMode: "MANUAL",
+          extractedText: "",
+        },
+        message: "Auto UTR extraction currently supports image proofs. Please enter UTR manually.",
+      });
+    }
+
+    const result = await recognizePaymentProof(file.path);
+    const extractedText = result.data?.text || "";
+    const utrNumber = extractUtrFromText(extractedText);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        utrNumber,
+        fetchMode: utrNumber ? "AUTO" : "MANUAL",
+        extractedText,
+      },
+      message: utrNumber
+        ? "UTR extracted successfully"
+        : "UTR not found. Please enter it manually.",
+    });
+  } catch (error: any) {
+    console.error("Error extracting UTR:", error?.message, error?.stack);
+    return res.status(200).json({
+      success: true,
+      data: {
+        utrNumber: "",
+        fetchMode: "MANUAL",
+        extractedText: "",
+      },
+      message: "Could not auto extract UTR. Please enter it manually.",
+    });
+  } finally {
+    if (file?.path) {
+      fs.unlink(file.path).catch(() => undefined);
+    }
+  }
+};
+
 // Mark invoice as paid (Admin)
 export const markInvoicePaid = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    const { adminNote } = req.body || {};
+    const user = (req as any).user;
+    const {
+      adminNote,
+      paymentMethod,
+      amountPaid,
+      paymentDate,
+      utrNumber,
+      fetchMode,
+    } = req.body || {};
+
+    const missingFields = [
+      ["paymentMethod", paymentMethod],
+      ["amountPaid", amountPaid],
+      ["paymentDate", paymentDate],
+      ["utrNumber", utrNumber],
+      ["paymentProof", req.file],
+    ]
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required payment fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    const parsedAmount = Number(amountPaid);
+    const parsedDate = new Date(paymentDate);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "amountPaid must be a valid positive number",
+      });
+    }
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "paymentDate must be a valid date",
+      });
+    }
 
     console.log("[markInvoicePaid] Marking invoice as paid:", id);
 
-    const updateData: any = { status: "Paid" };
+    const paymentProof = `/uploads/invoices/${req.file!.filename}`;
+    const localFilePath = path.join(INVOICE_UPLOADS_DIR, req.file!.filename);
+
+    await backupUploadedFile(paymentProof, localFilePath, {
+      originalName: req.file!.originalname,
+      contentType: req.file!.mimetype,
+      source: "partner-invoice-payment-proof",
+    });
+
+    const updateData: any = {
+      status: "Paid",
+      paymentDetails: {
+        paymentMethod,
+        amountPaid: parsedAmount,
+        paymentDate: parsedDate,
+        utrNumber: String(utrNumber).trim().toUpperCase(),
+        paymentProof,
+        fetchMode: normalizeFetchMode(fetchMode),
+        markedPaidBy: user?.id,
+        markedPaidAt: new Date(),
+      },
+    };
+
     if (adminNote) {
       updateData.adminNote = adminNote;
     }

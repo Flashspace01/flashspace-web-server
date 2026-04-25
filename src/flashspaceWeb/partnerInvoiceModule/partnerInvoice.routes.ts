@@ -5,7 +5,8 @@ import {
   uploadInvoice, 
   getPartnerInvoices, 
   getAllInvoicesAdmin, 
-  markInvoicePaid 
+  markInvoicePaid,
+  extractPaymentUtr,
 } from "./partnerInvoice.controller";
 import { uploadInvoiceFile } from "./config/multer.config";
 
@@ -35,9 +36,31 @@ router.get(
   getAllInvoicesAdmin
 );
 
+router.post(
+  "/extract-utr",
+  AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  uploadInvoiceFile.single("paymentProof"),
+  extractPaymentUtr
+);
+
+router.post(
+  "/extract-utr/:_cacheBust",
+  AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  uploadInvoiceFile.single("paymentProof"),
+  extractPaymentUtr
+);
+
+router.post(
+  "/payment/extract-utr",
+  AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  uploadInvoiceFile.single("paymentProof"),
+  extractPaymentUtr
+);
+
 router.patch(
   "/:id/pay",
   AuthMiddleware.requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  uploadInvoiceFile.single("paymentProof"),
   markInvoicePaid
 );
 
