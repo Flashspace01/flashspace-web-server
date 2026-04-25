@@ -16,6 +16,10 @@ doc.json
 # Runtime user uploads - stored outside Git
 uploads/
 
+# OCR runtime cache
+.tesseract-cache/
+eng.traineddata
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
