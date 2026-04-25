@@ -133,6 +133,9 @@ export class User extends TimeStamps {
   @prop({ enum: UserRole, default: UserRole.USER })
   public role!: UserRole;
 
+  @prop({ trim: true, unique: true, sparse: true })
+  public partnerId?: string; // e.g., FSP-2024-001
+
   // Account status
   @prop({ default: false })
   public isEmailVerified!: boolean;

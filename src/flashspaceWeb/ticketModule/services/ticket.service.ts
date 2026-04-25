@@ -260,6 +260,11 @@ export class TicketService {
     }
   }
 
+  static async replyToTicket(data: ReplyDTO & { ticketId: string }) {
+    const { ticketId, ...replyData } = data;
+    return this.addReply(ticketId, replyData);
+  }
+
   static async addReply(ticketId: string, data: ReplyDTO) {
     const query: any = { _id: new Types.ObjectId(ticketId) };
     if (data.sender === "user") query.user = new Types.ObjectId(data.userId);
@@ -637,15 +642,15 @@ export class TicketService {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) throw new Error("Ticket not found or access denied");
 
-    ticket.status = TicketStatus.CLOSED;
-    ticket.closedAt = new Date();
+    ticket.status = TicketStatus.RESOLVED;
+    ticket.resolvedAt = new Date();
     await ticket.save();
 
     NotificationService.notifyUser(
       ticket.user.toString(),
-      `Query Closed: ${ticket.ticketNumber}`,
-      `Your query has been closed by the partner.`,
-      NotificationType.INFO,
+      `Query Resolved: ${ticket.ticketNumber}`,
+      `Your query has been marked as resolved by the partner.`,
+      NotificationType.SUCCESS,
       { ticketId: ticket._id },
     );
 

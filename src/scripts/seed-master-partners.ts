@@ -379,6 +379,7 @@ async function seed() {
                     kycVerified: true,
                     isActive: true,
                     authProvider: 'local',
+                    isDeleted: false,
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
@@ -396,6 +397,7 @@ async function seed() {
                             kycVerified: true, 
                             isActive: true,
                             authProvider: 'local',
+                            isDeleted: false,
                             password: emailPasswordHash 
                         } 
                     }
