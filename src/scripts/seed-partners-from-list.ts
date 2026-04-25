@@ -108,6 +108,7 @@ async function seed() {
                     isEmailVerified: true,
                     kycVerified: true,
                     authProvider: 'local',
+                    isDeleted: false,
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
