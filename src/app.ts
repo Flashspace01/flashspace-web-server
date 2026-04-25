@@ -16,6 +16,10 @@ import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
 import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
 import { initSocket } from "./socket"; // Import socket init
+import {
+  backfillLocalUploadsToGridFs,
+  serveUploadedFile,
+} from "./flashspaceWeb/shared/utils/uploadedFileStore";
 
 const PORT: string | number = process.env.PORT || 5000;
 
@@ -152,15 +156,26 @@ dbConnection()
       .on("error", (err: any) => {
         console.error("Failed to start HTTP server:", err?.message || err);
       });
+
+    backfillLocalUploadsToGridFs()
+      .then((result) => {
+        console.log(
+          `[UploadedFileStore] Backfill complete. scanned=${result.scanned}, backedUp=${result.backedUp}, skipped=${result.skipped}, failed=${result.failed}`,
+        );
+      })
+      .catch((err) => {
+        console.error("[UploadedFileStore] Backfill failed:", err);
+      });
   })
   .catch((error: unknown) => {
     console.error("Database connection failed:", error);
     process.exit(1);
   });
 
-// Serve uploaded files statically
-// Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Serve uploaded files. `/api/uploads` is kept as a compatibility alias for
+// older frontend links that were built from an API base URL.
+app.use("/uploads", serveUploadedFile);
+app.use("/api/uploads", serveUploadedFile);
 
 // Main API routes
 app.get("/api/super-test", (req, res) => {

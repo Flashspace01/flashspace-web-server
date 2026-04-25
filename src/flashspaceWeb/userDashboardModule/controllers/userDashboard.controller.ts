@@ -17,6 +17,10 @@ import {
   CreditType,
 } from "../../creditLedgerModule/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
+import {
+  backupUploadedFile,
+  deleteUploadedFileBackup,
+} from "../../shared/utils/uploadedFileStore";
 import { BusinessInfoModel } from "../models/businessInfo.model";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -2377,6 +2381,20 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     console.log("[STEP 4] Profile found. Building document entry...");
     // Generate file URL using the updated helper
     const fileUrl = getMulterFileUrl(file.filename, documentType);
+    const uploadSubDir =
+      documentType === "video_kyc" ? "video-kyc" : "kyc-documents";
+    const localFilePath = path.join(
+      __dirname,
+      "../../../../uploads",
+      uploadSubDir,
+      file.filename,
+    );
+
+    await backupUploadedFile(fileUrl, localFilePath, {
+      originalName: file.originalname,
+      contentType: file.mimetype,
+      source: "kyc-document",
+    });
 
     // Check if document type already exists
     const existingIndex =
@@ -2423,6 +2441,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
+          await deleteUploadedFileBackup(oldDoc.fileUrl);
         } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
@@ -2556,6 +2575,7 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
           });
         }
       }
+      await deleteUploadedFileBackup(docToDelete.fileUrl);
     }
 
     // Update progress/status - only for models that support it
@@ -2897,6 +2917,7 @@ export const deleteKYCProfile = async (req: Request, res: Response) => {
                 console.log(`[deleteKYCProfile] Deleted file: ${filename}`);
               }
             }
+            await deleteUploadedFileBackup(doc.fileUrl);
           } catch (fileErr) {
             console.error(`[deleteKYCProfile] Error deleting file from disk:`, fileErr);
           }
