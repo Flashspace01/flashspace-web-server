@@ -23,6 +23,17 @@ console.log("💰 Finance Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
+
+// 1.1 Partner Management (Renamed for troubleshooting)
+adminRoutes.get(
+  "/space-partners",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getPartners,
+);
+
 // Space Partner KYC Document Review (admin)
 adminRoutes.put(
   "/spacePartner/kyc/document/review",
@@ -354,16 +365,6 @@ adminRoutes.get(
   "/affiliates/:id/stats",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
   AffiliateAdminController.getAffiliateStats,
-);
-
-// 8.1 Leaderboard
-adminRoutes.get(
-  "/leaderboard",
-  RBACMiddleware.requireAnyPermission([
-    Permission.MANAGE_ALL_USERS,
-    Permission.VIEW_DASHBOARD,
-  ]),
-  AdminController.getLeaderboard,
 );
 
 // 9. Finance Management
