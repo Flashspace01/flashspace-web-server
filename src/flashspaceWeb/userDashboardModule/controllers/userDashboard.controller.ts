@@ -3238,8 +3238,9 @@ export const replyToTicket = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const ticket = await TicketService.addReply(ticketId as string, {
-      userId,
+    const ticket = await TicketService.replyToTicket({
+      ticketId: ticketId as string,
+      userId: userId as string,
       sender: "user",
       message,
       attachments,

@@ -260,6 +260,11 @@ export class TicketService {
     }
   }
 
+  static async replyToTicket(data: ReplyDTO & { ticketId: string }) {
+    const { ticketId, ...replyData } = data;
+    return this.addReply(ticketId, replyData);
+  }
+
   static async addReply(ticketId: string, data: ReplyDTO) {
     const query: any = { _id: new Types.ObjectId(ticketId) };
     if (data.sender === "user") query.user = new Types.ObjectId(data.userId);
