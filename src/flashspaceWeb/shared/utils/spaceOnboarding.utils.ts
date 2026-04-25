@@ -1,5 +1,6 @@
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PropertyModel, KYCStatus } from "../../propertyModule/property.model";
+import { SpaceUserKycModel } from "../../spacePartnerModule/models/spaceUserKyc.model";
 import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
@@ -15,10 +16,13 @@ export const checkAndAdvanceSpaceStatus = async (
 ) => {
   try {
     // 1. Check Partner KYC Status
-    const partnerKyc = await KYCDocumentModel.findOne({ user: partnerId }).sort(
-      { createdAt: -1 },
-    );
-    const isPartnerApproved = partnerKyc?.overallStatus === "approved";
+    const [spacePartnerKyc, legacyPartnerKyc] = await Promise.all([
+      SpaceUserKycModel.findOne({ userId: partnerId }).sort({ createdAt: -1 }),
+      KYCDocumentModel.findOne({ user: partnerId }).sort({ createdAt: -1 }),
+    ]);
+    const isPartnerApproved =
+      spacePartnerKyc?.overallStatus === "approved" ||
+      legacyPartnerKyc?.overallStatus === "approved";
 
     // 2. Check Property KYC Status
     const property = await PropertyModel.findById(propertyId);

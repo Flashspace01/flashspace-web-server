@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PropertyModel } from "./property.model";
+import { PropertyModel, KYCStatus } from "./property.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
+import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
 
 const sendError = (
   res: Response,
@@ -126,6 +127,13 @@ export const updateProperty = async (req: Request, res: Response) => {
 
     if (!updatedProperty) {
       return sendError(res, 404, "Property not found or unauthorized");
+    }
+
+    if (updatedProperty.kycStatus === KYCStatus.APPROVED) {
+      await checkAndAdvanceSpaceStatus(
+        updatedProperty.partner.toString(),
+        updatedProperty._id.toString(),
+      );
     }
 
     res.status(200).json({

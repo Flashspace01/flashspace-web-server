@@ -1,15 +1,21 @@
 import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PropertyModel, KYCStatus } from "../../propertyModule/property.model";
+import { SpaceUserKycModel } from "../../spacePartnerModule/models/spaceUserKyc.model";
 
 export const assertPartnerCanActivateSpace = async (
   partnerId: string,
   propertyId: string,
 ) => {
-  const partnerKyc = await KYCDocumentModel.findOne({ user: partnerId }).sort({
-    createdAt: -1,
-  });
+  const [spacePartnerKyc, legacyPartnerKyc] = await Promise.all([
+    SpaceUserKycModel.findOne({ userId: partnerId }).sort({ createdAt: -1 }),
+    KYCDocumentModel.findOne({ user: partnerId }).sort({ createdAt: -1 }),
+  ]);
 
-  if (!partnerKyc || partnerKyc.overallStatus !== "approved") {
+  const isPartnerApproved =
+    spacePartnerKyc?.overallStatus === "approved" ||
+    legacyPartnerKyc?.overallStatus === "approved";
+
+  if (!isPartnerApproved) {
     throw new Error(
       "Personal KYC must be approved before activating this space.",
     );
