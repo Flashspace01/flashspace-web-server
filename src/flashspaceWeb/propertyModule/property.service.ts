@@ -45,6 +45,7 @@ export class PropertyService {
     if (data.kycRejectionReason)
       updateData.kycRejectionReason = data.kycRejectionReason;
     if (data.spaceId) updateData.spaceId = data.spaceId;
+    if (data.partner) updateData.partner = data.partner;
     if (data.googleMapLink) {
       updateData.googleMapLink = data.googleMapLink;
       // Also update location if link is provided and no explicit location is sent

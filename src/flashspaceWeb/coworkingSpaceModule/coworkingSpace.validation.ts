@@ -86,6 +86,8 @@ export const updateCoworkingSpaceSchema = z.object({
     images: z.array(z.string()).optional(),
     isActive: z.boolean().optional(),
     approvalStatus: z.string().optional(),
+    partner: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Partner ID").optional(),
+    partnerId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Partner ID").optional(),
   }),
 });
 
@@ -105,5 +107,8 @@ export const getCoworkingSpacesSchema = z.object({
         message: "Limit cannot exceed 100",
       })
       .optional(),
+    city: z.string().optional(),
+    name: z.string().optional(),
+    area: z.string().optional(),
   }),
 });

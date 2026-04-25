@@ -41,27 +41,31 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       );
     }
 
-    const partnerId = (req as any).user?.id;
+    const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
+    
+    // If admin is creating, they can specify a partner in the body
+    let partnerId = userId;
+    if (userRole === UserRole.ADMIN && req.body.partner) {
+      partnerId = req.body.partner;
+    } else if (userRole === UserRole.ADMIN && req.body.partnerId) {
+      partnerId = req.body.partnerId;
+    }
+
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
 
-    const createBody: any = validation.data.body;
+    const createBody: any = { ...validation.data.body };
 
-    if (
-      userRole !== UserRole.ADMIN &&
-      (createBody.isActive === true || createBody.approvalStatus === "active")
-    ) {
-      return sendError(
-        res,
-        403,
-        "Admin approval is required before publishing a virtual office.",
-      );
+    // If admin is creating, auto-approve
+    if (userRole === UserRole.ADMIN) {
+      createBody.approvalStatus = SpaceApprovalStatus.ACTIVE;
+      createBody.isActive = true;
     }
 
     const createdOffice = await VirtualOfficeService.createOffice(
       {
-        ...validation.data.body,
+        ...createBody,
         spaceId: (req.body as any).spaceId,
         propertyId: (req.body as any).propertyId,
       },
@@ -126,7 +130,8 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const { deleted, limit, page, property } = validation.data.query;
+    const { deleted, limit, page, property, city, name, area } =
+      validation.data.query;
     const _limit = limit ? Math.min(limit, 100) : 12; // paginate by default
     const _page = page ? Math.max(page, 1) : 1;
 
@@ -141,6 +146,10 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
     if (property) {
       query.property = property;
     }
+
+    if (city) query.city = new RegExp(`^${city}$`, "i");
+    if (name) query.name = new RegExp(name, "i");
+    if (area) query.area = area;
 
     const result = await VirtualOfficeService.getOffices(query, _limit, _page);
 

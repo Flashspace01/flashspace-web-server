@@ -123,6 +123,16 @@ adminRoutes.get(
   ]),
   AdminController.getUsers,
 );
+adminRoutes.get(
+  "/partners",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.VIEW_ALL_SPACES,
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getPartnerUsers,
+);
 adminRoutes.post(
   "/users",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
@@ -290,6 +300,12 @@ adminRoutes.put(
 
 // --- B2B2C Space Onboarding & Approval ---
 adminRoutes.get(
+  "/spaces",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.getAllSpaces,
+);
+
+adminRoutes.get(
   "/spaces/pending",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
   AdminController.getPendingSpaces,
@@ -299,6 +315,12 @@ adminRoutes.put(
   "/spaces/:spaceType/:id/approve",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
   AdminController.approveSpace,
+);
+
+adminRoutes.post(
+  "/spaces/list-on-behalf",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.listSpaceOnBehalf,
 );
 
 // 6. Ticket Management Routes (from ticket module)

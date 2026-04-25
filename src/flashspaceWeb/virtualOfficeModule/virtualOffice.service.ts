@@ -19,7 +19,7 @@ export class VirtualOfficeService {
       ...data,
       property: property._id,
       partner: partnerId,
-      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
+      approvalStatus: data.approvalStatus ?? SpaceApprovalStatus.PENDING_KYC,
     });
     const savedOffice = await office.save();
 
@@ -43,13 +43,25 @@ export class VirtualOfficeService {
     userRole?: string,
   ) {
     const query: any = { _id: officeId, isDeleted: false };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // SECURED: Only Admins can edit ANY office. Partners can only edit their own.
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
     }
 
     const updateData: any = { ...data };
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
+    }
 
     // Check if office exists and user is authorized
     const officeToUpdate = await VirtualOfficeModel.findOne(query);
@@ -57,7 +69,7 @@ export class VirtualOfficeService {
       throw new Error("Virtual office not found or unauthorized");
     }
 
-    if (userRole !== UserRole.ADMIN && updateData.isActive === true) {
+    if (!canManageAllSpaces && updateData.isActive === true) {
       await assertPartnerCanActivateSpace(
         userId,
         officeToUpdate.property.toString(),
@@ -67,12 +79,12 @@ export class VirtualOfficeService {
     // Update Property Fields
     await PropertyService.updateProperty(
       officeToUpdate.property.toString(),
-      data,
+      updateData,
     );
 
     const office = await VirtualOfficeModel.findOneAndUpdate(
       query,
-      { $set: data },
+      { $set: updateData },
       { new: true, runValidators: true },
     ).populate("property");
 
@@ -156,9 +168,13 @@ export class VirtualOfficeService {
     restore: boolean = false,
   ) {
     const query: any = { _id: officeId };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // SECURED
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
     }
 
