@@ -63,7 +63,7 @@ export class UserPreferences {
         delete ret.password;
         delete ret.refreshTokens;
         delete ret.emailVerificationToken;
-        delete ret.passwordResetToken;
+        delete ret.resetPasswordToken;
         return ret;
       },
     },
@@ -79,9 +79,9 @@ export class UserPreferences {
 @index({ lastLogin: -1 }) // Recent activity tracking
 @index(
   { emailVerificationOTPExpiry: 1 },
-  { sparse: true, expireAfterSeconds: 0 },
-) // Auto-cleanup expired OTPs
-@index({ resetPasswordExpiry: 1 }, { sparse: true, expireAfterSeconds: 0 }) // Auto-cleanup expired reset tokens
+  { sparse: true },
+) // Query expired OTPs without deleting user documents
+@index({ resetPasswordExpiry: 1 }, { sparse: true }) // Query expired reset tokens without deleting user documents
 export class User extends TimeStamps {
   public _id!: Types.ObjectId;
 

@@ -185,11 +185,11 @@ export class AuthController {
 
       const result = await this.authService.forgotPassword(forgotPasswordData);
 
-      res.status(200).json({
-        success: true,
+      res.status(result.success ? 200 : 500).json({
+        success: result.success,
         message: result.message,
         data: {},
-        error: {},
+        error: result.success ? {} : result.message,
       });
     } catch (error) {
       console.error("Forgot password controller error:", error);
@@ -282,12 +282,10 @@ export class AuthController {
       const result = await this.authService.changePassword(
         req.user.id,
         changePasswordData,
+        AuthMiddleware.extractRefreshToken(req),
       );
 
       if (result.success) {
-        // Clear cookies to force re-login with new password
-        AuthMiddleware.clearTokenCookies(res);
-
         res.status(200).json({
           success: true,
           message: result.message,

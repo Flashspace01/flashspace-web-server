@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { DateTime } from 'luxon';
+import { EmailUtil } from '../authModule/utils/email.util';
 
 export interface MeetingEmailOptions {
   to: string;
@@ -43,6 +44,8 @@ export class MeetingEmailUtil {
   }
 
   private static async sendEmail(options: { to: string; subject: string; html: string; text?: string }): Promise<void> {
+    return EmailUtil.sendEmail(options);
+
     const service = process.env.EMAIL_SERVICE?.toLowerCase();
 
     try {
@@ -51,11 +54,12 @@ export class MeetingEmailUtil {
       }
 
       if (service === 'gmail' || service === 'sendgrid') {
-        if (!this.transporter) {
+        const transporter = this.transporter!;
+        if (!transporter) {
           throw new Error('Email transporter not initialized');
         }
 
-        await this.transporter.sendMail({
+        await transporter.sendMail({
           from: `"FlashSpace" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
           to: options.to,
           subject: options.subject,

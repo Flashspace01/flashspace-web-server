@@ -2734,12 +2734,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
 
       const isPartnerProfile = kyc.isPartner === true;
       if (isBusiness) {
-        requiredDocs = [
-          "pan_card",
-          "gst_certificate",
-          "address_proof",
-          "video_kyc",
-        ];
+        requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
       } else if (isPartnerProfile) {
         requiredDocs = ["pan_card", "aadhaar"];
       } else {
