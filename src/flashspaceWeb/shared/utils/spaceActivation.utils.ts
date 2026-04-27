@@ -1,19 +1,12 @@
-import { KYCDocumentModel } from "../../userDashboardModule/models/kyc.model";
 import { PropertyModel, KYCStatus } from "../../propertyModule/property.model";
-import { SpaceUserKycModel } from "../../spacePartnerModule/models/spaceUserKyc.model";
+import { getPartnerKycStatus } from "./partnerKyc.utils";
 
 export const assertPartnerCanActivateSpace = async (
   partnerId: string,
   propertyId: string,
 ) => {
-  const [spacePartnerKyc, legacyPartnerKyc] = await Promise.all([
-    SpaceUserKycModel.findOne({ userId: partnerId }).sort({ createdAt: -1 }),
-    KYCDocumentModel.findOne({ user: partnerId }).sort({ createdAt: -1 }),
-  ]);
-
-  const isPartnerApproved =
-    spacePartnerKyc?.overallStatus === "approved" ||
-    legacyPartnerKyc?.overallStatus === "approved";
+  const { isApproved: isPartnerApproved } =
+    await getPartnerKycStatus(partnerId);
 
   if (!isPartnerApproved) {
     throw new Error(

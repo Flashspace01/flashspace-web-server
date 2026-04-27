@@ -10,6 +10,7 @@ import {
 } from "./meetingRoom.validation";
 import { UserRole } from "../authModule/models/user.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 // --- HELPERS ---
 const sendError = (
@@ -67,12 +68,26 @@ export const createMeetingRoom = async (req: Request, res: Response) => {
       partnerId = req.body.partnerId;
     }
 
-    const createBody: any = { ...validation.data.body };
+    const canCreateWithoutPartnerKyc =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // If admin is creating, auto-approve
-    if (userRole === "admin") {
+    if (canCreateWithoutPartnerKyc) {
       MEETING_ROOM_DATA.approvalStatus = SpaceApprovalStatus.ACTIVE;
       MEETING_ROOM_DATA.isActive = true;
+    } else {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
     }
 
     const createdRoom = await MeetingRoomService.createRoom(
@@ -94,6 +109,7 @@ export const bulkSaveMeetingRooms = async (req: Request, res: Response) => {
   try {
     const { propertyId, rooms } = req.body;
     const partnerId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
 
     if (!partnerId) {
       return sendError(res, 401, "Unauthorized: No partner found");
@@ -105,6 +121,24 @@ export const bulkSaveMeetingRooms = async (req: Request, res: Response) => {
         400,
         "Validation Error: propertyId and rooms array are required.",
       );
+    }
+
+    const canCreateWithoutPartnerKyc =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
+
+    if (!canCreateWithoutPartnerKyc) {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
     }
 
     const savedRooms = await MeetingRoomService.bulkSaveRooms(
