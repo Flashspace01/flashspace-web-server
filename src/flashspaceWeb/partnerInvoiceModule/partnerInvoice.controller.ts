@@ -17,7 +17,7 @@ const getPaymentOcrWorker = () => {
   if (!paymentOcrWorkerPromise) {
     paymentOcrWorkerPromise = createWorker("eng", undefined, {
       cachePath: TESSERACT_CACHE_DIR,
-    }).catch((error) => {
+    }).catch((error: any) => {
       paymentOcrWorkerPromise = null;
       throw error;
     });

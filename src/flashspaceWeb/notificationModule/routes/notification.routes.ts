@@ -1,6 +1,6 @@
 
 import { Router } from "express";
-import { getAdminNotifications, getUserNotifications, deleteNotification, markAsRead, deleteAllForAdmin, markAllAsRead, deleteAllForUser } from "../controllers/notification.controller";
+import { getAdminNotifications, getUserNotifications, deleteNotification, archiveNotification, markAsRead, deleteAllForAdmin, markAllAsRead, deleteAllForUser } from "../controllers/notification.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 
 export const notificationRoutes = Router();
@@ -22,6 +22,9 @@ notificationRoutes.delete("/admin/all", deleteAllForAdmin);
 
 // PATCH /api/notifications/:id/read
 notificationRoutes.patch("/:id/read", markAsRead);
+
+// PATCH /api/notifications/:id/archive
+notificationRoutes.patch("/:id/archive", AuthMiddleware.authenticate, archiveNotification);
 
 // PATCH /api/notifications/read-all
 notificationRoutes.patch("/read-all", AuthMiddleware.authenticate, markAllAsRead);

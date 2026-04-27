@@ -2416,4 +2416,157 @@ export class AdminService {
       };
     }
   }
+
+  // Document Management - Aggregated documents from all sources
+  async getAllDocuments(search?: string, type?: string, status?: string): Promise<ApiResponse<any>> {
+    try {
+      const results: any[] = [];
+
+      // 1. Fetch User KYC Documents
+      if (!type || type === "user") {
+        const userKycQuery: any = { isDeleted: false };
+        const userKycDocs = await KYCDocumentModel.find(userKycQuery)
+          .populate("user", "fullName email phoneNumber")
+          .lean();
+
+        userKycDocs.forEach((kyc: any) => {
+          const userName = kyc.user?.fullName || kyc.personalInfo?.fullName || "Unknown";
+          const userEmail = kyc.user?.email || kyc.personalInfo?.email || "";
+          
+          if (search && !userName.toLowerCase().includes(search.toLowerCase()) && !userEmail.toLowerCase().includes(search.toLowerCase())) return;
+
+          (kyc.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+
+            const isPartnerProfile = kyc.isPartner === true;
+            const docCategory = isPartnerProfile ? "Partner" : "User";
+
+            results.push({
+              id: `${kyc._id}_${doc._id || doc.type}`,
+              userId: kyc.user?._id,
+              ownerName: kyc.user?.fullName || userName,
+              ownerEmail: userEmail,
+              partnerName: isPartnerProfile ? userName : undefined,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || kyc.createdAt,
+              category: docCategory,
+              originalKycId: kyc._id,
+            });
+          });
+        });
+      }
+
+      // 2. Fetch Partner KYC Documents
+      if (!type || type === "partner") {
+        const partnerKycQuery: any = { isDeleted: false };
+        const partnerKycDocs = await PartnerKYCModel.find(partnerKycQuery)
+          .populate("user", "fullName email")
+          .lean();
+
+        partnerKycDocs.forEach((kyc: any) => {
+          // If we have a linked user, use their info for grouping/ownership
+          // This ensures partner docs show up under the main user who added them
+          const mainUser = kyc.user;
+          const ownerName =
+            mainUser?.fullName ||
+            kyc.fullName ||
+            kyc.personalInfo?.fullName ||
+            "Unknown";
+          const ownerEmail = mainUser?.email || kyc.email || "";
+          const partnerName =
+            kyc.fullName ||
+            kyc.personalInfo?.fullName ||
+            kyc.name ||
+            "Partner";
+
+          if (
+            search &&
+            !ownerName.toLowerCase().includes(search.toLowerCase()) &&
+            !ownerEmail.toLowerCase().includes(search.toLowerCase()) &&
+            !partnerName.toLowerCase().includes(search.toLowerCase())
+          )
+            return;
+
+          (kyc.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+            results.push({
+              id: `${kyc._id}_${doc._id || doc.type}`,
+              userId: mainUser?._id || kyc._id, // Use main user ID for grouping
+              ownerName: ownerName,
+              ownerEmail: ownerEmail,
+              partnerName: partnerName,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || kyc.createdAt,
+              category: "Partner",
+              originalKycId: kyc._id,
+            });
+          });
+        });
+      }
+
+      // 3. Fetch Business KYC Documents
+      if (!type || type === "business") {
+        const businessQuery: any = { isDeleted: false };
+        const businessDocs = await BusinessInfoModel.find(businessQuery)
+          .populate("user", "fullName email")
+          .lean();
+
+        businessDocs.forEach((biz: any) => {
+          const mainUser = biz.user;
+          const ownerName =
+            mainUser?.fullName || biz.companyName || biz.profileName || "Unknown";
+          const ownerEmail = mainUser?.email || biz.email || "";
+          const bizName = biz.companyName || biz.profileName || "Business";
+
+          if (
+            search &&
+            !ownerName.toLowerCase().includes(search.toLowerCase()) &&
+            !ownerEmail.toLowerCase().includes(search.toLowerCase()) &&
+            !bizName.toLowerCase().includes(search.toLowerCase())
+          )
+            return;
+
+          (biz.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+            results.push({
+              id: `${biz._id}_${doc._id || doc.type}`,
+              userId: mainUser?._id || biz._id,
+              ownerName: ownerName,
+              ownerEmail: ownerEmail,
+              businessName: bizName,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || biz.createdAt,
+              category: "Business",
+              originalKycId: biz._id,
+            });
+          });
+        });
+      }
+
+      // Sort by uploadedAt desc
+      results.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+
+      return {
+        success: true,
+        message: "Documents fetched successfully",
+        data: results
+      };
+    } catch (error: any) {
+      console.error("Error in getAllDocuments:", error);
+      return {
+        success: false,
+        message: "Failed to fetch documents",
+        error: error.message
+      };
+    }
+  }
 }

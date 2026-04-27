@@ -9,6 +9,7 @@ interface SendNotificationPayload {
     type: NotificationType;
     title: string;
     message: string;
+    archived?: boolean;
     metadata?: any;
 }
 
@@ -226,6 +227,7 @@ export class NotificationService {
             type,
             title,
             message,
+            archived: false,
             metadata: metadataWithPreference,
         });
     }
@@ -238,13 +240,16 @@ export class NotificationService {
         return await NotificationModel.updateMany({ recipient: userId, read: false }, { read: true });
     }
 
-    static async getUserNotifications(userId: string, limit = 20) {
+    static async getUserNotifications(userId: string, limit = 100) {
         const preferences = await this.getUserPreferences(userId);
-        const fetchLimit = Math.max(limit * 5, 100);
+        
+        const query: any = { recipient: userId };
 
-        const notifications = await NotificationModel.find({ recipient: userId })
+        console.log(`[NotificationService] Fetching all notifications for user ${userId}`);
+
+        const notifications = await NotificationModel.find(query)
             .sort({ createdAt: -1 })
-            .limit(fetchLimit);
+            .limit(limit);
 
         return notifications
             .filter((notification) => {
@@ -263,6 +268,19 @@ export class NotificationService {
 
     static async deleteNotification(notificationId: string) {
         return await NotificationModel.findByIdAndDelete(notificationId);
+    }
+
+    static async toggleArchive(notificationId: string) {
+        const notification = await NotificationModel.findById(notificationId);
+        if (!notification) throw new Error("Notification not found");
+        
+        notification.archived = !notification.archived;
+        if (notification.archived) {
+            notification.deletedAt = new Date(); // Set TTL start
+        } else {
+            notification.deletedAt = undefined; // Clear TTL
+        }
+        return await notification.save();
     }
 
     static async deleteAllForUser(userId: string) {

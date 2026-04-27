@@ -457,4 +457,15 @@ export class AdminController {
 
     res.status(result.success ? 201 : 500).json(result);
   }
+
+  // GET /api/admin/documents
+  static async getAllDocuments(req: Request, res: Response) {
+    const { search, type, status } = req.query;
+    const result = await adminService.getAllDocuments(
+      search as string,
+      type as string,
+      status as string
+    );
+    res.status(result.success ? 200 : 500).json(result);
+  }
 }
