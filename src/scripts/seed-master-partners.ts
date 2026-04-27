@@ -425,15 +425,15 @@ async function seed() {
                 // 3. Link Spaces belonging to this property
                 await mongoose.connection.db!.collection('coworkingspaces').updateMany(
                     { property: property._id },
-                    { $set: { partnerId: user._id } }
+                    { $set: { partner: user._id } }
                 );
                 await mongoose.connection.db!.collection('virtualoffices').updateMany(
                     { property: property._id },
-                    { $set: { partnerId: user._id } }
+                    { $set: { partner: user._id } }
                 );
                 await mongoose.connection.db!.collection('meetingrooms').updateMany(
                     { property: property._id },
-                    { $set: { partnerId: user._id } }
+                    { $set: { partner: user._id } }
                 );
                 console.log(`- Updated all associated spaces`);
 

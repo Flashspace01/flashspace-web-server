@@ -7,6 +7,7 @@ import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.mode
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
 import { TicketModel } from "../ticketModule/models/Ticket";
+import { BookingModel } from "../bookingModule/booking.model";
 import { UserRole } from "../authModule/models/user.model";
 import mongoose from "mongoose";
 
@@ -223,14 +224,6 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
     );
     const propertyIds = partnerProperties.map((p) => p._id);
 
-    if (propertyIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No properties found for this partner",
-        data: [],
-      });
-    }
-
     // 2. Get all space IDs across all types for those properties
     const [coworkingIds, virtualIds, meetingIds] = await Promise.all([
       CoworkingSpaceModel.distinct("_id", {
@@ -250,19 +243,8 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
       ...meetingIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
     ];
 
-    if (allSpaceIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No spaces found for this partner",
-        data: {
-          reviews: [],
-          pagination: { total: 0, page, pages: 0, limit },
-        },
-      });
-    }
-
     // 3. Prepare filters
-    const query: any = { space: { $in: allSpaceIds } };
+    const query: any = {};
     if (ratingFilter) {
       query.rating = ratingFilter;
     }
@@ -272,28 +254,47 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
 
     const skip = (page - 1) * limit;
 
-    // 4. Get all reviews (not paginated yet to allow merging)
+    // 4. Fetch Reviews and Ticket Feedback
+    const partnerBookingIds = await BookingModel.find({
+      partner: new mongoose.Types.ObjectId(partnerId),
+      isDeleted: false,
+    }).select("_id").lean();
+    
+    const bookingIdList = partnerBookingIds.map((b: any) => b._id);
+
+    const ticketFeedbackQuery: any = {
+      rating: { $ne: null },
+      $or: [
+        { partnerId: new mongoose.Types.ObjectId(partnerId) },
+        { assignee: new mongoose.Types.ObjectId(partnerId) }
+      ]
+    };
+
+    if (bookingIdList.length > 0) {
+      ticketFeedbackQuery.$or.push({ bookingId: { $in: bookingIdList } });
+    }
+
     const [reviews, ticketFeedback] = await Promise.all([
-      ReviewModel.find(query)
+      ReviewModel.find({
+        ...query,
+        space: { $in: allSpaceIds }
+      })
         .populate("user", "fullName firstName lastName email profilePicture")
         .populate({
           path: "space",
           populate: { path: "property", select: "name area city" },
         })
         .lean(),
-      TicketModel.find({ 
-        partnerId: new mongoose.Types.ObjectId(partnerId), 
-        rating: { $ne: null } 
-      })
-      .populate("user", "fullName firstName lastName email profilePicture")
-      .populate({
-        path: "bookingId",
-        select: "bookingNumber spaceSnapshot type"
-      })
-      .lean()
+      TicketModel.find(ticketFeedbackQuery)
+        .populate("user", "fullName firstName lastName email profilePicture")
+        .populate({
+          path: "bookingId",
+          select: "bookingNumber spaceSnapshot type"
+        })
+        .lean()
     ]);
 
-    // 5. Transform Reviews (Removed support tickets from list as requested)
+    // 5. Transform Reviews and Ticket Feedback
     const transformedReviews = reviews.map((r: any) => ({
       _id: r._id,
       company: r.user?.fullName || `${r.user?.firstName || ""} ${r.user?.lastName || ""}`.trim() || "Anonymous",
@@ -303,13 +304,28 @@ export const getPartnerReviews = async (req: Request, res: Response) => {
       spaceName: r.space?.name || r.space?.property?.name || "",
       spaceId: r.space?._id || "",
       spaceType: r.spaceModel || "",
-      review: r.comment,
+      review: r.comment || r.review || "No remarks provided",
       createdAt: r.createdAt,
       source: 'space_review'
     }));
 
-    // Combine and apply filters (Only reviews now)
-    let combined = [...transformedReviews];
+    const transformedTickets = ticketFeedback.map((t: any) => ({
+      _id: t._id,
+      company: t.user?.fullName || "Anonymous",
+      rating: Number(t.rating) || 0,
+      npsScore: undefined,
+      location: t.bookingId?.spaceSnapshot?.city || "Support Ticket",
+      spaceName: t.bookingId?.spaceSnapshot?.name || "Support Chat",
+      spaceId: t.bookingId?._id || "",
+      spaceType: t.bookingId?.type || "Ticket",
+      review: t.ratingRemarks || t.description || "No remarks provided",
+      createdAt: t.feedbackSubmittedAt || t.updatedAt,
+      source: 'support_ticket',
+      ticketNumber: t.ticketNumber
+    }));
+
+    // Combine and apply filters
+    let combined = [...transformedReviews, ...transformedTickets];
     
     if (ratingFilter) {
       combined = combined.filter(item => item.rating === ratingFilter);
@@ -372,15 +388,31 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
 
     const allSpaceIds = [...coworkingIds, ...virtualIds, ...meetingIds];
 
-    // NPS Calculation
+    // 2. Fetch all reviews and tickets with ratings
+    const partnerBookingIds = await BookingModel.find({
+      partner: new mongoose.Types.ObjectId(partnerId),
+      isDeleted: false,
+    }).select("_id").lean();
+    
+    const bookingIdList = partnerBookingIds.map((b: any) => b._id);
+
+    const ticketFeedbackQuery: any = {
+      rating: { $ne: null },
+      $or: [
+        { partnerId: new mongoose.Types.ObjectId(partnerId) },
+        { assignee: new mongoose.Types.ObjectId(partnerId) }
+      ]
+    };
+
+    if (bookingIdList.length > 0) {
+      ticketFeedbackQuery.$or.push({ bookingId: { $in: bookingIdList } });
+    }
+
     const [reviews, ticketFeedback] = await Promise.all([
       ReviewModel.find({
         space: { $in: allSpaceIds }
       }).lean(),
-      TicketModel.find({
-        partnerId: new mongoose.Types.ObjectId(partnerId),
-        rating: { $ne: null }
-      }).lean()
+      TicketModel.find(ticketFeedbackQuery).lean()
     ]);
 
     const totalResponses = reviews.filter(r => r.npsScore !== undefined).length + ticketFeedback.length;
