@@ -32,7 +32,7 @@ router.post('/resend-otp',
 router.get('/verify-email', authController.verifyEmail);
 
 router.post('/forgot-password', 
-  AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  AuthMiddleware.rateLimit(10, 15 * 60 * 1000), // 10 attempts per 15 minutes
   authController.forgotPassword
 );
 

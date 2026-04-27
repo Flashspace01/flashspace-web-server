@@ -1,4 +1,4 @@
-  import nodemailer from 'nodemailer';
+import nodemailer from 'nodemailer';
 import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
@@ -14,13 +14,50 @@ export class EmailUtil {
   private static contactTransporter: nodemailer.Transporter | null = null;
   private static isInitialized = false;
   private static isContactInitialized = false;
+  private static initializationError: Error | null = null;
+
+  private static getService(): string {
+    const configuredService = process.env.EMAIL_SERVICE?.trim().toLowerCase();
+
+    if (configuredService) {
+      return configuredService;
+    }
+
+    if (process.env.SMTP_HOST) {
+      return "smtp";
+    }
+
+    return "disabled";
+  }
+
+  private static getFromAddress(): string {
+    return (
+      process.env.EMAIL_FROM ||
+      (process.env.SMTP_USER
+        ? `"FlashSpace" <${process.env.SMTP_USER}>`
+        : process.env.EMAIL_USER
+          ? `"FlashSpace" <${process.env.EMAIL_USER}>`
+          : "FlashSpace <noreply@flashspace.co>")
+    );
+  }
+
+  private static failInitialization(message: string): void {
+    this.transporter = null;
+    this.isInitialized = false;
+    this.initializationError = new Error(message);
+    console.error(`Email service configuration error: ${message}`);
+  }
 
   static initialize() {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
+    this.transporter = null;
+    this.initializationError = null;
 
     if (service === 'sendgrid') {
       const apiKey = process.env.SENDGRID_API_KEY;
       if (!apiKey) {
+        this.failInitialization("SENDGRID_API_KEY is required when EMAIL_SERVICE=sendgrid");
+        return;
         console.warn('⚠️ SENDGRID_API_KEY not configured');
         return;
       }
@@ -28,6 +65,11 @@ export class EmailUtil {
       console.log('✅ SendGrid email service initialized');
       this.isInitialized = true;
     } else if (service === 'gmail') {
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        this.failInitialization("EMAIL_USER and EMAIL_PASSWORD are required when EMAIL_SERVICE=gmail");
+        return;
+      }
+
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -38,13 +80,32 @@ export class EmailUtil {
       console.log('✅ Gmail email service initialized');
       this.isInitialized = true;
     } else if (service === 'smtp') {
+      if (!process.env.SMTP_HOST) {
+        this.failInitialization("SMTP_HOST is required when EMAIL_SERVICE=smtp");
+        return;
+      }
+
+      const smtpUser =
+        process.env.SMTP_USER ||
+        (process.env.SMTP_HOST.includes("sendgrid") ? "apikey" : undefined);
+      const smtpPass =
+        process.env.SMTP_PASS ||
+        (process.env.SMTP_HOST.includes("sendgrid")
+          ? process.env.SENDGRID_API_KEY
+          : undefined);
+
+      if (!smtpUser || !smtpPass) {
+        this.failInitialization("SMTP_USER and SMTP_PASS are required when EMAIL_SERVICE=smtp");
+        return;
+      }
+
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
         secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: smtpUser,
+          pass: smtpPass,
         },
       });
       console.log('✅ SMTP email service initialized');
@@ -74,17 +135,21 @@ export class EmailUtil {
   }
 
   static async sendEmail(options: EmailOptions): Promise<void> {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
 
     try {
       if (!this.isInitialized) {
         this.initialize();
       }
 
+      if (!this.isInitialized) {
+        throw this.initializationError || new Error("Email service is not initialized");
+      }
+
       if (service === 'sendgrid') {
         const msg = {
           to: options.to,
-          from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
+          from: this.getFromAddress(),
           subject: options.subject,
           text: options.text || options.html.replace(/<[^>]*>/g, ''),
           html: options.html,
@@ -99,7 +164,7 @@ export class EmailUtil {
         }
 
         await this.transporter.sendMail({
-          from: process.env.EMAIL_FROM || `"FlashSpace" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
+          from: this.getFromAddress(),
           to: options.to,
           subject: options.subject,
           text: options.text,
@@ -113,6 +178,13 @@ export class EmailUtil {
         console.log('   Subject:', options.subject);
       }
     } catch (error: any) {
+      console.error('Error sending email:', error?.message || error);
+
+      if (service === 'sendgrid' && error.response?.body) {
+        console.error('SendGrid error details:', JSON.stringify(error.response.body, null, 2));
+      }
+
+      throw error;
       console.error('❌ Error sending email:', error);
 
       // COMMENTED OUT - SendGrid error logging
@@ -197,7 +269,7 @@ export class EmailUtil {
   }
 
   static async sendPasswordResetEmail(email: string, token: string, fullName: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
     const html = `
       <!DOCTYPE html>
@@ -616,11 +688,15 @@ export class EmailUtil {
   }
 
   static async testConnection(): Promise<boolean> {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
 
     try {
       if (!this.isInitialized) {
         this.initialize();
+      }
+
+      if (!this.isInitialized) {
+        throw this.initializationError || new Error("Email service is not initialized");
       }
 
       if (service === 'sendgrid') {
