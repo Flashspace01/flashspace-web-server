@@ -9,6 +9,7 @@ interface SendNotificationPayload {
     type: NotificationType;
     title: string;
     message: string;
+    archived?: boolean;
     metadata?: any;
 }
 
