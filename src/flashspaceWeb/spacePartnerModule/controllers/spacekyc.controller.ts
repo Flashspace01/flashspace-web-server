@@ -181,9 +181,16 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     }
 
     const kyc = await SpaceUserKycModel.findOne({ userId });
+    if (!kyc) {
+      return res.status(404).json({
+        success: false,
+        message: "KYC record not found",
+      });
+    }
+
     const user = await UserModel.findById(userId);
     const firstProperty = await PropertyModel.findOne({ partner: userId });
-    const kycObject = kyc ? kyc.toObject() : {};
+    const kycObject = kyc.toObject();
 
     // Construct the data object as requested:
     // 1. Business & Bank details from Property
