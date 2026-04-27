@@ -6,7 +6,7 @@ import {
   TicketCategory,
 } from "../models/Ticket";
 import { UserModel } from "../../authModule/models/user.model";
-import { Types } from "mongoose";
+import { Types, default as mongoose } from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
 import { BookingModel } from "../../bookingModule/booking.model";
@@ -180,6 +180,11 @@ export class TicketService {
       .populate("user", "fullName email phoneNumber")
       .populate("assignee", "fullName email")
       .lean();
+  }
+
+  static async replyToTicket(data: ReplyDTO & { ticketId: string }) {
+    const { ticketId, ...replyData } = data;
+    return this.addReply(ticketId, replyData);
   }
 
   // ============ ADMIN METHODS ============
