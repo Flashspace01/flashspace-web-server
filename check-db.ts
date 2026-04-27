@@ -1,20 +1,31 @@
-import mongoose from "mongoose";
-import * as dotenv from "dotenv";
+import mongoose from 'mongoose';
+import { TicketModel } from './src/flashspaceWeb/ticketModule/models/Ticket';
+import dotenv from 'dotenv';
+
 dotenv.config();
 
-// Since there's no model exported directly easily from outside without full ts-node setup,
-// I'll just connect and query raw.
-mongoose.connect("mongodb://localhost:27020/karyalink").then(async () => {
-    console.log("Connected to DB");
-    const bookings = await mongoose.connection.collection("bookings").find({}).toArray();
-    console.log("Total Bookings:", bookings.length);
-    console.log("Sample Booking ID:", bookings[0]?._id);
+async function check() {
+    try {
+        const uri = process.env.DB_URI;
+        console.log("Connecting to:", uri);
+        await mongoose.connect(uri!);
+        console.log("Connected.");
 
-    const invoices = await mongoose.connection.collection("invoices").find({}).toArray();
-    console.log("Total Invoices:", invoices.length);
-    if (invoices.length > 0) {
-        console.log("Sample Invoice bookingId:", invoices[0].bookingId);
+        const count = await TicketModel.countDocuments();
+        console.log("Total Tickets:", count);
+
+        if (count > 0) {
+            const latest = await TicketModel.findOne().sort({ createdAt: -1 });
+            console.log("Latest Ticket:", latest?.ticketNumber, latest?.subject);
+        }
+
+        const collections = await mongoose.connection.db?.listCollections().toArray();
+        console.log("Collections:", collections?.map(c => c.name));
+
+        await mongoose.disconnect();
+    } catch (err) {
+        console.error(err);
     }
+}
 
-    process.exit(0);
-}).catch(console.error);
+check();

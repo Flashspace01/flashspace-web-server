@@ -252,7 +252,10 @@ export const submitTicketFeedback = async (
       });
     }
 
-    const ticket = await TicketService.submitFeedback(ticketId, userId, rating, remarks);
+    const ticket = await TicketService.submitTicketFeedback(ticketId, {
+      rating: Number(rating),
+      remarks,
+    });
 
     // Emit socket event to notify participants
     getIO().to(ticketId).emit("ticket_updated", { ticketId, ticket });
