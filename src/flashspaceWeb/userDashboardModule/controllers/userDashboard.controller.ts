@@ -890,6 +890,169 @@ export const getPartnerClients = async (req: Request, res: Response) => {
   }
 };
 
+export const getPartnerClientBookings = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const partnerObjectId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
+    const [voSpaces, coworkingSpaces, meetingRooms] = await Promise.all([
+      VirtualOfficeModel.find({ partner: partnerObjectId }).select("_id"),
+      CoworkingSpaceModel.find({ partner: partnerObjectId }).select("_id"),
+      MeetingRoomModel.find({ partner: partnerObjectId }).select("_id"),
+    ]);
+    const ownedSpaceIds = [
+      ...voSpaces.map((space: any) => space._id),
+      ...coworkingSpaces.map((space: any) => space._id),
+      ...meetingRooms.map((space: any) => space._id),
+    ];
+
+    const bookings = await BookingModel.find({
+      $or: [{ partner: partnerObjectId }, { spaceId: { $in: ownedSpaceIds } }],
+      isDeleted: false,
+    })
+      .populate("user", "fullName email phoneNumber phone")
+      .populate("kycProfile", "profileName kycType businessInfo overallStatus")
+      .sort({ createdAt: -1 });
+
+    const bookingIds = bookings.map((booking: any) => booking._id);
+    const bookingNumbers = bookings
+      .map((booking: any) => booking.bookingNumber)
+      .filter(Boolean);
+    const userIds = [
+      ...new Set(bookings.map((booking: any) => booking.user?._id || booking.user)),
+    ].filter(Boolean);
+
+    const [businessInfos, invoices] = await Promise.all([
+      BusinessInfoModel.find({
+        user: { $in: userIds },
+        isDeleted: false,
+      }),
+      InvoiceModel.find({
+        partner: partnerObjectId,
+        $or: [
+          { booking: { $in: bookingIds } },
+          { bookingNumber: { $in: bookingNumbers } },
+        ],
+      }).select("invoiceNumber booking bookingNumber"),
+    ]);
+
+    const businessMap = new Map(
+      businessInfos.map((info: any) => [info.user.toString(), info]),
+    );
+    const invoiceMap = new Map<string, any>();
+    invoices.forEach((invoice: any) => {
+      if (invoice.booking) {
+        invoiceMap.set(invoice.booking.toString(), invoice);
+      }
+      if (invoice.bookingNumber) {
+        invoiceMap.set(invoice.bookingNumber, invoice);
+      }
+    });
+
+    const formatDate = (value?: Date | string) => {
+      if (!value) return "N/A";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "N/A";
+      return date.toISOString().split("T")[0];
+    };
+
+    const formatType = (type?: string) => {
+      if (type === "VirtualOffice") return "Virtual Office";
+      if (type === "CoworkingSpace") return "Coworking";
+      if (type === "MeetingRoom") return "Meeting Room";
+      return type || "Booking";
+    };
+
+    const formatSubStatus = (status?: string) =>
+      (status || "unknown")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const resolveDisplayStatus = (booking: any) => {
+      if (booking.status !== "active") return "INACTIVE";
+      if (!booking.endDate) return "ACTIVE";
+
+      const daysRemaining = Math.ceil(
+        (new Date(booking.endDate).getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      return daysRemaining > 0 && daysRemaining <= 30
+        ? "EXPIRING_SOON"
+        : "ACTIVE";
+    };
+
+    const rows = bookings.map((booking: any) => {
+      const user = booking.user;
+      const clientUserId = user?._id?.toString() || user?.toString() || "";
+      const business = businessMap.get(clientUserId);
+      const invoice =
+        invoiceMap.get(booking._id.toString()) ||
+        invoiceMap.get(booking.bookingNumber);
+      const kycProfile = booking.kycProfile as any;
+      const spaceSnapshot = booking.spaceSnapshot || {};
+      const city = spaceSnapshot.city || "";
+      const area = spaceSnapshot.area || "";
+
+      return {
+        id: booking.bookingNumber || booking._id.toString(),
+        bookingId: booking._id.toString(),
+        bookingNumber: booking.bookingNumber || booking._id.toString(),
+        invoiceNumber:
+          invoice?.invoiceNumber ||
+          booking.bookingNumber ||
+          booking._id.toString(),
+        userId: clientUserId,
+        companyName:
+          kycProfile?.businessInfo?.companyName ||
+          business?.companyName ||
+          user?.fullName ||
+          "N/A",
+        contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phoneNumber || user?.phone || "N/A",
+        plan: booking.plan?.name || "N/A",
+        workspace: formatType(booking.type),
+        type: booking.type,
+        spaceId: booking.spaceId?.toString(),
+        space: spaceSnapshot.name || "N/A",
+        location: [area, city].filter(Boolean).join(", ") || "N/A",
+        city: city || "N/A",
+        startDate: formatDate(booking.startDate),
+        endDate: formatDate(booking.endDate),
+        status: resolveDisplayStatus(booking),
+        subscriptionStatus: resolveDisplayStatus(booking),
+        subscriptionSubStatus: formatSubStatus(booking.status),
+        rawSubscriptionSubStatus: booking.status || "unknown",
+        kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+        kycType: kycProfile?.kycType
+          ? formatSubStatus(kycProfile.kycType)
+          : "N/A",
+        dealValue:
+          booking.plan?.finalPrice ||
+          booking.plan?.partnerPrice ||
+          booking.plan?.price ||
+          0,
+        createdAt: booking.createdAt,
+      };
+    });
+
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Get partner client bookings error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch partner bookings",
+    });
+  }
+};
+
 export const getPartnerClientDetails = async (req: Request, res: Response) => {
   try {
     const { clientId } = req.params; // This is now the User ID
