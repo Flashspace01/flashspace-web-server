@@ -36,6 +36,7 @@ import {
   getPartnerSpaceBookings,
   getPartnerPropertyBookings,
   getPartnerClients,
+  getPartnerClientBookings,
   getPartnerClientDetails,
   getAllPartnerSpaces,
   getUserMails,
@@ -75,6 +76,7 @@ router.get(
   getPartnerPropertyAnalytics,
 );
 router.get("/partner/clients", getPartnerClients);
+router.get("/partner/client-bookings", getPartnerClientBookings);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
 router.get("/partner/team-members", getTeamMembers);
 router.post("/partner/team-members", createTeamMember);

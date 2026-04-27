@@ -191,16 +191,21 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     const user = await UserModel.findById(userId);
     const firstProperty = await PropertyModel.findOne({ partner: userId });
     const kycObject = kyc.toObject();
+    const {
+      userId: kycUserId,
+      overallStatus,
+      kycStatus,
+    } = kycObject;
 
     // Construct the data object as requested:
     // 1. Business & Bank details from Property
     // 2. Documents & Status from SpaceUserKyc
     
     const data = {
-      userId,
-      overallStatus: "not_started",
-      kycStatus: "not_started",
       ...kycObject,
+      userId: kycUserId ?? userId,
+      overallStatus: overallStatus ?? "not_started",
+      kycStatus: kycStatus ?? "not_started",
 
       // Basic Info from User/Property
       fullName: user?.fullName || kyc?.fullName || "",
