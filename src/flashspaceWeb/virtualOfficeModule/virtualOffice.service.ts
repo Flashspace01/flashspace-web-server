@@ -4,6 +4,7 @@ import { PropertyModel } from "../propertyModule/property.model";
 import { PropertyService } from "../propertyModule/property.service";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 export class VirtualOfficeService {
   static async createOffice(data: any, partnerId: string) {
     let property;
@@ -18,7 +19,7 @@ export class VirtualOfficeService {
       ...data,
       property: property._id,
       partner: partnerId,
-      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
+      approvalStatus: data.approvalStatus ?? SpaceApprovalStatus.PENDING_KYC,
     });
     const savedOffice = await office.save();
 
@@ -42,10 +43,24 @@ export class VirtualOfficeService {
     userRole?: string,
   ) {
     const query: any = { _id: officeId, isDeleted: false };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // SECURED: Only Admins can edit ANY office. Partners can only edit their own.
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
+    }
+
+    const updateData: any = { ...data };
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
     }
 
     // Check if office exists and user is authorized
@@ -54,15 +69,22 @@ export class VirtualOfficeService {
       throw new Error("Virtual office not found or unauthorized");
     }
 
+    if (!canManageAllSpaces && updateData.isActive === true) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        officeToUpdate.property.toString(),
+      );
+    }
+
     // Update Property Fields
     await PropertyService.updateProperty(
       officeToUpdate.property.toString(),
-      data,
+      updateData,
     );
 
     const office = await VirtualOfficeModel.findOneAndUpdate(
       query,
-      { $set: data },
+      { $set: updateData },
       { new: true, runValidators: true },
     ).populate("property");
 
@@ -146,9 +168,13 @@ export class VirtualOfficeService {
     restore: boolean = false,
   ) {
     const query: any = { _id: officeId };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // SECURED
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
     }
 

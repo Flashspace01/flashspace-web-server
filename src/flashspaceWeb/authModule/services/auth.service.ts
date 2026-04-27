@@ -84,6 +84,7 @@ export class AuthService {
         lastOTPRequestTime: new Date(),
         otpRequestCount: 1,
         refreshTokens: [],
+        isDeleted: false,
       };
 
       const user = await this.userRepository.create(userData);
@@ -121,9 +122,12 @@ export class AuthService {
         success: true,
         message: "Account created successfully. Welcome to FlashSpace!",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          profilePicture: user.profilePicture,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified,
@@ -208,9 +212,12 @@ export class AuthService {
         success: true,
         message: "Login successful",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          profilePicture: user.profilePicture,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified,
@@ -338,9 +345,12 @@ export class AuthService {
         success: true,
         message: "Google authentication successful",
         user: {
+          _id: user._id.toString(),
           id: user._id.toString(),
           email: user.email,
           fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          profilePicture: user.profilePicture,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
           kycVerified: user.kycVerified,
@@ -418,8 +428,10 @@ export class AuthService {
 
       // Update user with reset token
       await this.userRepository.update(user._id.toString(), {
-        passwordResetToken: resetToken,
-        passwordResetExpires: resetExpires,
+        $set: {
+          resetPasswordToken: resetToken,
+          resetPasswordExpiry: resetExpires,
+        },
       });
 
       // Send reset email
@@ -484,12 +496,17 @@ export class AuthService {
       // Hash new password
       const hashedPassword = await PasswordUtil.hash(password);
 
-      // Update user
+      // Update user and invalidate any existing sessions
       await this.userRepository.update(user._id.toString(), {
-        password: hashedPassword,
-        resetPasswordToken: undefined,
-        resetPasswordExpiry: undefined,
-        refreshTokens: [], // Clear all refresh tokens for security
+        $set: {
+          password: hashedPassword,
+          authProvider: AuthProvider.LOCAL,
+          refreshTokens: [], // Clear all refresh tokens for security
+        },
+        $unset: {
+          resetPasswordToken: "",
+          resetPasswordExpiry: "",
+        },
       });
 
       return {
@@ -508,6 +525,7 @@ export class AuthService {
   async changePassword(
     userId: string,
     changePasswordData: ChangePasswordRequest,
+    currentRefreshToken?: string | null,
   ): Promise<AuthResponse> {
     try {
       const { currentPassword, newPassword, confirmPassword } =
@@ -565,10 +583,17 @@ export class AuthService {
       // Hash new password
       const hashedPassword = await PasswordUtil.hash(newPassword);
 
-      // Update user
+      // Update user. Keep the current session alive if we have its refresh token,
+      // while invalidating any other sessions.
+      const refreshTokenUpdate =
+        currentRefreshToken && user.refreshTokens.includes(currentRefreshToken)
+          ? [currentRefreshToken]
+          : [];
       await this.userRepository.update(userId, {
-        password: hashedPassword,
-        refreshTokens: [], // Clear all refresh tokens for security
+        $set: {
+          password: hashedPassword,
+          refreshTokens: refreshTokenUpdate,
+        },
       });
 
       return {

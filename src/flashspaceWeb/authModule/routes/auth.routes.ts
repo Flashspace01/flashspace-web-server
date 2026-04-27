@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { AuthMiddleware } from '../middleware/auth.middleware';
+import { uploadProfilePic } from '../config/multer.config';
 
 const router = Router();
 const authController = new AuthController();
@@ -31,7 +32,7 @@ router.post('/resend-otp',
 router.get('/verify-email', authController.verifyEmail);
 
 router.post('/forgot-password', 
-  AuthMiddleware.rateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+  AuthMiddleware.rateLimit(10, 15 * 60 * 1000), // 10 attempts per 15 minutes
   authController.forgotPassword
 );
 
@@ -59,7 +60,7 @@ router.post('/change-password', authController.changePassword);
 router.post('/logout', authController.logout);
 router.post('/logout-all', authController.logoutAll);
 
-// Profile routes (requires email verification)
+
 router.get(
   "/profile",
   AuthMiddleware.requireVerifiedEmail,

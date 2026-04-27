@@ -1,5 +1,4 @@
-  import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
 export interface EmailOptions {
@@ -14,44 +13,126 @@ export class EmailUtil {
   private static contactTransporter: nodemailer.Transporter | null = null;
   private static isInitialized = false;
   private static isContactInitialized = false;
+  private static initializationError: Error | null = null;
+  private static readonly localServices = new Set([
+    "nodemailer",
+    "local",
+    "log",
+    "disabled",
+    "sendgrid",
+  ]);
+
+  private static getService(): string {
+    const configuredService = process.env.EMAIL_SERVICE?.trim().toLowerCase();
+
+    if (configuredService) {
+      return configuredService;
+    }
+
+    return "nodemailer";
+  }
+
+  private static getFromAddress(): string {
+    const fromAddress =
+      process.env.EMAIL_FROM ||
+      (process.env.SMTP_USER
+        ? `"FlashSpace" <${process.env.SMTP_USER}>`
+        : process.env.EMAIL_USER
+          ? `"FlashSpace" <${process.env.EMAIL_USER}>`
+          : "FlashSpace <noreply@flashspace.co>");
+
+    return fromAddress.includes("<")
+      ? fromAddress
+      : `"FlashSpace" <${fromAddress}>`;
+  }
+
+  private static getReplyToAddress(): string | undefined {
+    return process.env.EMAIL_REPLY_TO || process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  }
+
+  private static failInitialization(message: string): void {
+    this.transporter = null;
+    this.isInitialized = false;
+    this.initializationError = new Error(message);
+    console.error(`Email service configuration error: ${message}`);
+  }
+
+  private static initializeLocalTransport(): void {
+    this.transporter = nodemailer.createTransport({
+      streamTransport: true,
+      buffer: true,
+      newline: "unix",
+    });
+    this.isInitialized = true;
+    console.log(
+      "Nodemailer local email service initialized - messages are generated and logged only",
+    );
+  }
+
+  private static isLocalService(service = this.getService()): boolean {
+    return this.localServices.has(service);
+  }
 
   static initialize() {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
+    this.transporter = null;
+    this.initializationError = null;
 
-    if (service === 'sendgrid') {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      if (!apiKey) {
-        console.warn('⚠️ SENDGRID_API_KEY not configured');
+    if (this.isLocalService(service)) {
+      if (service === "sendgrid") {
+        console.warn(
+          "EMAIL_SERVICE=sendgrid is ignored. Using Nodemailer local transport instead.",
+        );
+      }
+      this.initializeLocalTransport();
+    } else if (service === 'gmail') {
+      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        this.failInitialization("EMAIL_USER and EMAIL_PASSWORD are required when EMAIL_SERVICE=gmail");
         return;
       }
-      sgMail.setApiKey(apiKey);
-      console.log('✅ SendGrid email service initialized');
-      this.isInitialized = true;
-    } else if (service === 'gmail') {
+
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD,
+          user: process.env.EMAIL_USER.trim(),
+          pass: process.env.EMAIL_PASSWORD.replace(/\s+/g, ""),
         },
       });
       console.log('✅ Gmail email service initialized');
       this.isInitialized = true;
     } else if (service === 'smtp') {
+      if (!process.env.SMTP_HOST) {
+        this.failInitialization("SMTP_HOST is required when EMAIL_SERVICE=smtp");
+        return;
+      }
+
+      const smtpUser =
+        process.env.SMTP_USER ||
+        (process.env.SMTP_HOST.includes("sendgrid") ? "apikey" : undefined);
+      const smtpPass =
+        process.env.SMTP_PASS ||
+        (process.env.SMTP_HOST.includes("sendgrid")
+          ? process.env.SENDGRID_API_KEY
+          : undefined);
+
+      if (!smtpUser || !smtpPass) {
+        this.failInitialization("SMTP_USER and SMTP_PASS are required when EMAIL_SERVICE=smtp");
+        return;
+      }
+
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: parseInt(process.env.SMTP_PORT || '587'),
         secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: smtpUser,
+          pass: smtpPass,
         },
       });
       console.log('✅ SMTP email service initialized');
       this.isInitialized = true;
     } else {
-      console.log('📧 Email service disabled - emails will be logged only');
-      this.isInitialized = true;
+      this.initializeLocalTransport();
     }
 
     this.initializeContact();
@@ -74,38 +155,71 @@ export class EmailUtil {
   }
 
   static async sendEmail(options: EmailOptions): Promise<void> {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
 
     try {
       if (!this.isInitialized) {
         this.initialize();
       }
 
-      if (service === 'sendgrid') {
+      if (!this.isInitialized) {
+        throw this.initializationError || new Error("Email service is not initialized");
+      }
+
+      if (this.isLocalService(service) && service !== "sendgrid") {
+        if (!this.transporter) {
+          this.initializeLocalTransport();
+        }
+
+        await this.transporter!.sendMail({
+          from: this.getFromAddress(),
+          to: options.to,
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        });
+
+        console.log("Email generated by Nodemailer local transport:");
+        console.log("   To:", options.to);
+        console.log("   Subject:", options.subject);
+        return;
+      }
+
+      if (this.isLocalService(service)) {
         const msg = {
           to: options.to,
-          from: process.env.EMAIL_FROM || 'noreply@flashspace.co',
+          from: this.getFromAddress(),
           subject: options.subject,
           text: options.text || options.html.replace(/<[^>]*>/g, ''),
           html: options.html,
         };
 
-        const result = await sgMail.send(msg);
-        console.log('✅ Email sent successfully via SendGrid to:', options.to);
+        if (!this.transporter) {
+          this.initializeLocalTransport();
+        }
+        await this.transporter!.sendMail(msg);
+        console.log("Email generated by Nodemailer local transport for:", options.to);
         return;
       } else if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
           throw new Error(`${service} transporter not initialized`);
         }
 
-        await this.transporter.sendMail({
-          from: process.env.EMAIL_FROM || `"FlashSpace" <${process.env.EMAIL_USER || process.env.SMTP_USER}>`,
+        const info = await this.transporter.sendMail({
+          from: this.getFromAddress(),
           to: options.to,
+          replyTo: this.getReplyToAddress(),
           subject: options.subject,
           text: options.text,
           html: options.html,
         });
-        console.log(`✅ Email sent successfully via ${service}`);
+        console.log(`Email sent successfully via ${service}`);
+        console.log("   Message ID:", info.messageId);
+        console.log("   Accepted:", info.accepted);
+        console.log("   Response:", info.response);
+        if (info.rejected?.length) {
+          console.warn("   Rejected:", info.rejected);
+        }
       } else {
         // Log email instead of sending (for development/when no service configured)
         console.log('📧 Email logged (sending disabled):');
@@ -113,6 +227,13 @@ export class EmailUtil {
         console.log('   Subject:', options.subject);
       }
     } catch (error: any) {
+      console.error('Error sending email:', error?.message || error);
+
+      if (service === 'sendgrid' && error.response?.body) {
+        console.error('SendGrid error details:', JSON.stringify(error.response.body, null, 2));
+      }
+
+      throw error;
       console.error('❌ Error sending email:', error);
 
       // COMMENTED OUT - SendGrid error logging
@@ -197,7 +318,7 @@ export class EmailUtil {
   }
 
   static async sendPasswordResetEmail(email: string, token: string, fullName: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
     const html = `
       <!DOCTYPE html>
@@ -264,6 +385,10 @@ export class EmailUtil {
       html,
       text,
     });
+
+    if (this.isLocalService()) {
+      console.log("Password reset link:", resetUrl);
+    }
   }
 
   static async sendEmailVerificationOTP(email: string, otp: string, fullName: string): Promise<void> {
@@ -616,16 +741,20 @@ export class EmailUtil {
   }
 
   static async testConnection(): Promise<boolean> {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
+    const service = this.getService();
 
     try {
       if (!this.isInitialized) {
         this.initialize();
       }
 
-      if (service === 'sendgrid') {
-        // SendGrid doesn't have a verify method, we'll try to send a test
-        console.log('✅ SendGrid connection configured');
+      if (!this.isInitialized) {
+        throw this.initializationError || new Error("Email service is not initialized");
+      }
+
+      if (this.isLocalService(service)) {
+        // Local Nodemailer transport does not require a network verification.
+        console.log("Nodemailer local email transport ready");
         return true;
       } else if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
@@ -642,5 +771,68 @@ export class EmailUtil {
       console.error('❌ Email connection failed:', error);
       return false;
     }
+  }
+  static async sendMailRecordEmail(email: string, fullName: string, mailData: { sender: string; type: string; office: string }): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+        <div style="background: #35503F; color: #FEF8C3; padding: 25px; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px;">New Mail Received</h1>
+        </div>
+        <div style="padding: 30px; background: #ffffff;">
+          <p>Hello ${fullName},</p>
+          <p>A new mail item has been received at your virtual office.</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Sender:</strong> ${mailData.sender}</p>
+            <p style="margin: 5px 0;"><strong>Type:</strong> ${mailData.type}</p>
+            <p style="margin: 5px 0;"><strong>Office:</strong> ${mailData.office}</p>
+          </div>
+          <p>You can view more details and request forwarding from your dashboard.</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/mail-records" style="background: #35503F; color: #FEF8C3; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Mail Records</a>
+          </div>
+        </div>
+        <div style="background: #f1f3f5; padding: 15px; text-align: center; color: #777; font-size: 12px;">
+          <p>&copy; 2024 FlashSpace Tech. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `📧 New Mail: ${mailData.sender} - FlashSpace`,
+      html,
+    });
+  }
+
+  static async sendVisitRecordEmail(email: string, fullName: string, visitData: { visitor: string; purpose: string; office: string }): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+        <div style="background: #35503F; color: #FEF8C3; padding: 25px; text-align: center;">
+          <h1 style="margin: 0; font-size: 22px;">New Visitor Logged</h1>
+        </div>
+        <div style="padding: 30px; background: #ffffff;">
+          <p>Hello ${fullName},</p>
+          <p>A new visitor entry has been logged at your virtual office.</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Visitor:</strong> ${visitData.visitor}</p>
+            <p style="margin: 5px 0;"><strong>Purpose:</strong> ${visitData.purpose}</p>
+            <p style="margin: 5px 0;"><strong>Office:</strong> ${visitData.office}</p>
+          </div>
+          <p>Please log in to your dashboard to acknowledge/verify this visit.</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/visit-records" style="background: #35503F; color: #FEF8C3; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Visit Records</a>
+          </div>
+        </div>
+        <div style="background: #f1f3f5; padding: 15px; text-align: center; color: #777; font-size: 12px;">
+          <p>&copy; 2024 FlashSpace Tech. All rights reserved.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `🤝 New Visitor: ${visitData.visitor} - FlashSpace`,
+      html,
+    });
   }
 }

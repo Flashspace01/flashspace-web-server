@@ -61,12 +61,43 @@ export class SpaceUserKyc {
   @prop({ trim: true })
   public registeredAddress?: string;
 
+  @prop({ trim: true })
+  public contactPhone?: string;
+
+  // ------------------- BANK DETAILS -------------------
+  @prop({ trim: true })
+  public accountHolderName?: string;
+
+  @prop({ trim: true })
+  public bankName?: string;
+
+  @prop({ trim: true })
+  public accountNumber?: string;
+
+  @prop({ trim: true })
+  public ifscCode?: string;
+
+  @prop({ trim: true })
+  public branch?: string;
+
+  @prop({ trim: true })
+  public accountType?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public bankStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public bankRejectMessage?: string;
+
   // ------------------- COMPANY PARTNERS -------------------
   @prop({ type: () => [String], default: [] })
   public companyPartners!: string[];
 
   // ------------------- PER-DOCUMENT REVIEW STATUS -------------------
-
+  // Existing
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],
     default: "not_started",
@@ -84,6 +115,55 @@ export class SpaceUserKyc {
 
   @prop({ trim: true })
   public panImageRejectMessage?: string;
+
+  // New Documents
+  @prop({ trim: true })
+  public companyRegistrationUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public companyRegistrationStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public companyRegistrationRejectMessage?: string;
+
+  @prop({ trim: true })
+  public gstCertificateUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public gstCertificateStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public gstCertificateRejectMessage?: string;
+
+  @prop({ trim: true })
+  public addressProofUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public addressProofStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public addressProofRejectMessage?: string;
+
+  @prop({ trim: true })
+  public bankDetailsProofUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public bankDetailsProofStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public bankDetailsProofRejectMessage?: string;
 
   // ------------------- VIDEO KYC -------------------
   @prop({ trim: true })
@@ -106,14 +186,14 @@ export class SpaceUserKyc {
   })
   public overallStatus!: KycDecisionStatus;
 
+  @prop({ trim: true })
+  public overallRejectMessage?: string;
+
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],
     default: "not_started",
   })
   public kycStatus!: KycDecisionStatus;
-
-  @prop({ trim: true })
-  public overallRejectMessage?: string;
 }
 
 export const SpaceUserKycModel = getModelForClass(SpaceUserKyc);

@@ -10,6 +10,8 @@ import {
   getPartnerVirtualOfficesSchema,
 } from "./virtualOffice.validation";
 import { UserRole } from "../authModule/models/user.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 const sendError = (
   res: Response,
@@ -40,13 +42,46 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       );
     }
 
-    const partnerId = (req as any).user?.id;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+    
+    // If admin is creating, they can specify a partner in the body
+    let partnerId = userId;
+    if (userRole === UserRole.ADMIN && req.body.partner) {
+      partnerId = req.body.partner;
+    } else if (userRole === UserRole.ADMIN && req.body.partnerId) {
+      partnerId = req.body.partnerId;
+    }
+
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
 
+    const createBody: any = { ...validation.data.body };
+    const canCreateWithoutPartnerKyc =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
+
+    // If admin is creating, auto-approve
+    if (canCreateWithoutPartnerKyc) {
+      createBody.approvalStatus = SpaceApprovalStatus.ACTIVE;
+      createBody.isActive = true;
+    } else {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
+    }
+
     const createdOffice = await VirtualOfficeService.createOffice(
       {
-        ...validation.data.body,
+        ...createBody,
         spaceId: (req.body as any).spaceId,
         propertyId: (req.body as any).propertyId,
       },
@@ -111,15 +146,26 @@ export const getAllVirtualOffices = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const { deleted, limit, page, property } = validation.data.query;
+    const { deleted, limit, page, property, city, name, area } =
+      validation.data.query;
     const _limit = limit ? Math.min(limit, 100) : 12; // paginate by default
     const _page = page ? Math.max(page, 1) : 1;
 
-    const query: any = deleted === "true" ? { isDeleted: true } : {};
+    const isDeleted = String(deleted) === "true";
+    const query: any = { isDeleted };
+
+    if (!isDeleted) {
+      query.isActive = true;
+      query.approvalStatus = SpaceApprovalStatus.ACTIVE;
+    }
 
     if (property) {
       query.property = property;
     }
+
+    if (city) query.city = new RegExp(`^${city}$`, "i");
+    if (name) query.name = new RegExp(name, "i");
+    if (area) query.area = area;
 
     const result = await VirtualOfficeService.getOffices(query, _limit, _page);
 
@@ -158,6 +204,23 @@ export const getVirtualOfficeById = async (req: Request, res: Response) => {
 
     if (!office) return sendError(res, 404, "Virtual office not found");
 
+    const isPublished =
+      office.isActive && office.approvalStatus === SpaceApprovalStatus.ACTIVE;
+
+    if (!isPublished) {
+      const user = (req as any).user;
+      const isPartner = user && user.id && office.partner.toString() === user.id;
+      const isAdmin = user && user.role === UserRole.ADMIN;
+
+      if (!isPartner && !isAdmin) {
+        return sendError(
+          res,
+          404,
+          "Virtual office not found",
+        );
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: "Virtual office retrieved successfully",
@@ -183,6 +246,9 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
     const result = await VirtualOfficeService.getOffices(
       {
         city: new RegExp(`^${city}$`, "i"),
+        isActive: true,
+        isDeleted: false,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
       },
       _limit,
       _page,

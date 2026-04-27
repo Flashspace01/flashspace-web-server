@@ -3,12 +3,20 @@ import path from 'path';
 import fs from 'fs';
 
 // Create uploads directories if they don't exist
-const kycDocsDir = path.join(__dirname, '../../../../uploads/kyc-documents');
-const videoKycDir = path.join(__dirname, '../../../../uploads/video-kyc');
+const serverRoot = path.join(__dirname, '../../../../');
+const kycDocsDir = path.resolve(serverRoot, 'uploads/kyc-documents');
+const videoKycDir = path.resolve(serverRoot, 'uploads/video-kyc');
+
+console.log(`[Multer Config] Initializing directories:
+  KYC: ${kycDocsDir}
+  Video: ${videoKycDir}`);
 
 [kycDocsDir, videoKycDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
+        console.log(`[Multer Config] Creating directory: ${dir}`);
         fs.mkdirSync(dir, { recursive: true });
+    } else {
+        console.log(`[Multer Config] Directory already exists: ${dir}`);
     }
 });
 

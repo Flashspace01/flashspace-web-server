@@ -148,6 +148,18 @@ export class Ticket extends TimeStamps {
   @prop()
   public expiresAt?: Date;
 
+  @prop({ min: 1, max: 5, default: null })
+  public rating?: number;
+
+  @prop({ trim: true, default: null })
+  public ratingRemarks?: string;
+
+  @prop({ ref: () => User, default: null })
+  public ratedAssignee?: Ref<User>;
+
+  @prop({ default: null })
+  public feedbackSubmittedAt?: Date;
+
   static generateTicketNumber(): string {
     const prefix = "TKT";
     const date = new Date();

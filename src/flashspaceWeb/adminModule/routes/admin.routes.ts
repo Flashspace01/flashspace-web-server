@@ -23,6 +23,17 @@ console.log("💰 Finance Routes Loaded");
 export const adminRoutes = Router();
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
+
+// 1.1 Partner Management (Renamed for troubleshooting)
+adminRoutes.get(
+  "/space-partners",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getPartners,
+);
+
 // Space Partner KYC Document Review (admin)
 adminRoutes.put(
   "/spacePartner/kyc/document/review",
@@ -123,6 +134,16 @@ adminRoutes.get(
   ]),
   AdminController.getUsers,
 );
+adminRoutes.get(
+  "/partners",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.VIEW_ALL_SPACES,
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getPartnerUsers,
+);
 adminRoutes.post(
   "/users",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
@@ -172,6 +193,16 @@ adminRoutes.get(
     Permission.VIEW_ALL_SPACES,
   ]),
   AdminController.getClients,
+);
+
+adminRoutes.get(
+  "/clients/:clientId",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.MANAGE_OWN_SPACES,
+    Permission.VIEW_ALL_SPACES,
+  ]),
+  AdminController.getClientDetails,
 );
 
 // 5. KYC Management
@@ -280,6 +311,21 @@ adminRoutes.put(
 
 // --- B2B2C Space Onboarding & Approval ---
 adminRoutes.get(
+  "/spaces",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.getAllSpaces,
+);
+
+adminRoutes.get(
+  "/documents",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getAllDocuments,
+);
+
+adminRoutes.get(
   "/spaces/pending",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
   AdminController.getPendingSpaces,
@@ -289,6 +335,12 @@ adminRoutes.put(
   "/spaces/:spaceType/:id/approve",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
   AdminController.approveSpace,
+);
+
+adminRoutes.post(
+  "/spaces/list-on-behalf",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
+  AdminController.listSpaceOnBehalf,
 );
 
 // 6. Ticket Management Routes (from ticket module)
@@ -322,16 +374,6 @@ adminRoutes.get(
   "/affiliates/:id/stats",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
   AffiliateAdminController.getAffiliateStats,
-);
-
-// 8.1 Leaderboard
-adminRoutes.get(
-  "/leaderboard",
-  RBACMiddleware.requireAnyPermission([
-    Permission.MANAGE_ALL_USERS,
-    Permission.VIEW_DASHBOARD,
-  ]),
-  AdminController.getLeaderboard,
 );
 
 // 9. Finance Management

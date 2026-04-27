@@ -106,6 +106,43 @@ export class Property {
 
   @prop({ ref: () => User, required: true })
   public partner!: Ref<User>;
+
+  @prop()
+  public googleMapLink?: string;
+
+  // --- BUSINESS & BANK DETAILS (Migrated from SpaceUserKyc) ---
+  @prop({ trim: true })
+  public companyName?: string;
+
+  @prop({ trim: true })
+  public gstNumber?: string;
+
+  @prop({ trim: true })
+  public panNumber?: string;
+
+  @prop({ trim: true })
+  public registeredAddress?: string;
+
+  @prop({ trim: true })
+  public contactPhone?: string;
+
+  @prop({ trim: true })
+  public accountHolderName?: string;
+
+  @prop({ trim: true })
+  public bankName?: string;
+
+  @prop({ trim: true })
+  public accountNumber?: string;
+
+  @prop({ trim: true })
+  public ifscCode?: string;
+
+  @prop({ trim: true })
+  public branch?: string;
+
+  @prop({ trim: true })
+  public accountType?: string;
 }
 
 export const PropertyModel = getModelForClass(Property);

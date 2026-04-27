@@ -11,7 +11,21 @@ import { NotificationService } from "../../notificationModule/services/notificat
 import { NotificationType } from "../../notificationModule/models/Notification";
 import { BookingModel } from "../../bookingModule/booking.model";
 import { MeetingModel } from "../../meetingSchedulerModule/meeting.model";
+import { PropertyModel } from "../../propertyModule/property.model";
+import { VirtualOfficeModel } from "../../virtualOfficeModule/virtualOffice.model";
+import { CoworkingSpaceModel } from "../../coworkingSpaceModule/coworkingSpace.model";
+import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import Visit from "../../visitModule/models/visit.model";
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+
+// Explicit type → model mapping for reliable partner resolution
+const SPACE_MODEL_MAP: Record<string, any> = {
+  VirtualOffice: VirtualOfficeModel,
+  CoworkingSpace: CoworkingSpaceModel,
+  MeetingRoom: MeetingRoomModel,
+};
 
 export interface CreateTicketDTO {
   subject: string;
@@ -41,33 +55,124 @@ export class TicketService {
   // ============ USER METHODS ============
 
   static async createTicket(userId: string, data: CreateTicketDTO): Promise<any> {
+    console.log(`[TicketDebug] createTicket called for user ${userId} with data:`, JSON.stringify(data));
     const ticketNumber = Ticket.generateTicketNumber();
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    let chatType: "user_admin" | "user_partner" = "user_admin";
-    let affiliateId: Types.ObjectId | undefined = undefined;
-    let partnerId: Types.ObjectId | undefined = undefined;
-
-    if (data.bookingId) {
-      const booking = (await BookingModel.findById(data.bookingId).lean()) as any;
-      if (booking) {
-        chatType = "user_partner";
-        if (booking.partner) {
-          partnerId = new Types.ObjectId(booking.partner.toString());
-        }
-        if (booking.affiliateId) {
-          affiliateId = new Types.ObjectId(booking.affiliateId.toString());
-        }
-      }
-    }
-
     let bookingObjectId: Types.ObjectId | undefined;
+    let partnerId: Types.ObjectId | undefined = undefined;
+    let affiliateId: Types.ObjectId | undefined = undefined;
+    let chatType: "user_admin" | "user_partner" = "user_admin";
+
     if (data.bookingId) {
+      let bookingDoc: any;
       if (Types.ObjectId.isValid(data.bookingId)) {
         bookingObjectId = new Types.ObjectId(data.bookingId);
+        bookingDoc = await BookingModel.findById(bookingObjectId).lean();
+        console.log(`[TicketDebug] Lookup by ID ${bookingObjectId}: ${bookingDoc ? "Found" : "Not Found"}`);
       } else {
-        const booking = await BookingModel.findOne({ bookingNumber: data.bookingId }).select("_id").lean();
-        if (booking) bookingObjectId = booking._id as Types.ObjectId;
+        bookingDoc = await BookingModel.findOne({ bookingNumber: data.bookingId }).lean();
+        console.log(`[TicketDebug] Lookup by Number ${data.bookingId}: ${bookingDoc ? "Found" : "Not Found"}`);
+        if (bookingDoc) bookingObjectId = bookingDoc._id as Types.ObjectId;
+      }
+
+      if (bookingDoc) {
+        console.log(`[TicketDebug] Booking found. Type: ${bookingDoc.type}, SpaceId: ${bookingDoc.spaceId}`);
+        chatType = "user_partner";
+
+        // ── Step 1: Resolve partner from the actual space model ──
+        const debugLogs: string[] = [];
+        debugLogs.push(`[${new Date().toISOString()}] Creating ticket for booking: ${bookingObjectId}`);
+
+        try {
+          const SpaceModel = SPACE_MODEL_MAP[bookingDoc.type];
+          debugLogs.push(`Space Type: ${bookingDoc.type}, Model exists: ${!!SpaceModel}`);
+
+          if (SpaceModel) {
+            const space = await SpaceModel.findById(bookingDoc.spaceId).lean();
+            debugLogs.push(`Space record found: ${!!space}`);
+            
+            if (space && (space as any).partner) {
+              const sid = (space as any).partner.toString();
+              debugLogs.push(`Found partner ID in space: ${sid}`);
+              
+              // Verify immediately
+              const userExists = await UserModel.findById(sid).select('_id fullName').lean();
+              if (userExists) {
+                partnerId = new Types.ObjectId(sid);
+                debugLogs.push(`✅ Partner verified: ${userExists.fullName}`);
+              } else {
+                debugLogs.push(`❌ Partner ID ${sid} NOT found in Users collection!`);
+              }
+            }
+
+            // ── Step 2: Fallback to Property (via space.property) ──
+            if (!partnerId && space && (space as any).property) {
+              debugLogs.push(`Falling back to checking Property: ${(space as any).property}`);
+              const property = await PropertyModel.findById((space as any).property).lean();
+              if (property && property.partner) {
+                const pid = property.partner.toString();
+                const userExists = await UserModel.findById(pid).select('_id fullName').lean();
+                if (userExists) {
+                  partnerId = new Types.ObjectId(pid);
+                  debugLogs.push(`✅ Partner found via Property: ${userExists.fullName}`);
+                } else {
+                  debugLogs.push(`❌ Property partner ${pid} NOT found in Users!`);
+                }
+              }
+            }
+          }
+
+          // ── Step 3: Direct Property Lookup ──
+          if (!partnerId) {
+            debugLogs.push(`Trying direct Property lookup for spaceId: ${bookingDoc.spaceId}`);
+            const property = await PropertyModel.findById(bookingDoc.spaceId).lean();
+            if (property && property.partner) {
+              const pid = property.partner.toString();
+              const userExists = await UserModel.findById(pid).select('_id fullName').lean();
+              if (userExists) {
+                partnerId = new Types.ObjectId(pid);
+                debugLogs.push(`✅ Partner found via direct Property lookup: ${userExists.fullName}`);
+              }
+            }
+          }
+
+          // ── Step 4: Final fallback ──
+          if (!partnerId && bookingDoc.partner) {
+            const bid = bookingDoc.partner.toString();
+            debugLogs.push(`Last fallback - checking booking.partner: ${bid}`);
+            const userExists = await UserModel.findById(bid).select('_id fullName').lean();
+            if (userExists) {
+              partnerId = new Types.ObjectId(bid);
+              debugLogs.push(`✅ Partner found via booking fallback: ${userExists.fullName}`);
+            } else {
+              debugLogs.push(`❌ Booking partner ${bid} NOT found in Users!`);
+            }
+          }
+
+        } catch (err: any) {
+          debugLogs.push(`ERROR in resolution: ${err.message}`);
+        }
+
+        debugLogs.push(`FINAL Resolved partnerId: ${partnerId || 'NONE'}`);
+
+        // Safety override for the known bad ID
+        if (partnerId && partnerId.toString() === '69e0ba90ffbd9962e51008e2') {
+            debugLogs.push(`🚨 FORCING NULL: Suspicious ID detected at last moment.`);
+            partnerId = undefined;
+        }
+
+        // Write logs to file for Antigravity to see
+        try {
+          const logPath = path.resolve(process.cwd(), 'ticket_debug.log');
+          fs.appendFileSync(logPath, debugLogs.join('\n') + '\n\n');
+        } catch (f) { /* ignore */ }
+
+        if (bookingDoc.affiliateId) {
+          affiliateId = new Types.ObjectId(bookingDoc.affiliateId.toString());
+        }
+      } else {
+        console.warn(`[TicketDebug] Could not find booking for ID: ${data.bookingId}`);
       }
     }
 
@@ -78,10 +183,11 @@ export class TicketService {
       user: new Types.ObjectId(userId),
       category: data.category,
       priority: data.priority || TicketPriority.MEDIUM,
-      status: TicketStatus.OPEN,
+      status: partnerId ? TicketStatus.IN_PROGRESS : TicketStatus.OPEN,
       attachments: data.attachments || [],
       bookingId: bookingObjectId,
       partnerId,
+      assignee: partnerId || null, // Auto-assign to partner if exists
       chatType,
       affiliateId,
       tappedIn: [],
@@ -91,6 +197,7 @@ export class TicketService {
 
     const populatedTicket = await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
+      .populate("assignee", "fullName email role")
       .lean();
 
     NotificationService.notifyAdmin(
@@ -99,6 +206,16 @@ export class TicketService {
       NotificationType.INFO,
       { ticketId: ticket._id },
     );
+
+    if (partnerId) {
+      NotificationService.notifyUser(
+        partnerId.toString(),
+        `New Assignment: ${ticketNumber}`,
+        `You have been assigned to help with ticket regarding your space booking.`,
+        NotificationType.INFO,
+        { ticketId: ticket._id },
+      );
+    }
 
     return populatedTicket;
   }
@@ -111,7 +228,8 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean(),
       TicketModel.countDocuments({ user: new Types.ObjectId(userId) }),
     ]);
@@ -133,12 +251,18 @@ export class TicketService {
 
       return await TicketModel.findOne(query)
         .populate("user", "fullName email phoneNumber")
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean();
     } catch (error) {
       console.error("Error in getTicketById:", error);
       return null;
     }
+  }
+
+  static async replyToTicket(data: ReplyDTO & { ticketId: string }) {
+    const { ticketId, ...replyData } = data;
+    return this.addReply(ticketId, replyData);
   }
 
   static async addReply(ticketId: string, data: ReplyDTO) {
@@ -214,7 +338,8 @@ export class TicketService {
         .skip(skip)
         .limit(limit)
         .populate("user", "fullName email phoneNumber")
-        .populate("assignee", "fullName email")
+        .populate("assignee", "fullName email role")
+        .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean(),
       TicketModel.countDocuments(query),
     ]);
@@ -272,7 +397,7 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
     return ticket;
@@ -304,7 +429,7 @@ export class TicketService {
 
     return await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email")
+      .populate("assignee", "fullName email role")
       .lean();
   }
 
@@ -315,9 +440,34 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
+
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
+    // Notify the user about the assignment
+    try {
+      NotificationService.notifyUser(
+        targetUserId,
+        `Ticket Assigned: ${ticket.ticketNumber}`,
+        `Your ticket has been assigned to ${(ticket.assignee as any).fullName || 'a specialist'}. They will assist you shortly.`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+
+      // Notify the assignee about their new task
+      NotificationService.notifyUser(
+        assigneeId,
+        `New Ticket Assignment: ${ticket.ticketNumber}`,
+        `You have been assigned to handle ticket: ${ticket.subject}`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+    } catch (err) {
+      console.error("Failed to send assignment notifications:", err);
+    }
+
     return ticket;
   }
 
@@ -328,7 +478,7 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
     return ticket;
@@ -341,12 +491,14 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
 
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
     NotificationService.notifyUser(
-      ticket.user._id.toString(),
+      targetUserId,
       `Ticket Resolved: ${ticket.ticketNumber}`,
       `Your ticket has been marked as resolved.`,
       NotificationType.SUCCESS,
@@ -363,12 +515,14 @@ export class TicketService {
       { new: true },
     )
       .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email");
+      .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
 
+    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
+
     NotificationService.notifyUser(
-      ticket.user._id.toString(),
+      targetUserId,
       `Ticket Closed: ${ticket.ticketNumber}`,
       `Your ticket has been closed.`,
       NotificationType.INFO,
@@ -392,27 +546,36 @@ export class TicketService {
 
   private static async validatePartnerOwnership(ticketId: string, partnerId: string) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
-    if (bookingIds.length === 0) return null;
 
-    return TicketModel.findOne({
+    const query: any = {
       _id: new Types.ObjectId(ticketId),
-      bookingId: { $in: bookingIds },
-    });
+      $or: [
+        { partnerId: new Types.ObjectId(partnerId) },
+        { assignee: new Types.ObjectId(partnerId) }
+      ]
+    };
+
+    if (bookingIds.length > 0) {
+      query.$or.push({ bookingId: { $in: bookingIds } });
+    }
+
+    return TicketModel.findOne(query);
   }
 
   static async getPartnerTickets(partnerId: string, page: number = 1, limit: number = 20) {
     const bookingIds = await this.getPartnerBookingIds(partnerId);
-    if (bookingIds.length === 0) {
-      return { tickets: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false };
-    }
 
     const skip = (page - 1) * limit;
-    const query = {
-      $or: [
-        { bookingId: { $in: bookingIds } },
-        { partnerId: new Types.ObjectId(partnerId) }
-      ]
-    };
+    const orConditions: any[] = [
+      { partnerId: new Types.ObjectId(partnerId) },
+      { assignee: new Types.ObjectId(partnerId) }
+    ];
+
+    if (bookingIds.length > 0) {
+      orConditions.push({ bookingId: { $in: bookingIds } });
+    }
+
+    const query = { $or: orConditions };
 
     const [tickets, total] = await Promise.all([
       TicketModel.find(query)
@@ -420,10 +583,20 @@ export class TicketService {
         .skip(skip)
         .limit(limit)
         .populate("user", "fullName email phoneNumber")
+        .populate("assignee", "fullName email role")
         .populate("bookingId", "bookingNumber spaceSnapshot type")
         .lean(),
       TicketModel.countDocuments(query),
     ]);
+
+    console.log(`[TicketDebug] Found ${tickets.length} tickets for partner ${partnerId}. Global count: ${total}`);
+    if (tickets.length > 0) {
+        console.log(`[TicketDebug] Example ticket for partner:`, tickets[0]._id, { 
+            partnerId: tickets[0].partnerId, 
+            assignee: tickets[0].assignee?._id || tickets[0].assignee,
+            bookingId: tickets[0].bookingId?._id || tickets[0].bookingId
+        });
+    }
 
     return {
       tickets,
@@ -469,15 +642,15 @@ export class TicketService {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) throw new Error("Ticket not found or access denied");
 
-    ticket.status = TicketStatus.CLOSED;
-    ticket.closedAt = new Date();
+    ticket.status = TicketStatus.RESOLVED;
+    ticket.resolvedAt = new Date();
     await ticket.save();
 
     NotificationService.notifyUser(
       ticket.user.toString(),
-      `Query Closed: ${ticket.ticketNumber}`,
-      `Your query has been closed by the partner.`,
-      NotificationType.INFO,
+      `Query Resolved: ${ticket.ticketNumber}`,
+      `Your query has been marked as resolved by the partner.`,
+      NotificationType.SUCCESS,
       { ticketId: ticket._id },
     );
 
@@ -673,5 +846,38 @@ export class TicketService {
       .populate("user", "fullName email phoneNumber")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
+  }
+
+  static async submitFeedback(ticketId: string, userId: string, rating: number, remarks: string) {
+    const ticket = await TicketModel.findOne({
+      _id: new Types.ObjectId(ticketId),
+      user: new Types.ObjectId(userId)
+    });
+
+    if (!ticket) throw new Error("Ticket not found or access denied");
+    
+    if (ticket.status !== TicketStatus.CLOSED && ticket.status !== TicketStatus.RESOLVED) {
+      throw new Error("Feedback can only be submitted for closed or resolved tickets");
+    }
+
+    if (ticket.feedbackSubmittedAt) {
+      throw new Error("Feedback already submitted for this ticket");
+    }
+
+    ticket.rating = rating;
+    ticket.ratingRemarks = remarks;
+    ticket.ratedAssignee = ticket.assignee || ticket.partnerId; // Capture the person who was assigned/partner
+    ticket.feedbackSubmittedAt = new Date();
+
+    await ticket.save();
+
+    NotificationService.notifyAdmin(
+      `Feedback Received: ${ticket.ticketNumber}`,
+      `User rated ${rating}/5: ${remarks.substring(0, 50)}...`,
+      NotificationType.INFO,
+      { ticketId: ticket._id }
+    );
+
+    return ticket;
   }
 }

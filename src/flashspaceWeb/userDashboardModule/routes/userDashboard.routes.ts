@@ -1,6 +1,14 @@
 import { Router } from "express";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../config/multer.config";
+import { AuthController } from "../../authModule/controllers/auth.controller";
+import { uploadProfilePic } from "../../authModule/config/multer.config";
+import {
+  createTeamMember,
+  deleteTeamMember,
+  getTeamMembers,
+} from "../../spacePartnerModule/controllers/teamMember.controller";
+const authController = new AuthController();
 import {
   getDashboardOverview,
   getAllBookings,
@@ -28,6 +36,7 @@ import {
   getPartnerSpaceBookings,
   getPartnerPropertyBookings,
   getPartnerClients,
+  getPartnerClientBookings,
   getPartnerClientDetails,
   getAllPartnerSpaces,
   getUserMails,
@@ -67,7 +76,11 @@ router.get(
   getPartnerPropertyAnalytics,
 );
 router.get("/partner/clients", getPartnerClients);
+router.get("/partner/client-bookings", getPartnerClientBookings);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
+router.get("/partner/team-members", getTeamMembers);
+router.post("/partner/team-members", createTeamMember);
+router.delete("/partner/team-members/:memberId", deleteTeamMember);
 
 // ============ BOOKINGS ============
 router.get("/bookings", getAllBookings);
@@ -117,6 +130,7 @@ router.delete("/kyc/profile/:profileId", deleteKYCProfile);
 router.delete("/kyc/business-info/:profileId", deleteKYCProfile);
 router.post(
   "/kyc/submit",
+  
   (req, res, next) => {
     console.log(
       `[DEBUG_ROUTE] POST /kyc/submit hit at ${new Date().toISOString()}`,
@@ -139,6 +153,13 @@ router.post("/support/tickets/:ticketId/reply", replyToTicket);
 // ============ CREDITS & REWARDS ============
 router.get("/credits", getCredits);
 router.post("/credits/redeem", redeemReward);
+
+// ============ PROFILE ============
+router.post(
+  "/upload-avatar",
+  uploadProfilePic.single("profilePicture"),
+  authController.uploadProfilePicture,
+);
 
 // ============ PARTNER KYC ============
 import {

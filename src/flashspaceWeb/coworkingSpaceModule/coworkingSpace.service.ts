@@ -5,6 +5,7 @@ import { PropertyService } from "../propertyModule/property.service";
 import { PropertyModel } from "../propertyModule/property.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 
 export class CoworkingSpaceService {
   static generateSeatsForFloors(floors?: any[]) {
@@ -45,7 +46,7 @@ export class CoworkingSpaceService {
       ...data,
       property: property._id,
       partner: partnerId,
-      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
+      approvalStatus: data.approvalStatus ?? SpaceApprovalStatus.PENDING_KYC,
       avgRating: 0,
       totalReviews: 0,
     });
@@ -71,14 +72,26 @@ export class CoworkingSpaceService {
     userRole?: string,
   ) {
     const query: any = { _id: spaceId, isDeleted: false };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // Enforce ownership if the user is NOT an admin
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
     }
 
     // Exclude rating fields from update to prevent manipulation
     const { avgRating, totalReviews, ...updateData } = data;
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
+    }
 
     if (updateData.floors) {
       updateData.floors = this.generateSeatsForFloors(updateData.floors);
@@ -87,6 +100,17 @@ export class CoworkingSpaceService {
     const spaceToUpdate = await CoworkingSpaceModel.findOne(query);
     if (!spaceToUpdate) {
       throw new Error("Space not found or unauthorized");
+    }
+
+    if (
+      !canManageAllSpaces &&
+      (updateData.isActive === true ||
+        updateData.approvalStatus === SpaceApprovalStatus.ACTIVE)
+    ) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        spaceToUpdate.property.toString(),
+      );
     }
 
     // Update Property Fields
@@ -151,7 +175,7 @@ export class CoworkingSpaceService {
       }
     }
 
-    const finalQuery = { ...filter, isDeleted: false };
+    const finalQuery = { isDeleted: false, ...filter };
     const baseQuery = CoworkingSpaceModel.find(finalQuery)
       .populate({
         path: "property",
@@ -197,18 +221,27 @@ export class CoworkingSpaceService {
   }
 
   // FIXED: Added userRole and dynamic RBAC query
-  static async deleteSpace(spaceId: string, userId: string, userRole?: string) {
-    const query: any = { _id: spaceId, isDeleted: false };
+  static async deleteSpace(
+    spaceId: string,
+    userId: string,
+    userRole?: string,
+    restore: boolean = false,
+  ) {
+    const query: any = { _id: spaceId, isDeleted: restore };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // Enforce ownership if the user is NOT an admin
-    if (userRole !== UserRole.ADMIN) {
+    if (!canManageAllSpaces) {
       query.partner = userId;
     }
 
     // Soft delete
     const space = await CoworkingSpaceModel.findOneAndUpdate(
       query,
-      { isActive: false, isDeleted: true },
+      { isActive: restore, isDeleted: !restore },
       { new: true },
     );
 

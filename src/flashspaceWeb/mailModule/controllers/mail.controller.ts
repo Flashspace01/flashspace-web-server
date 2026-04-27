@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
 import Mail from "../models/mail.model";
+import { UserModel } from "../../authModule/models/user.model";
+import { NotificationType } from "../../notificationModule/models/Notification";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { EmailUtil } from "../../authModule/utils/email.util";
 
 export const createMail = async (req: Request, res: Response) => {
   try {
@@ -34,6 +38,49 @@ export const createMail = async (req: Request, res: Response) => {
     });
 
     await newMail.save();
+
+    // Notify client user (if account exists for the provided email)
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const clientUser = await UserModel.findOne({
+        email: normalizedEmail,
+        isDeleted: { $ne: true },
+      })
+        .select("_id")
+        .lean();
+
+      if (clientUser?._id) {
+        // 1. In-app notification
+        await NotificationService.notifyUser(
+          clientUser._id.toString(),
+          "New Mail Record Added",
+          `A new mail item from ${sender} has been logged for ${space}.`,
+          NotificationType.INFO,
+          {
+            mailId: newMail._id,
+            type: "mail_record",
+            sender,
+            space,
+            actionUrl: "/dashboard/mail-records",
+          },
+          { preferenceKey: "push" },
+        );
+
+        // 2. Email notification
+        try {
+          await EmailUtil.sendMailRecordEmail(
+            normalizedEmail,
+            (clientUser as any).fullName || client,
+            { sender, type, office: space }
+          );
+        } catch (emailErr) {
+          console.error("[createMail] Email failed:", emailErr);
+        }
+      }
+    } catch (notifError) {
+      console.error("[createMail] Failed to notify client user:", notifError);
+    }
+
     res.status(201).json({ success: true, data: newMail });
   } catch (error) {
     console.error("[createMail] Error:", error);
@@ -82,12 +129,10 @@ export const updateMailStatus = async (req: Request, res: Response) => {
 
     const validStatuses = ["Pending Action", "Forwarded", "Collected"];
     if (!status || !validStatuses.includes(status)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Invalid or missing status provided.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or missing status provided.",
+      });
     }
 
     const updatedMail = await Mail.findByIdAndUpdate(
@@ -100,6 +145,28 @@ export const updateMailStatus = async (req: Request, res: Response) => {
       return res
         .status(404)
         .json({ success: false, message: "Mail record not found" });
+    }
+
+    // Notify Partner if the client requested forwarding
+    if (status === "Forwarded") {
+      try {
+        await NotificationService.notifyUser(
+          updatedMail.partnerId.toString(),
+          "Mail Forwarding Requested",
+          `A client has requested forwarding for mail item ${updatedMail.mailId} (from ${updatedMail.sender}).`,
+          NotificationType.INFO,
+          {
+            mailId: updatedMail._id,
+            type: "mail_forward_request",
+            sender: updatedMail.sender,
+            client: updatedMail.client,
+            actionUrl: "/spaceportal/mail-visits",
+          },
+          { preferenceKey: "push" },
+        );
+      } catch (notifError) {
+        console.error("[updateMailStatus] Notification failed:", notifError);
+      }
     }
 
     res.status(200).json({ success: true, data: updatedMail });

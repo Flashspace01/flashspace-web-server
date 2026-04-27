@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
 import Visit from "../models/visit.model";
+import { UserModel } from "../../authModule/models/user.model";
+import { NotificationType } from "../../notificationModule/models/Notification";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { EmailUtil } from "../../authModule/utils/email.util";
 
 export const getVisits = async (req: Request, res: Response) => {
   try {
@@ -64,6 +68,49 @@ export const createVisit = async (req: Request, res: Response) => {
     });
 
     await newVisit.save();
+
+    // Notify client user (if account exists for the provided email)
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      const clientUser = await UserModel.findOne({
+        email: normalizedEmail,
+        isDeleted: { $ne: true },
+      })
+        .select("_id")
+        .lean();
+
+      if (clientUser?._id) {
+        // 1. In-app notification
+        await NotificationService.notifyUser(
+          clientUser._id.toString(),
+          "New Visit Record Added",
+          `A visitor entry for ${visitor} has been logged at ${space}.`,
+          NotificationType.INFO,
+          {
+            visitId: newVisit._id,
+            type: "visit_record",
+            visitor,
+            space,
+            actionUrl: "/dashboard/visit-records",
+          },
+          { preferenceKey: "loginAlerts" },
+        );
+
+        // 2. Email notification
+        try {
+          await EmailUtil.sendVisitRecordEmail(
+            normalizedEmail,
+            (clientUser as any).fullName || client,
+            { visitor, purpose, office: space }
+          );
+        } catch (emailErr) {
+          console.error("[createVisit] Email failed:", emailErr);
+        }
+      }
+    } catch (notifError) {
+      console.error("[createVisit] Failed to notify client user:", notifError);
+    }
+
     res.status(201).json({ success: true, data: newVisit });
   } catch (error: any) {
     console.error("Error creating visit record:", error);
@@ -80,8 +127,10 @@ export const updateVisitStatus = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ["Pending", "Completed"];
+    console.log(`[DEBUG] Updating Visit ${id} to status: ${status}`);
+    const validStatuses = ["Pending", "Forwarded", "Completed"];
     if (!status || !validStatuses.includes(status)) {
+      console.log(`[DEBUG] Validation failed. Received: ${status}, Allowed: ${validStatuses}`);
       return res.status(400).json({
         success: false,
         message: "Invalid or missing status provided.",
@@ -98,6 +147,28 @@ export const updateVisitStatus = async (req: Request, res: Response) => {
       return res
         .status(404)
         .json({ success: false, message: "Visit not found" });
+    }
+
+    // Notify Partner if the client requested forwarding for the visit
+    if (status === "Forwarded") {
+      try {
+        await NotificationService.notifyUser(
+          updatedVisit.partnerId.toString(),
+          "Visit Forwarding Requested",
+          `The client for visit ${updatedVisit.visitId} (${updatedVisit.visitor}) has requested forwarding/info.`,
+          NotificationType.INFO,
+          {
+            visitId: updatedVisit._id,
+            type: "visit_forward_request",
+            visitor: updatedVisit.visitor,
+            client: updatedVisit.client,
+            actionUrl: "/spaceportal/mail-visits",
+          },
+          { preferenceKey: "push" },
+        );
+      } catch (notifError) {
+        console.error("[updateVisitStatus] Notification failed:", notifError);
+      }
     }
 
     res.status(200).json({ success: true, data: updatedVisit });

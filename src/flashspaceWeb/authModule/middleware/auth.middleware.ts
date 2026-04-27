@@ -16,6 +16,7 @@ export class AuthMiddleware {
     try {
       console.log("[AuthMiddleware.authenticate] Incoming request:", {
         path: req.path,
+        originalUrl: req.originalUrl,
         method: req.method,
       });
 
@@ -37,6 +38,9 @@ export class AuthMiddleware {
       }
 
       if (!token) {
+        console.warn("[AuthMiddleware.authenticate] No token found in cookies or headers!");
+        console.log("[AuthMiddleware.authenticate] All Headers:", req.headers);
+        console.log("[AuthMiddleware.authenticate] All Cookies:", req.cookies);
         res.status(401).json({
           success: false,
           message: "Access token required",

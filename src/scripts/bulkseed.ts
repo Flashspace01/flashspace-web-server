@@ -193,6 +193,7 @@ const runSeed = async () => {
         adminMarkupPerMonth: cwMarkup,
         finalPricePerMonth: cwPrice + cwMarkup,
         isActive: true,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
         floors: floors,
         operatingHours: {
           openTime: "08:00",
@@ -216,6 +217,7 @@ const runSeed = async () => {
         partner: property.partner,
         property: property._id,
         isActive: true,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
         partnerGstPricePerYear: voPrice,
         adminMarkupGstPerYear: 500,
         finalGstPricePerYear: voPrice + 500,

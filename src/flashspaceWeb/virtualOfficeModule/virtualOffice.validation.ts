@@ -88,6 +88,8 @@ export const updateVirtualOfficeSchema = z.object({
     isActive: z.boolean().optional(),
     isDeleted: z.boolean().optional(),
     approvalStatus: z.string().optional(),
+    partner: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Partner ID").optional(),
+    partnerId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid Partner ID").optional(),
   }),
 });
 
@@ -113,6 +115,9 @@ export const getVirtualOfficesSchema = z.object({
       .string()
       .regex(/^[0-9a-fA-F]{24}$/, "Invalid Property ID")
       .optional(),
+    city: z.string().optional(),
+    name: z.string().optional(),
+    area: z.string().optional(),
   }),
 });
 

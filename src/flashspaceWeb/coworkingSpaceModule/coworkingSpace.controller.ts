@@ -9,6 +9,8 @@ import {
 import { CoworkingSpaceModel } from "./coworkingSpace.model";
 import { PropertyModel } from "../propertyModule/property.model";
 import { UserRole } from "../authModule/models/user.model";
+import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 const sendError = (
   res: Response,
@@ -58,12 +60,46 @@ export const createCoworkingSpace = async (req: Request, res: Response) => {
       propertyId,
     } = validation.data.body;
 
-    const partnerId = (req as any).user?.id;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+    
+    // If admin is creating, they can specify a partner in the body
+    let partnerId = userId;
+    if (userRole === UserRole.ADMIN && req.body.partner) {
+      partnerId = req.body.partner;
+    } else if (userRole === UserRole.ADMIN && req.body.partnerId) {
+      partnerId = req.body.partnerId;
+    }
+
     if (!partnerId)
       return sendError(res, 401, "Unauthorized: No partner found");
 
+    const createBody: any = { ...validation.data.body };
+    const canCreateWithoutPartnerKyc =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
+
+    // If admin is creating, auto-approve
+    if (canCreateWithoutPartnerKyc) {
+      createBody.approvalStatus = SpaceApprovalStatus.ACTIVE;
+      createBody.isActive = true;
+    } else {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
+    }
+
     const createdSpace = await CoworkingSpaceService.createSpace(
       {
+        ...createBody,
         name,
         address,
         city,
@@ -146,15 +182,27 @@ export const getAllCoworkingSpaces = async (req: Request, res: Response) => {
       return sendError(res, 400, "Validation Error", validation.error.issues);
     }
 
-    const { deleted, property, limit, page } = validation.data.query;
+    const { deleted, property, limit, page, city, name, area } =
+      validation.data.query;
     const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
-    const query: any = String(deleted) === "true" ? { isDeleted: true } : {};
+    const isDeleted = String(deleted) === "true";
+    const query: any = { isDeleted };
+
+    // Public listing should only show active spaces
+    if (!isDeleted) {
+      query.isActive = true;
+      query.approvalStatus = SpaceApprovalStatus.ACTIVE;
+    }
 
     if (property) {
       query.property = property;
     }
+
+    if (city) query.city = new RegExp(`^${city}$`, "i");
+    if (name) query.name = new RegExp(name, "i");
+    if (area) query.area = area;
 
     const result = await CoworkingSpaceService.getSpaces(query, {
       limit: _limit,
@@ -207,7 +255,10 @@ export const getCoworkingSpaceById = async (req: Request, res: Response) => {
     );
     if (!space) return sendError(res, 404, "Coworking space not found");
 
-    if (!space.isActive) {
+    const isPublished =
+      space.isActive && space.approvalStatus === SpaceApprovalStatus.ACTIVE;
+
+    if (!isPublished) {
       const user = (req as any).user;
       const isPartner = user && user.id && space.partner.toString() === user.id;
       const isAdmin = user && user.role === UserRole.ADMIN;
@@ -251,6 +302,9 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
     const result = await CoworkingSpaceService.getSpaces(
       {
         city: new RegExp(`^${city}$`, "i"),
+        isActive: true,
+        isDeleted: false,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
       },
       { limit: _limit, page: _page },
     );
@@ -338,8 +392,10 @@ export const getPartnerSpaces = async (req: Request, res: Response) => {
 export const deleteCoworkingSpace = async (req: Request, res: Response) => {
   try {
     const { coworkingSpaceId } = req.params;
+    const { restore } = req.query;
     const userId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
+    const isRestoring = String(restore) === "true";
 
     if (!userId) return sendError(res, 401, "Unauthorized");
 
@@ -347,10 +403,13 @@ export const deleteCoworkingSpace = async (req: Request, res: Response) => {
       coworkingSpaceId as string,
       userId,
       userRole,
+      isRestoring,
     );
     res.status(200).json({
       success: true,
-      message: "Coworking space deleted successfully",
+      message: isRestoring
+        ? "Coworking space restored successfully"
+        : "Coworking space deleted successfully",
       data: {},
     });
   } catch (err: any) {

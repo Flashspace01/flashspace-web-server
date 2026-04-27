@@ -16,6 +16,7 @@ import {
   escalateTicket,
   resolveTicket,
   closeTicket,
+  submitTicketFeedback,
   getPartnerTickets,
   addPartnerReply,
   partnerCloseTicket,
@@ -32,6 +33,7 @@ router.post('/', AuthMiddleware.authenticate, RoleMiddleware.requireClientRole, 
 router.get('/my-tickets', AuthMiddleware.authenticate, RoleMiddleware.requireClientRole, getUserTickets);
 router.get('/:ticketId', AuthMiddleware.authenticate, RoleMiddleware.requireClientRole, getTicketById);
 router.post('/:ticketId/reply', AuthMiddleware.authenticate, RoleMiddleware.requireClientRole, TicketValidation.validateReply, replyToTicket);
+router.post('/:ticketId/feedback', AuthMiddleware.authenticate, RoleMiddleware.requireClientRole, submitTicketFeedback);
 
 // ============ ADMIN ROUTES ============
 router.get('/admin/all', AuthMiddleware.authenticate, RoleMiddleware.requireAdmin, getAllTickets);

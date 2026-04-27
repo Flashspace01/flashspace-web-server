@@ -16,6 +16,10 @@ import { dbConnection } from "./config/db.config";
 import { EmailUtil } from "./flashspaceWeb/authModule/utils/email.util";
 import { GoogleUtil } from "./flashspaceWeb/authModule/utils/google.util";
 import { initSocket } from "./socket"; // Import socket init
+import {
+  backfillLocalUploadsToGridFs,
+  serveUploadedFile,
+} from "./flashspaceWeb/shared/utils/uploadedFileStore";
 
 const PORT: string | number = process.env.PORT || 5000;
 
@@ -60,6 +64,27 @@ const allowedOrigins = [
   "http://72.60.219.115:8080",
   "http://72.60.219.115",
 ];
+
+// Middleware to handle CORS Preflight and PNA
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    
+    if (req.headers["access-control-request-private-network"]) {
+      res.setHeader("Access-Control-Allow-Private-Network", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, x-api-key, X-API-Key, x-region, X-Region, Accept, Origin");
+      return res.sendStatus(204);
+    }
+  }
+  next();
+});
 
 // Middleware to handle Private Network Access (PNA) preflight requests
 app.use((req, res, next) => {
@@ -120,6 +145,7 @@ app.use((req, res, next) => {
 dbConnection()
   .then(() => {
     console.log("Database connection established successfully.");
+    console.log(`[SERVER] Started/Restarted at: ${new Date().toISOString()}`);
 
     // Start server with feedback and explicit host binding
     const HOST = process.env.HOST || "0.0.0.0";
@@ -131,17 +157,34 @@ dbConnection()
       .on("error", (err: any) => {
         console.error("Failed to start HTTP server:", err?.message || err);
       });
+
+    backfillLocalUploadsToGridFs()
+      .then((result) => {
+        console.log(
+          `[UploadedFileStore] Backfill complete. scanned=${result.scanned}, backedUp=${result.backedUp}, skipped=${result.skipped}, failed=${result.failed}`,
+        );
+      })
+      .catch((err) => {
+        console.error("[UploadedFileStore] Backfill failed:", err);
+      });
   })
   .catch((error: unknown) => {
     console.error("Database connection failed:", error);
     process.exit(1);
   });
 
-// Serve uploaded files statically
-// Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Serve uploaded files. `/api/uploads` is kept as a compatibility alias for
+// older frontend links that were built from an API base URL.
+app.use("/uploads", serveUploadedFile);
+app.use("/api/uploads", serveUploadedFile);
 
 // Main API routes
+app.get("/api/super-test", (req, res) => {
+  res.json({ success: true, message: "SUPER TEST - app.ts is working" });
+});
+app.get("/api/test-route", (req, res) => {
+  res.json({ success: true, message: "GOT IT - Server is running the latest code" });
+});
 app.use("/api", mainRoutes);
 
 // 404 Handler for /api
@@ -161,4 +204,6 @@ app.use((req, res) => {
   });
 });
 
-// TART - force nodemon restart 1774859050855
+// TART - force nodemon restart 2555159050858
+// TART - force nodemon restart 2555159050857
+// TART - force nodemon restart ${Date.now() + 1}

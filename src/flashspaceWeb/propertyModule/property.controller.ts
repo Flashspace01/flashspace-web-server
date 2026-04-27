@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PropertyModel } from "./property.model";
+import { PropertyModel, KYCStatus } from "./property.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
@@ -7,6 +7,9 @@ import { getFileUrl as getMulterFileUrl } from "../userDashboardModule/config/mu
 import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
+import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 const sendError = (
   res: Response,
@@ -26,14 +29,46 @@ const sendError = (
 export const createProperty = async (req: Request, res: Response) => {
   try {
     console.log("🏨 CreateProperty hit by user:", (req as any).user);
-    const partnerId = (req as any).user?.id;
+    const userId = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+    
+    // If admin is creating, they can specify a partner in the body
+    let partnerId = userId;
+    if (userRole === "admin" && req.body.partner) {
+      partnerId = req.body.partner;
+      console.log(`👑 Admin is assigning property to partner: ${partnerId}`);
+    } else if (userRole === "admin" && req.body.partnerId) {
+       partnerId = req.body.partnerId;
+       console.log(`👑 Admin is assigning property to partnerId: ${partnerId}`);
+    }
+
     if (!partnerId) {
-      console.log("❌ createProperty: No partner ID found in request");
+      console.log("❌ createProperty: No partner ID found in request or body");
       return sendError(res, 401, "Unauthorized: No partner found");
     }
 
+    const canCreateWithoutPartnerKyc =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "space_partner_manager";
+
+    if (!canCreateWithoutPartnerKyc) {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
+    }
+
+    const { partner: _, partnerId: __, ...otherData } = req.body;
+
     const property = new PropertyModel({
-      ...req.body,
+      ...otherData,
       partner: partnerId,
     });
 
@@ -54,15 +89,29 @@ export const updateProperty = async (req: Request, res: Response) => {
     const { propertyId } = req.params;
     const partnerId = (req as any).user?.id;
     const userRole = (req as any).user?.role;
+    const canManageAllSpaces =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "space_partner_manager";
 
     const query: any = { _id: propertyId };
-    if (userRole !== "admin") {
+    if (!canManageAllSpaces) {
       query.partner = partnerId;
+    }
+
+    const updateData: any = { ...req.body };
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
     }
 
     // 1. ADDED: Validation to ensure all documents are approved before KYC approval
     // Skip this check for admins as they may be manually publishing/overriding
-    if (req.body.kycStatus === "approved" && userRole !== "admin") {
+    if (updateData.kycStatus === "approved" && !canManageAllSpaces) {
       const property = await PropertyModel.findById(propertyId);
       if (!property) {
         return sendError(res, 404, "Property not found");
@@ -82,14 +131,28 @@ export const updateProperty = async (req: Request, res: Response) => {
       }
     }
 
+    if (
+      !canManageAllSpaces &&
+      (updateData.isActive === true || updateData.status === "active")
+    ) {
+      await assertPartnerCanActivateSpace(partnerId, String(propertyId));
+    }
+
     const updatedProperty = await PropertyModel.findOneAndUpdate(
       query,
-      { $set: req.body },
+      { $set: updateData },
       { new: true, runValidators: true },
     );
 
     if (!updatedProperty) {
       return sendError(res, 404, "Property not found or unauthorized");
+    }
+
+    if (updatedProperty.kycStatus === KYCStatus.APPROVED) {
+      await checkAndAdvanceSpaceStatus(
+        updatedProperty.partner.toString(),
+        updatedProperty._id.toString(),
+      );
     }
 
     res.status(200).json({

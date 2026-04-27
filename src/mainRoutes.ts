@@ -1,4 +1,5 @@
 import { Router } from "express";
+console.log("[DEBUG] mainRoutes.ts is being loaded...");
 import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes";
 // import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtualOffice.routes";
@@ -8,6 +9,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
+console.log("[DEBUG] adminRoutes imported successfully");
 import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
@@ -22,8 +24,12 @@ import mailRoutes from "./flashspaceWeb/mailModule/routes/mail.routes";
 import { propertyRoutes } from "./flashspaceWeb/propertyModule/property.routes";
 import { leadRoutes } from "./flashspaceWeb/leadModule/lead.routes";
 import { sendGuestMessage } from "./flashspaceWeb/chatModule/controllers/chatController";
+import partnerInvoiceRoutes from "./flashspaceWeb/partnerInvoiceModule/partnerInvoice.routes";
+
 export const mainRoutes = Router();
 
+// DEBUG: Catch all routes for partnerInvoices
+mainRoutes.use("/partnerInvoices", partnerInvoiceRoutes);
 
 import mongoose from "mongoose";
 
@@ -38,8 +44,15 @@ mainRoutes.get("/health", (req, res) => {
   });
 });
 
+// /api/admin (Admin Dashboard APIs)
+mainRoutes.use("/admin", adminRoutes);
+
 // /api/auth
 mainRoutes.use("/auth", authRoutes);
+
+mainRoutes.get("/test-invoices", (req, res) => {
+  res.json({ success: true, message: "Partner invoices route is reachable" });
+});
 // /api/contactForm
 mainRoutes.use("/contactForm", contactFormRoutes);
 // /api/affiliate (Affiliate Portal APIs)
@@ -56,8 +69,6 @@ mainRoutes.use("/partnerInquiry", partnerInquiryRoutes);
 mainRoutes.use("/payment", paymentRoutes);
 // /api/user (Dashboard APIs)
 mainRoutes.use("/user", userDashboardRoutes);
-// /api/admin (Admin Dashboard APIs)
-mainRoutes.use("/admin", adminRoutes);
 // /api/spacePartner
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 // /api/meetings (Meeting Scheduler APIs)
@@ -89,3 +100,6 @@ mainRoutes.use("/chat", chatRoutes);
 
 // /api/leads
 mainRoutes.use("/leads", leadRoutes);
+
+console.log("[DEBUG] mainRoutes.ts registration complete.");
+

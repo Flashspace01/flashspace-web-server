@@ -11,11 +11,16 @@ import { UserModel } from "../../authModule/models/user.model";
 import Mail from "../../mailModule/models/mail.model";
 import Visit from "../../visitModule/models/visit.model";
 import { TicketModel, TicketStatus } from "../../ticketModule/models/Ticket";
+import { TicketService } from "../../ticketModule/services/ticket.service";
 import {
   CreditLedgerModel,
   CreditType,
 } from "../../creditLedgerModule/creditLedger.model";
 import { getFileUrl as getMulterFileUrl } from "../config/multer.config";
+import {
+  backupUploadedFile,
+  deleteUploadedFileBackup,
+} from "../../shared/utils/uploadedFileStore";
 import { BusinessInfoModel } from "../models/businessInfo.model";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -408,7 +413,7 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
             : "Unknown",
           kycStatus: b.kycStatus || "pending",
           status: b.status,
-          category: "Booking"
+          category: b.type === "VirtualOffice" ? "Virtual Office" : b.type === "CoworkingSpace" ? "Coworking" : b.type === "MeetingRoom" ? "Meeting Room" : b.type || "Booking"
         };
       }),
       ...meetings.map((m: any) => {
@@ -478,6 +483,8 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
         };
       }),
       ...supportTickets.map((t: any) => {
+        console.log(`[DEBUG] Ticket ${t.ticketNumber} raw keys:`, Object.keys(t));
+        console.log(`[DEBUG] Ticket ${t.ticketNumber} category:`, t.category);
         const name = t.user?.fullName || "Unknown";
         const initials =
           name
@@ -508,10 +515,13 @@ export const getPartnerActiveRequests = async (req: Request, res: Response) => {
             : "Unknown",
           kycStatus: "approved",
           status: t.status,
-          category: "Ticket"
+          category: t.category || "General",
+          rawTicket: t // For debugging
         };
       })
     ];
+
+    console.log(`[DEBUG] Sending ${combinedRequests.length} combined requests. Categories:`, combinedRequests.map(r => r.category));
 
     return res.status(200).json({
       success: true,
@@ -674,18 +684,23 @@ export const getPartnerPropertyBookings = async (
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
+    const partnerId = new mongoose.Types.ObjectId(userId);
+
     // 1. Find all spaces belonging to this property
     const [coworking, virtual, meeting] = await Promise.all([
       CoworkingSpaceModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
       VirtualOfficeModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
       MeetingRoomModel.find({
         property: new mongoose.Types.ObjectId(propertyId as string),
+        partner: partnerId,
         isDeleted: false,
       }).select("_id"),
     ]);
@@ -751,7 +766,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
       businessInfos.map((info) => [info.user.toString(), info]),
     );
 
-    // 3. Group bookings by user and select the best representative booking
+    // Group bookings by user and select the best representative booking
     const clientMap = new Map<string, any>();
 
     bookings.forEach((booking: any) => {
@@ -790,14 +805,15 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         status,
         kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
         dealValue: booking.plan?.finalPrice || booking.plan?.price || 0,
+        category: booking.type === "VirtualOffice" ? "Virtual Office" : booking.type === "CoworkingSpace" ? "Coworking" : booking.type === "MeetingRoom" ? "Meeting Room" : booking.type || "Booking",
         createdAt: booking.createdAt,
       };
 
-      // If user already exists in map, decide which booking to keep
-      // Priority: ACTIVE > EXPIRING_SOON > INACTIVE
-      const existing = clientMap.get(userIdStr);
+      // Use composite key to allow same user with different categories (e.g. Booking and Ticket)
+      const mapKey = `${userIdStr}_${clientData.category}`;
+      const existing = clientMap.get(mapKey);
       if (!existing) {
-        clientMap.set(userIdStr, clientData);
+        clientMap.set(mapKey, clientData);
       } else {
         const priority: Record<string, number> = {
           ACTIVE: 3,
@@ -805,8 +821,61 @@ export const getPartnerClients = async (req: Request, res: Response) => {
           INACTIVE: 1,
         };
         if (priority[status] > priority[existing.status]) {
-          clientMap.set(userIdStr, clientData);
+          clientMap.set(mapKey, clientData);
         }
+      }
+    });
+
+    // 4. Fetch resolved support tickets for this partner
+    const allPartnerBookings = await BookingModel.find({
+      partner: userId,
+      isDeleted: false,
+    }).distinct("_id");
+    const resolvedTickets = await TicketModel.find({
+      $or: [
+        { bookingId: { $in: allPartnerBookings } },
+        { partnerId: userId },
+        { assignee: userId }
+      ],
+      status: { $in: ["resolved", "closed"] },
+    }).populate("user", "fullName email phoneNumber")
+      .populate("bookingId", "spaceSnapshot")
+      .lean();
+
+    console.log(`[DEBUG getPartnerClients] Found ${resolvedTickets.length} resolved/closed tickets for partner ${userId}. All booking IDs: ${allPartnerBookings.length}`);
+    if (resolvedTickets.length > 0) {
+      console.log(`[DEBUG getPartnerClients] First resolved ticket:`, resolvedTickets[0]._id, resolvedTickets[0].status, resolvedTickets[0].category);
+    }
+
+    resolvedTickets.forEach((ticket: any) => {
+      const user = ticket.user;
+      const userIdStr = user?._id?.toString() || user?.toString();
+      if (!userIdStr) return;
+
+      const business = businessMap.get(userIdStr);
+      const category = ticket.category || "Ticket";
+
+      const clientData = {
+        id: ticket.ticketNumber,
+        userId: userIdStr,
+        companyName: business?.companyName || user?.fullName || "N/A",
+        contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phoneNumber || "N/A",
+        plan: "Support",
+        space: ticket.bookingId?.spaceSnapshot?.name || ticket.subject || "Query",
+        startDate: "N/A",
+        endDate: "N/A",
+        status: "RESOLVED",
+        kycStatus: "VERIFIED",
+        dealValue: 0,
+        category,
+        createdAt: ticket.createdAt,
+      };
+
+      const mapKey = `${userIdStr}_${category}`;
+      if (!clientMap.has(mapKey)) {
+        clientMap.set(mapKey, clientData);
       }
     });
 
@@ -818,6 +887,169 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to fetch clients" });
+  }
+};
+
+export const getPartnerClientBookings = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const partnerObjectId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
+    const [voSpaces, coworkingSpaces, meetingRooms] = await Promise.all([
+      VirtualOfficeModel.find({ partner: partnerObjectId }).select("_id"),
+      CoworkingSpaceModel.find({ partner: partnerObjectId }).select("_id"),
+      MeetingRoomModel.find({ partner: partnerObjectId }).select("_id"),
+    ]);
+    const ownedSpaceIds = [
+      ...voSpaces.map((space: any) => space._id),
+      ...coworkingSpaces.map((space: any) => space._id),
+      ...meetingRooms.map((space: any) => space._id),
+    ];
+
+    const bookings = await BookingModel.find({
+      $or: [{ partner: partnerObjectId }, { spaceId: { $in: ownedSpaceIds } }],
+      isDeleted: false,
+    })
+      .populate("user", "fullName email phoneNumber phone")
+      .populate("kycProfile", "profileName kycType businessInfo overallStatus")
+      .sort({ createdAt: -1 });
+
+    const bookingIds = bookings.map((booking: any) => booking._id);
+    const bookingNumbers = bookings
+      .map((booking: any) => booking.bookingNumber)
+      .filter(Boolean);
+    const userIds = [
+      ...new Set(bookings.map((booking: any) => booking.user?._id || booking.user)),
+    ].filter(Boolean);
+
+    const [businessInfos, invoices] = await Promise.all([
+      BusinessInfoModel.find({
+        user: { $in: userIds },
+        isDeleted: false,
+      }),
+      InvoiceModel.find({
+        partner: partnerObjectId,
+        $or: [
+          { booking: { $in: bookingIds } },
+          { bookingNumber: { $in: bookingNumbers } },
+        ],
+      }).select("invoiceNumber booking bookingNumber"),
+    ]);
+
+    const businessMap = new Map(
+      businessInfos.map((info: any) => [info.user.toString(), info]),
+    );
+    const invoiceMap = new Map<string, any>();
+    invoices.forEach((invoice: any) => {
+      if (invoice.booking) {
+        invoiceMap.set(invoice.booking.toString(), invoice);
+      }
+      if (invoice.bookingNumber) {
+        invoiceMap.set(invoice.bookingNumber, invoice);
+      }
+    });
+
+    const formatDate = (value?: Date | string) => {
+      if (!value) return "N/A";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "N/A";
+      return date.toISOString().split("T")[0];
+    };
+
+    const formatType = (type?: string) => {
+      if (type === "VirtualOffice") return "Virtual Office";
+      if (type === "CoworkingSpace") return "Coworking";
+      if (type === "MeetingRoom") return "Meeting Room";
+      return type || "Booking";
+    };
+
+    const formatSubStatus = (status?: string) =>
+      (status || "unknown")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const resolveDisplayStatus = (booking: any) => {
+      if (booking.status !== "active") return "INACTIVE";
+      if (!booking.endDate) return "ACTIVE";
+
+      const daysRemaining = Math.ceil(
+        (new Date(booking.endDate).getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      return daysRemaining > 0 && daysRemaining <= 30
+        ? "EXPIRING_SOON"
+        : "ACTIVE";
+    };
+
+    const rows = bookings.map((booking: any) => {
+      const user = booking.user;
+      const clientUserId = user?._id?.toString() || user?.toString() || "";
+      const business = businessMap.get(clientUserId);
+      const invoice =
+        invoiceMap.get(booking._id.toString()) ||
+        invoiceMap.get(booking.bookingNumber);
+      const kycProfile = booking.kycProfile as any;
+      const spaceSnapshot = booking.spaceSnapshot || {};
+      const city = spaceSnapshot.city || "";
+      const area = spaceSnapshot.area || "";
+
+      return {
+        id: booking.bookingNumber || booking._id.toString(),
+        bookingId: booking._id.toString(),
+        bookingNumber: booking.bookingNumber || booking._id.toString(),
+        invoiceNumber:
+          invoice?.invoiceNumber ||
+          booking.bookingNumber ||
+          booking._id.toString(),
+        userId: clientUserId,
+        companyName:
+          kycProfile?.businessInfo?.companyName ||
+          business?.companyName ||
+          user?.fullName ||
+          "N/A",
+        contactName: user?.fullName || "N/A",
+        email: user?.email || "N/A",
+        phone: user?.phoneNumber || user?.phone || "N/A",
+        plan: booking.plan?.name || "N/A",
+        workspace: formatType(booking.type),
+        type: booking.type,
+        spaceId: booking.spaceId?.toString(),
+        space: spaceSnapshot.name || "N/A",
+        location: [area, city].filter(Boolean).join(", ") || "N/A",
+        city: city || "N/A",
+        startDate: formatDate(booking.startDate),
+        endDate: formatDate(booking.endDate),
+        status: resolveDisplayStatus(booking),
+        subscriptionStatus: resolveDisplayStatus(booking),
+        subscriptionSubStatus: formatSubStatus(booking.status),
+        rawSubscriptionSubStatus: booking.status || "unknown",
+        kycStatus: booking.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+        kycType: kycProfile?.kycType
+          ? formatSubStatus(kycProfile.kycType)
+          : "N/A",
+        dealValue:
+          booking.plan?.finalPrice ||
+          booking.plan?.partnerPrice ||
+          booking.plan?.price ||
+          0,
+        createdAt: booking.createdAt,
+      };
+    });
+
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Get partner client bookings error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch partner bookings",
+    });
   }
 };
 
@@ -1149,6 +1381,42 @@ export const getAllBookings = async (req: Request, res: Response) => {
     const limitNum = Number(limit) || 100;
     const skip = (Number(page) - 1) * limitNum;
 
+    // 0. AUTO-FIX: Transition pending_kyc to active if user is already verified
+    try {
+      const user = await UserModel.findById(userId);
+      if (user?.kycVerified) {
+        // Find bookings that need activation
+        const needsActivation = await BookingModel.find({
+          user: userId,
+          status: "pending_kyc",
+          isDeleted: { $ne: true }
+        });
+
+        if (needsActivation.length > 0) {
+          await BookingModel.updateMany(
+            { user: userId, status: "pending_kyc", isDeleted: { $ne: true } },
+            { 
+              $set: { 
+                status: "active", 
+                kycStatus: "approved",
+                updatedAt: new Date()
+              },
+              $push: {
+                timeline: {
+                  status: "activated_automatically",
+                  date: new Date(),
+                  note: "Booking activated automatically as user KYC is already verified.",
+                  by: "System"
+                }
+              }
+            }
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[getAllBookings] Auto-activation error:", err);
+    }
+
     // Prepare seat filter if applicable
     let seatFilter: any = null;
     if (!normalizedType || normalizedType === "CoworkingSpace") {
@@ -1352,6 +1620,24 @@ export const getBookingById = async (req: Request, res: Response) => {
     });
 
     if (booking) {
+      // AUTO-FIX: Transition pending_kyc to active if user is already verified
+      const user = await UserModel.findById(userId);
+      if (user?.kycVerified && booking.status === "pending_kyc") {
+        booking.status = "active";
+        booking.kycStatus = "approved";
+        
+        // Add timeline entry for the automatic activation
+        booking.timeline = booking.timeline || [];
+        booking.timeline.push({
+          status: "activated_automatically",
+          date: new Date(),
+          note: "Booking activated automatically as user KYC is already verified.",
+          by: "System"
+        });
+
+        await booking.save();
+      }
+
       const bookingObj = booking.toObject() as any;
       if (bookingObj.endDate) {
         const now = new Date();
@@ -1504,6 +1790,19 @@ export const toggleAutoRenew = async (req: Request, res: Response) => {
       return res
         .status(404)
         .json({ success: false, message: "Booking not found" });
+    }
+
+    // Send Notification
+    try {
+      await NotificationService.notifyUser(
+        userId as string,
+        "Auto-Renewal Update",
+        `Auto-renewal for booking #${booking.bookingNumber} has been ${autoRenew ? "enabled" : "disabled"}.`,
+        NotificationType.SUCCESS,
+        { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+      );
+    } catch (notifError) {
+      console.error("[toggleAutoRenew] Notification failed:", notifError);
     }
 
     res.status(200).json({
@@ -1780,6 +2079,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
         panNumber: b.panNumber,
         cinNumber: b.cinNumber,
         registeredAddress: b.registeredAddress,
+        address: b.registeredAddress,
         industry: b.industry,
         verified: b.status === "approved",
       },
@@ -1849,6 +2149,7 @@ export const getBusinessInfo = async (req: Request, res: Response) => {
 export const updateBusinessInfo = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    let kyc: any = null;
     const {
       companyName,
       companyType,
@@ -1856,18 +2157,26 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       panNumber,
       cinNumber,
       registeredAddress,
+      address,
       industry,
       profileId,
       profileName,
       kycType,
       partners,
+      businessNature,
+      pincode,
+      city,
+      state,
+      country,
       personalPhone,
       personalDob,
       personalAadhaar,
       personalPan,
+      personalAddress,
       personalFullName,
       personalEmail,
     } = req.body;
+    const resolvedAddress = personalAddress || registeredAddress || address;
     console.log(
       `[updateBusinessInfo] User: ${userId}, ProfileId: ${profileId}, Type: ${kycType}`,
     );
@@ -1875,23 +2184,21 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     // ============================================
     // CASE 1: BUSINESS PROFILE (Using BusinessInfoModel)
     // ============================================
-    if (kycType === "business" || (profileId && profileId !== "new")) {
-      let businessInfo = null;
-      // Check if profileId is valid business info
-      if (profileId && profileId !== "new") {
-        if (!mongoose.Types.ObjectId.isValid(profileId as string)) {
-          return res
-            .status(400)
-            .json({ success: false, message: "Invalid Profile ID format" });
-        }
-        businessInfo = await BusinessInfoModel.findOne({
-          _id: profileId,
-          user: userId,
-        });
-      }
+    // We only enter Case 1 if kycType is explicitly 'business' 
+    // OR if we are updating an existing BusinessInfo record.
+    let isExplicitBusiness = kycType === "business";
+    let existingBusiness = null;
 
-      if (businessInfo || kycType === "business") {
-        console.log("[updateBusinessInfo] Processing as Business Profile");
+    if (profileId && profileId !== "new" && mongoose.Types.ObjectId.isValid(profileId as string)) {
+      existingBusiness = await BusinessInfoModel.findOne({
+        _id: profileId,
+        user: userId,
+      });
+    }
+
+    if (isExplicitBusiness || existingBusiness) {
+      let businessInfo = existingBusiness;
+      console.log("[updateBusinessInfo] Processing as Business Profile");
 
         if (!businessInfo) {
           const mainProfile = await KYCDocumentModel.findOne({
@@ -1921,6 +2228,26 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
           businessInfo.registeredAddress = registeredAddress;
         if (industry) businessInfo.industry = industry;
         if (profileName) businessInfo.profileName = profileName;
+        if (businessNature) businessInfo.businessNature = businessNature;
+        if (pincode) businessInfo.pincode = pincode;
+
+        // Sync to KYC.personalInfo for unified display in Dashboard Profile
+        kyc = await KYCDocumentModel.findOne({ user: userId });
+        if (kyc) {
+          if (!kyc.personalInfo) {
+            kyc.personalInfo = {};
+          }
+          if (resolvedAddress) {
+            kyc.personalInfo.address = resolvedAddress;
+            kyc.personalInfo.registeredAddress = resolvedAddress;
+          }
+          if (city) kyc.personalInfo.city = city;
+          if (state) kyc.personalInfo.state = state;
+          if (country) kyc.personalInfo.country = country;
+          if (pincode) kyc.personalInfo.pincode = pincode;
+          kyc.markModified("personalInfo");
+          await kyc.save();
+        }
 
         // Ensure status is in_progress if it was not started, but don't revert pending/approved
         if (!businessInfo.status || businessInfo.status === "not_started") {
@@ -1989,12 +2316,12 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
               panNumber: businessInfo.panNumber,
               cinNumber: businessInfo.cinNumber,
               registeredAddress: businessInfo.registeredAddress,
+              address: businessInfo.registeredAddress,
               industry: businessInfo.industry,
             },
             overallStatus: businessInfo.status,
           },
         });
-      }
     }
 
     // ============================================
@@ -2004,7 +2331,6 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       "[updateBusinessInfo] Processing as Individual/Main Profile (Legacy)",
     );
 
-    let kyc;
     if (profileId && profileId !== "new") {
       kyc = await KYCDocumentModel.findOne({ _id: profileId, user: userId });
       if (!kyc) {
@@ -2039,19 +2365,25 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
     }
 
     // Update business info if provided (Legacy support)
-    if (companyName || gstNumber || partners) {
+    if (companyName || gstNumber || partners || (resolvedAddress && kyc.businessInfo)) {
       kyc.businessInfo = {
         companyName: companyName || kyc.businessInfo?.companyName,
         companyType: companyType || kyc.businessInfo?.companyType,
         gstNumber: gstNumber || kyc.businessInfo?.gstNumber,
         panNumber: panNumber || kyc.businessInfo?.panNumber,
         cinNumber: cinNumber || kyc.businessInfo?.cinNumber,
-        registeredAddress:
-          registeredAddress || kyc.businessInfo?.registeredAddress,
+        registeredAddress: resolvedAddress || kyc.businessInfo?.registeredAddress,
         industry: industry || kyc.businessInfo?.industry,
+        businessNature: businessNature || kyc.businessInfo?.businessNature,
         partners: partners || kyc.businessInfo?.partners || [],
         verified: false,
       };
+      kyc.markModified("businessInfo");
+
+      // Update profile name if it was generic and we now have a company name
+      if (companyName && (!kyc.profileName || kyc.profileName === "Personal Profile" || kyc.profileName === "Individual Profile")) {
+        kyc.profileName = companyName;
+      }
     }
 
     // Update personal info logic (Legacy support)
@@ -2061,7 +2393,12 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       personalAadhaar ||
       personalPan ||
       personalFullName ||
-      personalEmail
+      personalEmail ||
+      resolvedAddress ||
+      country ||
+      state ||
+      city ||
+      pincode
     ) {
       if (!kyc.personalInfo) {
         const user = await UserModel.findById(userId);
@@ -2077,6 +2414,17 @@ export const updateBusinessInfo = async (req: Request, res: Response) => {
       if (personalDob) kyc.personalInfo.dateOfBirth = personalDob;
       if (personalAadhaar) kyc.personalInfo.aadhaarNumber = personalAadhaar;
       if (personalPan) kyc.personalInfo.panNumber = personalPan;
+      if (resolvedAddress) {
+        kyc.personalInfo.address = resolvedAddress;
+        kyc.personalInfo.registeredAddress = resolvedAddress;
+      }
+      if (country) kyc.personalInfo.country = country;
+      if (state) kyc.personalInfo.state = state;
+      if (city) kyc.personalInfo.city = city;
+      if (pincode) kyc.personalInfo.pincode = pincode;
+
+      kyc.markModified("personalInfo"); // Explicitly mark as modified
+
       if (personalFullName) {
         kyc.personalInfo.fullName = personalFullName;
         // Update isPartner flag if changing fullName on existing individual profile
@@ -2196,6 +2544,20 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     console.log("[STEP 4] Profile found. Building document entry...");
     // Generate file URL using the updated helper
     const fileUrl = getMulterFileUrl(file.filename, documentType);
+    const uploadSubDir =
+      documentType === "video_kyc" ? "video-kyc" : "kyc-documents";
+    const localFilePath = path.join(
+      __dirname,
+      "../../../../uploads",
+      uploadSubDir,
+      file.filename,
+    );
+
+    await backupUploadedFile(fileUrl, localFilePath, {
+      originalName: file.originalname,
+      contentType: file.mimetype,
+      source: "kyc-document",
+    });
 
     // Check if document type already exists
     const existingIndex =
@@ -2242,6 +2604,7 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
               });
             }
           }
+          await deleteUploadedFileBackup(oldDoc.fileUrl);
         } catch (err: any) {
           console.error("[Delete Old File] Critical Error:", err);
         }
@@ -2375,6 +2738,7 @@ export const deleteKYCDocument = async (req: Request, res: Response) => {
           });
         }
       }
+      await deleteUploadedFileBackup(docToDelete.fileUrl);
     }
 
     // Update progress/status - only for models that support it
@@ -2533,12 +2897,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
 
       const isPartnerProfile = kyc.isPartner === true;
       if (isBusiness) {
-        requiredDocs = [
-          "pan_card",
-          "gst_certificate",
-          "address_proof",
-          "video_kyc",
-        ];
+        requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
       } else if (isPartnerProfile) {
         requiredDocs = ["pan_card", "aadhaar"];
       } else {
@@ -2632,6 +2991,33 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       );
     }
 
+    // Notify User (KYC submitted/pending)
+    try {
+      const profileType = isPartner
+        ? "partner"
+        : isBusinessInfoDoc
+          ? "business"
+          : "individual";
+
+      await NotificationService.notifyUser(
+        userId as string,
+        "KYC Submitted for Review",
+        "Your KYC has been submitted and is now pending review by our team.",
+        NotificationType.INFO,
+        {
+          kycId: profileId,
+          type: profileType,
+          status: "pending",
+        },
+        { preferenceKey: "reminders" },
+      );
+    } catch (notifError) {
+      console.error(
+        "[submitKYCForReview] Failed to notify user:",
+        notifError,
+      );
+    }
+
     res.status(200).json({
       success: true,
       message:
@@ -2689,6 +3075,7 @@ export const deleteKYCProfile = async (req: Request, res: Response) => {
                 console.log(`[deleteKYCProfile] Deleted file: ${filename}`);
               }
             }
+            await deleteUploadedFileBackup(doc.fileUrl);
           } catch (fileErr) {
             console.error(`[deleteKYCProfile] Error deleting file from disk:`, fileErr);
           }
@@ -2931,31 +3318,22 @@ export const getInvoiceById = async (req: Request, res: Response) => {
 
 export const getAllTickets = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { status, page = 1, limit = 100 } = req.query;
+    const userId = req.user?.id || (req.user as any)?._id;
+    const { status, page = 1, limit = 10 } = req.query;
 
-    const filter: any = { user: userId, isDeleted: false };
-    if (status) filter.status = status;
-
-    const limitNum = Number(limit) || 100;
-    const skip = (Number(page) - 1) * limitNum;
-
-    const [tickets, total] = await Promise.all([
-      SupportTicketModel.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum)
-        .select("-messages"),
-      SupportTicketModel.countDocuments(filter),
-    ]);
+    const result = await TicketService.getUserTickets(
+      userId,
+      Number(page),
+      Number(limit),
+    );
 
     res.status(200).json({
       success: true,
-      data: tickets,
+      data: result.tickets,
       pagination: {
-        total,
-        page: Number(page),
-        pages: Math.ceil(total / limitNum),
+        total: result.total,
+        page: result.page,
+        pages: result.totalPages,
       },
     });
   } catch (error) {
@@ -2968,8 +3346,8 @@ export const getAllTickets = async (req: Request, res: Response) => {
 
 export const createTicket = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    const { subject, category, priority, description, bookingId } = req.body;
+    const userId = req.user?.id || (req.user as any)?._id;
+    const { subject, category, priority, description, bookingId, attachments } = req.body;
 
     if (!subject || !category || !description) {
       return res.status(400).json({
@@ -2978,43 +3356,30 @@ export const createTicket = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate ticket number
-    const count = await SupportTicketModel.countDocuments();
-    const ticketNumber = `TKT-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
-    const ticket = await SupportTicketModel.create({
-      ticketNumber,
-      user: userId,
-      bookingId,
+    // Use the robust TicketService instead of direct model creation
+    const ticket = await TicketService.createTicket(userId, {
       subject,
-      category,
-      priority: priority || "medium",
-      status: "open",
-      messages: [
-        {
-          sender: "user",
-          senderName: req.user?.email || "User",
-          senderId: userId,
-          message: description,
-          createdAt: new Date(),
-        },
-      ],
+      description,
+      category: category as any,
+      priority: priority as any,
+      attachments,
+      bookingId,
     });
+
+    // Notify admins (already handled in TicketService, but controller usually emits specifically)
+    // If not already in Service, we add it here or verify. 
+    // In ticket.controller.ts it emits: getIO().to("admin_feed").emit("new_ticket_created", ticket);
 
     res.status(201).json({
       success: true,
-      message: "Support ticket created",
-      data: {
-        _id: ticket._id,
-        ticketNumber: ticket.ticketNumber,
-        status: ticket.status,
-      },
+      message: "Support ticket created successfully",
+      data: ticket,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create ticket error:", error);
     res
-      .status(500)
-      .json({ success: false, message: "Failed to create ticket" });
+      .status(400)
+      .json({ success: false, message: error.message || "Failed to create ticket" });
   }
 };
 
@@ -3044,48 +3409,28 @@ export const getTicketById = async (req: Request, res: Response) => {
 
 export const replyToTicket = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id || (req.user as any)?._id;
     const { ticketId } = req.params;
-    const { message } = req.body;
+    const { message, attachments } = req.body;
 
     if (!message) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Message is required" });
+      return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const ticket = await SupportTicketModel.findOne({
-      _id: ticketId,
-      user: userId,
-      isDeleted: false,
-    });
-
-    if (!ticket) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Ticket not found" });
-    }
-
-    ticket.messages = ticket.messages || [];
-    ticket.messages.push({
+    const ticket = await TicketService.replyToTicket({
+      ticketId: ticketId as string,
+      userId: userId as string,
       sender: "user",
-      senderName: req.user?.email || "User",
-      senderId: userId as any,
       message,
-      createdAt: new Date(),
+      attachments,
     });
 
-    if (ticket.status === "waiting_customer") {
-      ticket.status = "in_progress";
-    }
-
-    ticket.updatedAt = new Date();
-    await ticket.save();
-
-    res.status(200).json({ success: true, message: "Reply sent" });
-  } catch (error) {
+    res.status(200).json({ success: true, message: "Reply sent successfully", data: ticket });
+  } catch (error: any) {
     console.error("Reply to ticket error:", error);
-    res.status(500).json({ success: false, message: "Failed to send reply" });
+    res
+      .status(400)
+      .json({ success: false, message: error.message || "Failed to send reply" });
   }
 };
 
@@ -3260,6 +3605,9 @@ export const redeemReward = async (req: Request, res: Response) => {
 export const getUserMails = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
 
     const user = await UserModel.findById(userId);
 
@@ -3270,22 +3618,54 @@ export const getUserMails = async (req: Request, res: Response) => {
     }
 
     const userEmail = user.email.trim();
-    const userEmailRegex = new RegExp(`^${userEmail}$`, "i");
-    const mails = await Mail.find({
-      $or: [
-        { email: { $regex: userEmailRegex } },
-        { clientEmail: { $regex: userEmailRegex } },
-      ],
-    })
-      .lean()
-      .sort({ createdAt: -1 });
+    const emailRegex = new RegExp(`^${userEmail}$`, "i");
+    const baseFilter = {
+      $or: [{ email: emailRegex }, { clientEmail: emailRegex }],
+    };
+
+    const [mails, total, allUserMails] =
+      await Promise.all([
+        Mail.find(baseFilter)
+          .lean()
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Mail.countDocuments(baseFilter),
+        Mail.find(baseFilter).lean(),
+      ]);
+
+    const stats = {
+      pending: allUserMails.filter(m => m.status?.toLowerCase() === 'pending action').length,
+      forwarded: allUserMails.filter(m => m.status?.toLowerCase() === 'forwarded').length,
+      collected: allUserMails.filter(m => m.status?.toLowerCase() === 'collected').length
+    };
 
     const formattedMails = mails.map((m: any) => ({
       ...m,
       mailId: m.mailId || m._id?.toString(),
     }));
 
-    res.status(200).json({ success: true, data: formattedMails });
+    const finalResponse = {
+      success: true,
+      data: formattedMails,
+      pagination: {
+        total: total || 0,
+        page: Number(page) || 1,
+        limit: Number(limit) || 10,
+        pages: Math.ceil((total || 0) / (Number(limit) || 10)),
+      },
+      stats: {
+        pending: stats.pending || 0,
+        forwarded: stats.forwarded || 0,
+        collected: stats.collected || 0,
+      },
+      debug_v: "2.1", // To verify code update
+    };
+
+    console.log("=== GET USER MAILS RESPONSE V2.1 ===");
+    console.log("Stats to send:", finalResponse.stats);
+
+    res.status(200).json(finalResponse);
   } catch (error) {
     console.error("Get user mails error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch mails" });
@@ -3328,4 +3708,3 @@ export const getUserVisits = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Failed to fetch visits" });
   }
 };
-

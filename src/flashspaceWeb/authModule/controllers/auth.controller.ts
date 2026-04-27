@@ -185,11 +185,11 @@ export class AuthController {
 
       const result = await this.authService.forgotPassword(forgotPasswordData);
 
-      res.status(200).json({
-        success: true,
+      res.status(result.success ? 200 : 500).json({
+        success: result.success,
         message: result.message,
         data: {},
-        error: {},
+        error: result.success ? {} : result.message,
       });
     } catch (error) {
       console.error("Forgot password controller error:", error);
@@ -282,12 +282,10 @@ export class AuthController {
       const result = await this.authService.changePassword(
         req.user.id,
         changePasswordData,
+        AuthMiddleware.extractRefreshToken(req),
       );
 
       if (result.success) {
-        // Clear cookies to force re-login with new password
-        AuthMiddleware.clearTokenCookies(res);
-
         res.status(200).json({
           success: true,
           message: result.message,
@@ -827,6 +825,67 @@ export class AuthController {
       });
     } catch (error) {
       console.error("Update profile controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        data: {},
+        error: "Internal server error",
+      });
+    }
+  };
+
+  // Upload profile picture
+  uploadProfilePicture = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: "Authentication required",
+          data: {},
+          error: "Not authenticated",
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+          data: {},
+          error: "Missing file",
+        });
+        return;
+      }
+
+      const { UserModel } = await import("../models/user.model");
+      const imageUrl = `/uploads/profile-pictures/${req.file.filename}`;
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        req.user.id,
+        { $set: { profilePicture: imageUrl } },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+          data: {},
+          error: "User not found",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Profile picture uploaded successfully",
+        data: {
+          profilePicture: updatedUser.profilePicture,
+        },
+        error: {},
+      });
+    } catch (error) {
+      console.error("Upload profile picture controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

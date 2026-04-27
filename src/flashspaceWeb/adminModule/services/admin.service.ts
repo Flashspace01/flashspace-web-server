@@ -22,7 +22,9 @@ import { PaymentModel } from "../../paymentModule/payment.model";
 import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
-import { PropertyModel } from "../../propertyModule/property.model";
+import { PropertyModel, KYCStatus, PropertyStatus } from "../../propertyModule/property.model";
+import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancials.model";
+import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
 export class AdminService {
   /**
@@ -212,6 +214,88 @@ export class AdminService {
     }
   }
 
+  // Get all partners and their details
+  async getPartners(
+    page: number = 1,
+    limit: number = 50,
+    search?: string,
+  ): Promise<ApiResponse<any>> {
+    try {
+      const skip = (page - 1) * limit;
+      const query: any = {
+        role: UserRole.PARTNER,
+        isDeleted: false,
+      };
+
+      if (search) {
+        query.$or = [
+          { fullName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { phoneNumber: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const partners = await UserModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const total = await UserModel.countDocuments(query);
+
+      // Fetch all active properties to map them to partners
+      const allProperties = await PropertyModel.find({
+        isDeleted: false,
+      })
+        .select("name city area partner")
+        .lean();
+
+      // Map properties to each partner
+      const partnerDetails = partners.map((partner: any) => {
+        const properties = allProperties.filter(
+          (p: any) => p.partner?.toString() === partner._id.toString(),
+        );
+
+        const spaces = properties.map((p: any) => ({
+          name: p.name,
+          type: "Property",
+          location: `${p.city}, ${p.area}`,
+        }));
+
+        return {
+          id: partner._id,
+          name: partner.fullName,
+          email: partner.email,
+          phone: partner.phoneNumber || "N/A",
+          totalSpaces: spaces.length,
+          spaces: spaces,
+          kycVerified: partner.kycVerified,
+          createdAt: partner.createdAt,
+        };
+      });
+
+      return {
+        success: true,
+        message: "Partners fetched successfully",
+        data: {
+          partners: partnerDetails,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("Error in getPartners:", error);
+      return {
+        success: false,
+        message: "Failed to fetch partners",
+        error: error.message,
+      };
+    }
+  }
+
   // Get all users (Admin only usually, but logic kept generic if needed)
   async getUsers(
     page: number = 1,
@@ -227,6 +311,8 @@ export class AdminService {
       if (role && role !== "all") {
         if (role === "team") {
           query.role = { $in: STAFF_ROLES };
+        } else if (role.includes(",")) {
+          query.role = { $in: role.split(",") };
         } else {
           query.role = role;
         }
@@ -288,8 +374,36 @@ export class AdminService {
     }
   }
 
+  async getPartnerUsers(): Promise<ApiResponse<any>> {
+    try {
+      const partners = await UserModel.find({
+        role: UserRole.PARTNER,
+        isDeleted: { $ne: true },
+      })
+        .sort({ fullName: 1, createdAt: -1 })
+        .select("_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt");
+
+      return {
+        success: true,
+        message: "Partner users fetched successfully",
+        data: {
+          partners,
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to fetch partner users",
+        error: error.message,
+      };
+    }
+  }
+
   // Get pending KYC requests
-  async getPendingKYC(user: any): Promise<ApiResponse<any>> {
+  async getPendingKYC(
+    user: any,
+    includeApproved: boolean = false,
+  ): Promise<ApiResponse<any>> {
     try {
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let bookingIds: string[] = [];
@@ -313,7 +427,9 @@ export class AdminService {
 
       const query: any = {
         isDeleted: false,
-        overallStatus: { $nin: ["in_progress", "not_started"] },
+        overallStatus: includeApproved
+          ? { $nin: ["in_progress", "not_started"] }
+          : { $in: ["pending", "resubmit"] },
       };
 
       // If partner, filter KYC docs by linkedBookings
@@ -322,12 +438,18 @@ export class AdminService {
       }
 
       const kycDocs = await KYCDocumentModel.find(query)
+        .select(
+          "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress partnerCount businessInfoCount createdAt updatedAt",
+        )
         .populate("user", "fullName email phoneNumber")
-        .sort({ updatedAt: -1 });
+        .sort({ updatedAt: -1 })
+        .lean();
 
       return {
         success: true,
-        message: "Pending KYC requests fetched successfully",
+        message: includeApproved
+          ? "KYC requests fetched successfully"
+          : "Pending KYC requests fetched successfully",
         data: kycDocs,
       };
     } catch (error: any) {
@@ -431,7 +553,33 @@ export class AdminService {
     }
   }
 
-  // Get all clients (mapped from bookings)
+  private resolveClientStatus(bookings: any[]): "Active" | "At Risk" | "Churned" {
+    if (!bookings.length) return "At Risk";
+
+    const hasActive = bookings.some((b) => b.status === "active");
+    if (hasActive) return "Active";
+
+    const hasPending = bookings.some((b) =>
+      ["pending_payment", "pending_kyc"].includes(b.status),
+    );
+    if (hasPending) return "At Risk";
+
+    const allClosed = bookings.every((b) =>
+      ["expired", "cancelled"].includes(b.status),
+    );
+    if (allClosed) return "Churned";
+
+    return "At Risk";
+  }
+
+  private normalizeBookingType(type?: string): string {
+    if (type === "VirtualOffice") return "Virtual Office";
+    if (type === "CoworkingSpace") return "Coworking Space";
+    if (type === "MeetingRoom") return "Meeting Room";
+    return type || "Unknown";
+  }
+
+  // Get all clients (derived from bookings)
   async getClients(
     user: any,
     page: number = 1,
@@ -440,9 +588,7 @@ export class AdminService {
     statusFilter?: string,
   ): Promise<ApiResponse<any>> {
     try {
-      const isAdminOrSales = [UserRole.ADMIN, UserRole.SALES].includes(
-        user.role,
-      );
+      const isAdminOrSales = STAFF_ROLES.includes(user.role);
       const query: any = { isDeleted: false };
 
       if (!isAdminOrSales) {
@@ -461,127 +607,106 @@ export class AdminService {
         query.spaceId = { $in: spaceIds };
       }
 
-      // We need to fetch all relevant bookings to aggregate correctly
-      // In a very large scale app, this should be an aggregation pipeline.
       const allBookings = await BookingModel.find(query)
-        .populate("user", "fullName email phoneNumber company")
-        .populate("spaceSnapshot", "name city")
+        .populate("user", "fullName email phoneNumber")
         .sort({ createdAt: -1 });
 
       const clientMap = new Map<string, any>();
 
       allBookings.forEach((booking: any) => {
-        if (!booking.user) return;
+        if (!booking.user?._id) return;
+
         const userId = booking.user._id.toString();
+        const bookingAmount = Number(booking.amount || booking.plan?.price || 0);
+        const bookingDate = new Date(booking.createdAt);
         const existing = clientMap.get(userId);
-        const amount = Number(booking.amount || booking.plan?.price || 0);
-        const date = new Date(booking.createdAt);
 
-        // Date fallbacks
-        let startDate = booking.startDate ? new Date(booking.startDate) : date;
-        let endDate = booking.endDate ? new Date(booking.endDate) : null;
-
-        if (!endDate && booking.plan?.tenure) {
-          endDate = new Date(startDate);
-          const tenure = Number(booking.plan.tenure) || 12;
-          const unit = booking.plan.tenureUnit || "months";
-          if (unit === "year" || unit === "years")
-            endDate.setFullYear(endDate.getFullYear() + tenure);
-          else endDate.setMonth(endDate.getMonth() + tenure);
-        }
-
-        if (existing) {
-          existing.revenue += amount;
-          existing.bookingCount += 1;
-          if (date > existing.lastActivityDate) {
-            existing.lastActivityDate = date;
-            existing.plan = booking.plan?.name || booking.type;
-            existing.spaceName =
-              booking.spaceSnapshot?.name ||
-              booking.location ||
-              existing.spaceName;
-          }
-          if (startDate < existing.startDate) {
-            existing.startDate = startDate;
-          }
-          if (endDate && (!existing.endDate || endDate > existing.endDate)) {
-            existing.endDate = endDate;
-          }
-        } else {
+        if (!existing) {
           clientMap.set(userId, {
             id: userId,
-            clientId: `CL-${userId.substring(userId.length - 4).toUpperCase()}`,
-            name: booking.user.email || "Unknown Email",
-            companyName:
-              booking.user.company || booking.user.fullName || "Individual",
-            email: booking.user.email,
-            phone: booking.user.phoneNumber || "+91 98765 43210",
-            plan: booking.plan?.name || booking.type || "Standard Access",
-            spaceName:
-              booking.spaceSnapshot?.name || booking.location || "Main Hub",
-            revenue: amount,
+            name: booking.user.fullName || booking.user.email || "Unknown Client",
+            email: booking.user.email || "",
+            phone: booking.user.phoneNumber || "",
+            totalRevenue: bookingAmount,
             bookingCount: 1,
-            lastActivityDate: date,
-            startDate: startDate,
-            endDate: endDate,
-            initials: (booking.user.fullName || "CL")
-              .substring(0, 2)
-              .toUpperCase(),
+            activeBookings: booking.status === "active" ? 1 : 0,
+            firstBookingDate: bookingDate,
+            lastBookingDate: bookingDate,
+            bookings: [booking],
           });
+          return;
+        }
+
+        existing.totalRevenue += bookingAmount;
+        existing.bookingCount += 1;
+        existing.activeBookings += booking.status === "active" ? 1 : 0;
+        existing.bookings.push(booking);
+
+        if (bookingDate > existing.lastBookingDate) {
+          existing.lastBookingDate = bookingDate;
+        }
+        if (bookingDate < existing.firstBookingDate) {
+          existing.firstBookingDate = bookingDate;
         }
       });
 
-      let clients = Array.from(clientMap.values());
-
-      // Search filter
-      if (search) {
-        const lowerSearch = search.toLowerCase();
-        clients = clients.filter(
-          (c) =>
-            c.name.toLowerCase().includes(lowerSearch) ||
-            c.companyName.toLowerCase().includes(lowerSearch) ||
-            c.email.toLowerCase().includes(lowerSearch),
-        );
-      }
-
-      // Calculate health & status
-      const stats = { total: clients.length, active: 0, atRisk: 0, churned: 0 };
-
-      clients = clients.map((client) => {
-        const daysSinceActive =
-          (new Date().getTime() - client.lastActivityDate.getTime()) /
-          (1000 * 3600 * 24);
-
-        // Instead of random, use a stable health score based on recency & bookings
-        let healthScore = 100 - Math.min(daysSinceActive, 50); // Decay up to 50
-        healthScore = Math.max(
-          50,
-          Math.min(100, Math.floor(healthScore + client.bookingCount * 2)),
-        );
-
-        let statusLabel = "Active";
-        if (daysSinceActive > 60) statusLabel = "Churned";
-        else if (daysSinceActive > 30) statusLabel = "At Risk";
-        else if (healthScore < 60) statusLabel = "At Risk";
-
-        if (statusLabel === "Active") stats.active++;
-        else if (statusLabel === "At Risk") stats.atRisk++;
-        else stats.churned++;
-
+      let clients = Array.from(clientMap.values()).map((client) => {
+        const statusLabel = this.resolveClientStatus(client.bookings);
         return {
-          ...client,
-          displayName: client.companyName,
-          health: healthScore,
-          statusLabel: statusLabel,
+          id: client.id,
+          name: client.name,
+          email: client.email || "-",
+          phone: client.phone || "-",
+          bookingCount: client.bookingCount,
+          activeBookings: client.activeBookings,
+          totalRevenue: client.totalRevenue,
+          firstBookingDate: client.firstBookingDate?.toISOString?.() || null,
+          lastBookingDate: client.lastBookingDate?.toISOString?.() || null,
+          statusLabel,
+          initials: client.name
+            .split(" ")
+            .slice(0, 2)
+            .map((part: string) => part[0] || "")
+            .join("")
+            .toUpperCase(),
         };
       });
 
-      // Status filter
-      if (statusFilter && statusFilter !== "All Clients") {
-        clients = clients.filter((c) => c.statusLabel === statusFilter);
+      if (search) {
+        const lower = search.trim().toLowerCase();
+        clients = clients.filter(
+          (client) =>
+            client.name.toLowerCase().includes(lower) ||
+            client.email.toLowerCase().includes(lower) ||
+            client.phone.toLowerCase().includes(lower),
+        );
       }
 
-      // Pagination
+      const stats = { total: clients.length, active: 0, atRisk: 0, churned: 0 };
+      clients.forEach((client) => {
+        if (client.statusLabel === "Active") stats.active += 1;
+        else if (client.statusLabel === "At Risk") stats.atRisk += 1;
+        else stats.churned += 1;
+      });
+
+      if (statusFilter && statusFilter !== "all") {
+        const normalized =
+          statusFilter === "at_risk"
+            ? "At Risk"
+            : statusFilter === "active"
+              ? "Active"
+              : statusFilter === "churned"
+                ? "Churned"
+                : statusFilter;
+        clients = clients.filter((client) => client.statusLabel === normalized);
+      }
+
+      clients.sort(
+        (a, b) =>
+          new Date(b.lastBookingDate || 0).getTime() -
+          new Date(a.lastBookingDate || 0).getTime(),
+      );
+
       const total = clients.length;
       const skip = (page - 1) * limit;
       const paginatedClients = clients.slice(skip, skip + limit);
@@ -604,6 +729,85 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch clients",
+        error: error.message,
+      };
+    }
+  }
+
+  async getClientDetails(user: any, clientId: string): Promise<ApiResponse<any>> {
+    try {
+      const isAdminOrSales = STAFF_ROLES.includes(user.role);
+      const query: any = {
+        user: clientId,
+        isDeleted: false,
+      };
+
+      if (!isAdminOrSales) {
+        const spaceIds = await this.getManagedSpaceIds(user.id);
+        if (spaceIds.length === 0) {
+          return { success: false, message: "Client not found" };
+        }
+        query.spaceId = { $in: spaceIds };
+      }
+
+      const bookings = await BookingModel.find(query)
+        .populate("user", "fullName email phoneNumber")
+        .sort({ createdAt: -1 });
+
+      if (!bookings.length || !bookings[0].user) {
+        return { success: false, message: "Client not found" };
+      }
+
+      const clientUser: any = bookings[0].user;
+      const totalRevenue = bookings.reduce(
+        (sum: number, booking: any) =>
+          sum + Number(booking.amount || booking.plan?.price || 0),
+        0,
+      );
+
+      const statusLabel = this.resolveClientStatus(bookings);
+      const activeBookings = bookings.filter((booking: any) => booking.status === "active").length;
+
+      return {
+        success: true,
+        message: "Client details fetched successfully",
+        data: {
+          client: {
+            id: clientUser._id?.toString?.() || clientId,
+            name: clientUser.fullName || clientUser.email || "Unknown Client",
+            email: clientUser.email || "-",
+            phone: clientUser.phoneNumber || "-",
+            totalBookings: bookings.length,
+            activeBookings,
+            totalRevenue,
+            firstBookingDate: bookings[bookings.length - 1]?.createdAt || null,
+            lastBookingDate: bookings[0]?.createdAt || null,
+            statusLabel,
+          },
+          bookings: bookings.map((booking: any) => ({
+            id: booking._id?.toString?.() || "",
+            bookingNumber: booking.bookingNumber || "-",
+            type: this.normalizeBookingType(booking.type),
+            status: booking.status || "pending_payment",
+            planName: booking.plan?.name || "-",
+            planTenure:
+              booking.plan?.tenure && booking.plan?.tenureUnit
+                ? `${booking.plan.tenure} ${booking.plan.tenureUnit}`
+                : null,
+            amount: Number(booking.amount || booking.plan?.price || 0),
+            spaceName: booking.spaceSnapshot?.name || "Unknown Space",
+            spaceCity: booking.spaceSnapshot?.city || null,
+            startDate: booking.startDate || null,
+            endDate: booking.endDate || null,
+            createdAt: booking.createdAt || null,
+          })),
+        },
+      };
+    } catch (error: any) {
+      console.error("Error in getClientDetails:", error);
+      return {
+        success: false,
+        message: "Failed to fetch client details",
         error: error.message,
       };
     }
@@ -1617,6 +1821,88 @@ export class AdminService {
     }
   }
 
+  async getAllSpaces(
+    page: number = 1,
+    limit: number = 20,
+    filters: { city?: string; partner?: string; search?: string; deleted?: string } = {}
+  ): Promise<ApiResponse<any>> {
+    try {
+      const skip = (page - 1) * limit;
+      const baseFilter: any = { isDeleted: String(filters.deleted) === "true" };
+
+      if (filters.city) baseFilter.city = new RegExp(`^${filters.city}$`, "i");
+      if (filters.partner) baseFilter.partner = filters.partner;
+
+      const [vo, cs, mr] = await Promise.all([
+        VirtualOfficeModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+        CoworkingSpaceModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+        MeetingRoomModel.find(baseFilter)
+          .populate("partner", "fullName email")
+          .populate("property"),
+      ]);
+
+      const mapSpace = (space: any, type: string) => {
+        const obj = space.toObject();
+        return {
+          ...obj,
+          spaceType: type,
+          // Extract property fields for easier frontend consumption
+          propertyName: obj.property?.name,
+          propertyCity: obj.property?.city,
+          propertyAddress: obj.property?.address,
+        };
+      };
+
+      let allSpaces = [
+        ...vo.map((s) => mapSpace(s, "virtual_office")),
+        ...cs.map((s) => mapSpace(s, "coworking")),
+        ...mr.map((s) => mapSpace(s, "meeting_room")),
+      ];
+
+      // Manual search filter if search term provided
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        allSpaces = allSpaces.filter(
+          (s) =>
+            s.name?.toLowerCase().includes(search) ||
+            s.propertyName?.toLowerCase().includes(search) ||
+            s.propertyAddress?.toLowerCase().includes(search) ||
+            (s.partner as any)?.fullName?.toLowerCase().includes(search) ||
+             (s.partner as any)?.email?.toLowerCase().includes(search)
+        );
+      }
+
+      const totalCount = allSpaces.length;
+      const paginatedSpaces = allSpaces
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(skip, skip + limit);
+
+      return {
+        success: true,
+        message: "All spaces fetched successfully",
+        data: {
+          spaces: paginatedSpaces,
+          pagination: {
+            total: totalCount,
+            page,
+            pages: Math.ceil(totalCount / limit),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error("Error fetching all spaces:", error);
+      return {
+        success: false,
+        message: "Failed to fetch spaces",
+        error: error.message,
+      };
+    }
+  }
+
   // --- B2B2C Space Onboarding ---
 
   async getPendingSpaces(): Promise<ApiResponse<any>> {
@@ -1753,6 +2039,75 @@ export class AdminService {
     }
   }
 
+  // Admin listing space on behalf of partner
+  async listSpaceOnBehalf(
+    partnerId: string,
+    spaceType: "coworking" | "meeting_room" | "virtual_office",
+    propertyData: any,
+    spaceData: any
+  ): Promise<ApiResponse<any>> {
+    try {
+      // 1. Create Property with Approved Status
+      const property = new PropertyModel({
+        ...propertyData,
+        partner: partnerId,
+        kycStatus: KYCStatus.APPROVED,
+        status: PropertyStatus.ACTIVE,
+        isActive: true,
+      });
+      await property.save();
+
+      // 2. Create Space based on type
+      let space;
+      const commonData = {
+        ...spaceData,
+        property: property._id,
+        partner: partnerId,
+        approvalStatus: SpaceApprovalStatus.ACTIVE,
+        isActive: true,
+      };
+
+      if (spaceType === "coworking") {
+        space = new CoworkingSpaceModel({
+          ...commonData,
+          finalPricePerMonth: (spaceData.partnerPricePerMonth || 0) + (spaceData.adminMarkupPerMonth || 0),
+        });
+      } else if (spaceType === "meeting_room") {
+        space = new MeetingRoomModel({
+          ...commonData,
+          finalPricePerHour: (spaceData.partnerPricePerHour || 0) + (spaceData.adminMarkupPerHour || 0),
+          finalPricePerDay: (spaceData.partnerPricePerDay || 0) + (spaceData.adminMarkupPerDay || 0),
+        });
+      } else if (spaceType === "virtual_office") {
+        space = new VirtualOfficeModel({
+          ...commonData,
+          finalGstPricePerYear: (spaceData.partnerGstPricePerYear || 0) + (spaceData.adminMarkupGstPerYear || 0),
+          finalMailingPricePerYear: (spaceData.partnerMailingPricePerYear || 0) + (spaceData.adminMarkupMailingPerYear || 0),
+          finalBrPricePerYear: (spaceData.partnerBrPricePerYear || 0) + (spaceData.adminMarkupBrPerYear || 0),
+        });
+      }
+
+      if (!space) {
+        return { success: false, message: "Invalid space type" };
+      }
+
+      await space.save();
+
+      return {
+        success: true,
+        message: "Space listed and activated on behalf of partner successfully",
+        data: { property, space },
+      };
+    } catch (error: any) {
+      console.error("List space on behalf error:", error);
+      return {
+        success: false,
+        message: "Failed to list space on behalf",
+        error: error.message,
+      };
+    }
+  }
+
   private getEmptyRevenueStats() {
     return {
       metrics: { mtd: 0, ytd: 0, avgPerClient: 0, partnerPayouts: 0 },
@@ -1761,7 +2116,7 @@ export class AdminService {
     };
   }
 
-  // Get all invoices (payments)
+  // Get all invoices (payments and partner-uploaded invoices)
   async getAllInvoices(
     user: any,
     page: number = 1,
@@ -1777,90 +2132,219 @@ export class AdminService {
     try {
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       const skip = (page - 1) * limit;
-      const query: any = { isDeleted: { $ne: true } };
 
-      if (!isAdminOrStaff) {
-        const spaceIds = await this.getManagedSpaceIds(user.id);
-        if (spaceIds.length === 0) {
+      const fetchB2C = !filters.type || filters.type === "all" || filters.type === "b2c";
+      const fetchB2B = !filters.type || filters.type === "all" || filters.type === "b2b";
+
+      console.log(`[AdminService] Fetching invoices. Page: ${page}, Limit: ${limit}, Type: ${filters.type}`);
+
+      // Common Date Filter
+      const dateFilter: any = {};
+      if (filters.startDate || filters.endDate) {
+        if (filters.startDate) dateFilter.$gte = new Date(filters.startDate);
+        if (filters.endDate) {
+          const end = new Date(filters.endDate);
+          end.setHours(23, 59, 59, 999);
+          dateFilter.$lte = end;
+        }
+      }
+
+      // ── B2C Promise (PaymentModel) ────────────────────────────────
+      const b2cPromise = (async () => {
+        if (!fetchB2C) return { data: [], count: 0 };
+
+        const b2cQuery: any = { isDeleted: { $ne: true } };
+        if (!isAdminOrStaff) {
+          const spaceIds = await this.getManagedSpaceIds(user.id);
+          if (spaceIds.length === 0) return { data: [], count: 0 };
+          b2cQuery.spaceId = { $in: spaceIds };
+        }
+
+        if (filters.status && filters.status !== "all") {
+          b2cQuery.status = filters.status;
+        }
+
+        if (filters.search) {
+          b2cQuery.$or = [
+            { userName: { $regex: filters.search, $options: "i" } },
+            { userEmail: { $regex: filters.search, $options: "i" } },
+            { razorpayOrderId: { $regex: filters.search, $options: "i" } },
+            { spaceName: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          b2cQuery.createdAt = dateFilter;
+        }
+
+        const [payments, count] = await Promise.all([
+          PaymentModel.find(b2cQuery)
+            .sort({ createdAt: -1 })
+            .skip(fetchB2B ? 0 : skip)
+            .limit(fetchB2B ? 500 : limit) // Buffer for merging
+            .lean(),
+          PaymentModel.countDocuments(b2cQuery),
+        ]);
+
+        // Get invoice numbers for payments
+        const paymentIds = payments.map((p) => p._id.toString());
+        const invoices = await InvoiceModel.find({
+          payment: { $in: paymentIds },
+        }).select("payment invoiceNumber").lean();
+
+        const data = payments.map((p) => {
+          const inv = invoices.find((i) => i.payment?.toString() === p._id.toString());
           return {
-            success: true,
-            message: "Invoices fetched successfully",
-            data: {
-              invoices: [],
-              pagination: { total: 0, page, pages: 0 },
-            },
+            ...p,
+            _id: p._id,
+            invoiceNumber: inv?.invoiceNumber || "N/A",
+            invoiceType: "B2C",
+          };
+        });
+
+        return { data, count };
+      })();
+
+      // ── B2B Manual Promise (PartnerInvoice) ──────────────────────
+      const b2bManualPromise = (async () => {
+        if (!fetchB2B) return { data: [], count: 0 };
+
+        const b2bQuery: any = {};
+        // If not admin, filter by partnerId (current user)
+        if (!isAdminOrStaff) {
+          b2bQuery.partnerId = user.id;
+        }
+
+        if (filters.status && filters.status !== "all") {
+          // Map B2C statuses to B2B if needed, or assume they are similar
+          b2bQuery.status = filters.status.charAt(0).toUpperCase() + filters.status.slice(1);
+        }
+
+        if (filters.search) {
+          b2bQuery.$or = [
+            { invoiceId: { $regex: filters.search, $options: "i" } },
+            { client: { $regex: filters.search, $options: "i" } },
+            { space: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          b2bQuery.createdAt = dateFilter;
+        }
+
+        const [partnerInvoices, count] = await Promise.all([
+          PartnerInvoice.find(b2bQuery)
+            .sort({ createdAt: -1 })
+            .skip(fetchB2C ? 0 : skip)
+            .limit(fetchB2C ? 500 : limit)
+            .lean(),
+          PartnerInvoice.countDocuments(b2bQuery),
+        ]);
+
+        const data = partnerInvoices.map((inv) => ({
+          _id: inv._id,
+          invoiceNumber: inv.invoiceId,
+          userName: inv.client,
+          userEmail: "N/A",
+          totalAmount: inv.amount,
+          status: inv.status?.toLowerCase() || "pending",
+          paymentType: "partner_invoice",
+          spaceName: inv.space,
+          planName: inv.description,
+          createdAt: inv.createdAt,
+          razorpayOrderId: "MANUAL",
+          invoiceType: "B2B_MANUAL",
+        }));
+
+        return { data, count };
+      })();
+
+      // ── B2B Uploaded Promise (PartnerInvoiceModel) ────────────────
+      const b2bUploadedPromise = (async () => {
+        if (!fetchB2B) return { data: [], count: 0 };
+
+        const uploadedQuery: any = {};
+        if (!isAdminOrStaff) {
+          uploadedQuery.partnerId = user.id;
+        }
+
+        if (filters.status && filters.status !== "all") {
+          const normalizedStatus =
+            filters.status.toLowerCase() === "paid" ||
+            filters.status.toLowerCase() === "completed"
+              ? "Paid"
+              : "Pending";
+          uploadedQuery.status = {
+            $in: [normalizedStatus, normalizedStatus.toUpperCase()],
           };
         }
-        query.spaceId = { $in: spaceIds };
-      }
 
-      // Apply Filters
-      if (filters.type && filters.type !== "all") {
-        query.paymentType = filters.type;
-      }
-
-      if (filters.status && filters.status !== "all") {
-        query.status = filters.status;
-      }
-
-      if (filters.search) {
-        query.$or = [
-          { userName: { $regex: filters.search, $options: "i" } },
-          { userEmail: { $regex: filters.search, $options: "i" } },
-          { razorpayOrderId: { $regex: filters.search, $options: "i" } },
-          { spaceName: { $regex: filters.search, $options: "i" } },
-        ];
-      }
-
-      if (filters.startDate || filters.endDate) {
-        query.createdAt = {};
-        if (filters.startDate) {
-          query.createdAt.$gte = new Date(filters.startDate);
+        if (filters.search) {
+          uploadedQuery.$or = [
+            { invoiceNumber: { $regex: filters.search, $options: "i" } },
+          ];
         }
-        if (filters.endDate) {
-          const endDate = new Date(filters.endDate);
-          endDate.setHours(23, 59, 59, 999);
-          query.createdAt.$lte = endDate;
+
+        if (Object.keys(dateFilter).length > 0) {
+          uploadedQuery.createdAt = dateFilter;
         }
-      }
 
-      // Fetch payments (invoices)
-      const payments = await PaymentModel.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
+        const [uploadedInvoices, count] = await Promise.all([
+          PartnerInvoiceModel.find(uploadedQuery)
+            .populate("partnerId", "fullName email")
+            .sort({ createdAt: -1 })
+            .skip(fetchB2C ? 0 : skip)
+            .limit(fetchB2C ? 500 : limit)
+            .lean(),
+          PartnerInvoiceModel.countDocuments(uploadedQuery),
+        ]);
 
-      // Get invoice details for these payments
-      const paymentIds = payments.map((p) => p._id.toString());
-      const invoices = await InvoiceModel.find({
-        payment: { $in: paymentIds },
-        isDeleted: { $ne: true },
-      }).lean();
+        const data = uploadedInvoices.map((inv: any) => ({
+          _id: inv._id,
+          invoiceNumber: inv.invoiceNumber,
+          userName: inv.partnerId?.fullName || "Partner",
+          userEmail: inv.partnerId?.email || "N/A",
+          totalAmount: inv.amount,
+          status: inv.status?.toLowerCase() || "pending",
+          paymentType: "partner_invoice",
+          spaceName: "Partner Upload",
+          planName: "Physical Invoice",
+          createdAt: inv.createdAt,
+          razorpayOrderId: "UPLOADED",
+          invoiceType: "B2B_UPLOAD",
+          fileUrl: inv.fileUrl,
+          paymentDetails: inv.paymentDetails,
+        }));
 
-      // Merge invoice data (like invoiceNumber) into payment data
-      const mergedData = payments.map((payment) => {
-        const invoice = invoices.find(
-          (inv) => inv.payment?.toString() === payment._id.toString(),
-        );
-        return {
-          ...payment,
-          invoiceNumber: invoice?.invoiceNumber || "N/A",
-          invoiceId: invoice?._id || null,
-        };
-      });
+        return { data, count };
+      })();
 
-      const total = await PaymentModel.countDocuments(query);
+      // ── Execute and Merge ────────────────────────────────────────
+      const [b2cRes, b2bManRes, b2bUpRes] = await Promise.all([
+        b2cPromise,
+        b2bManualPromise,
+        b2bUploadedPromise
+      ]);
+
+      let combined = [...b2cRes.data, ...b2bManRes.data, ...b2bUpRes.data];
+      combined.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const totalCount = b2cRes.count + b2bManRes.count + b2bUpRes.count;
+      
+      // If "all" or multiple types, slice from the merged result
+      const finalData = (!filters.type || filters.type === "all")
+        ? combined.slice(skip, skip + limit)
+        : combined;
 
       return {
         success: true,
         message: "Invoices fetched successfully",
         data: {
-          invoices: mergedData,
+          invoices: finalData,
           pagination: {
-            total,
+            total: totalCount,
             page,
-            pages: Math.ceil(total / limit),
+            pages: Math.ceil(totalCount / limit),
           },
         },
       };
@@ -1928,6 +2412,159 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch leaderboard",
+        error: error.message
+      };
+    }
+  }
+
+  // Document Management - Aggregated documents from all sources
+  async getAllDocuments(search?: string, type?: string, status?: string): Promise<ApiResponse<any>> {
+    try {
+      const results: any[] = [];
+
+      // 1. Fetch User KYC Documents
+      if (!type || type === "user") {
+        const userKycQuery: any = { isDeleted: false };
+        const userKycDocs = await KYCDocumentModel.find(userKycQuery)
+          .populate("user", "fullName email phoneNumber")
+          .lean();
+
+        userKycDocs.forEach((kyc: any) => {
+          const userName = kyc.user?.fullName || kyc.personalInfo?.fullName || "Unknown";
+          const userEmail = kyc.user?.email || kyc.personalInfo?.email || "";
+          
+          if (search && !userName.toLowerCase().includes(search.toLowerCase()) && !userEmail.toLowerCase().includes(search.toLowerCase())) return;
+
+          (kyc.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+
+            const isPartnerProfile = kyc.isPartner === true;
+            const docCategory = isPartnerProfile ? "Partner" : "User";
+
+            results.push({
+              id: `${kyc._id}_${doc._id || doc.type}`,
+              userId: kyc.user?._id,
+              ownerName: kyc.user?.fullName || userName,
+              ownerEmail: userEmail,
+              partnerName: isPartnerProfile ? userName : undefined,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || kyc.createdAt,
+              category: docCategory,
+              originalKycId: kyc._id,
+            });
+          });
+        });
+      }
+
+      // 2. Fetch Partner KYC Documents
+      if (!type || type === "partner") {
+        const partnerKycQuery: any = { isDeleted: false };
+        const partnerKycDocs = await PartnerKYCModel.find(partnerKycQuery)
+          .populate("user", "fullName email")
+          .lean();
+
+        partnerKycDocs.forEach((kyc: any) => {
+          // If we have a linked user, use their info for grouping/ownership
+          // This ensures partner docs show up under the main user who added them
+          const mainUser = kyc.user;
+          const ownerName =
+            mainUser?.fullName ||
+            kyc.fullName ||
+            kyc.personalInfo?.fullName ||
+            "Unknown";
+          const ownerEmail = mainUser?.email || kyc.email || "";
+          const partnerName =
+            kyc.fullName ||
+            kyc.personalInfo?.fullName ||
+            kyc.name ||
+            "Partner";
+
+          if (
+            search &&
+            !ownerName.toLowerCase().includes(search.toLowerCase()) &&
+            !ownerEmail.toLowerCase().includes(search.toLowerCase()) &&
+            !partnerName.toLowerCase().includes(search.toLowerCase())
+          )
+            return;
+
+          (kyc.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+            results.push({
+              id: `${kyc._id}_${doc._id || doc.type}`,
+              userId: mainUser?._id || kyc._id, // Use main user ID for grouping
+              ownerName: ownerName,
+              ownerEmail: ownerEmail,
+              partnerName: partnerName,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || kyc.createdAt,
+              category: "Partner",
+              originalKycId: kyc._id,
+            });
+          });
+        });
+      }
+
+      // 3. Fetch Business KYC Documents
+      if (!type || type === "business") {
+        const businessQuery: any = { isDeleted: false };
+        const businessDocs = await BusinessInfoModel.find(businessQuery)
+          .populate("user", "fullName email")
+          .lean();
+
+        businessDocs.forEach((biz: any) => {
+          const mainUser = biz.user;
+          const ownerName =
+            mainUser?.fullName || biz.companyName || biz.profileName || "Unknown";
+          const ownerEmail = mainUser?.email || biz.email || "";
+          const bizName = biz.companyName || biz.profileName || "Business";
+
+          if (
+            search &&
+            !ownerName.toLowerCase().includes(search.toLowerCase()) &&
+            !ownerEmail.toLowerCase().includes(search.toLowerCase()) &&
+            !bizName.toLowerCase().includes(search.toLowerCase())
+          )
+            return;
+
+          (biz.documents || []).forEach((doc: any) => {
+            if (status && doc.status !== status) return;
+            results.push({
+              id: `${biz._id}_${doc._id || doc.type}`,
+              userId: mainUser?._id || biz._id,
+              ownerName: ownerName,
+              ownerEmail: ownerEmail,
+              businessName: bizName,
+              docType: doc.type,
+              docName: doc.name || doc.type,
+              fileUrl: doc.fileUrl,
+              status: doc.status || "pending",
+              uploadedAt: doc.uploadedAt || biz.createdAt,
+              category: "Business",
+              originalKycId: biz._id,
+            });
+          });
+        });
+      }
+
+      // Sort by uploadedAt desc
+      results.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+
+      return {
+        success: true,
+        message: "Documents fetched successfully",
+        data: results
+      };
+    } catch (error: any) {
+      console.error("Error in getAllDocuments:", error);
+      return {
+        success: false,
+        message: "Failed to fetch documents",
         error: error.message
       };
     }

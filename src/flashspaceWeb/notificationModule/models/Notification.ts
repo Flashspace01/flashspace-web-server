@@ -23,6 +23,8 @@ export interface INotification extends Document {
     title: string;
     message: string;
     read: boolean;
+    archived: boolean;
+    deletedAt?: Date;
     metadata?: any; // e.g. ticketId, meetingId
     createdAt: Date;
 }
@@ -34,7 +36,11 @@ const NotificationSchema: Schema = new Schema({
     title: { type: String, required: true },
     message: { type: String, required: true },
     read: { type: Boolean, default: false },
+    archived: { type: Boolean, default: false },
+    deletedAt: { type: Date },
     metadata: { type: Schema.Types.Mixed },
 }, { timestamps: true });
+
+NotificationSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
 
 export const NotificationModel = mongoose.model<INotification>('Notification', NotificationSchema);

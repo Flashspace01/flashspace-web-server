@@ -12,7 +12,7 @@
     "test:watch": "nodemon --exec 'npm run test:api'",
     "test:feedback": "ts-node src/scripts/test-feedback.ts",
     "test:rbac": "ts-node src/scripts/test-rbac-security.ts",
-    "seed": "ts-node src/scripts/seedData.ts",
+    "seed": "ts-node src/scripts/seed-master-partners.ts",
     "seed:spaces": "ts-node src/scripts/newseed.ts",
     "seed:roles": "ts-node src/scripts/seedInternalRoles.ts",
     "add:coordinates": "ts-node src/scripts/addCoordinates.ts",
@@ -64,6 +64,7 @@
     "redis": "^5.10.0",
     "reflect-metadata": "^0.2.2",
     "socket.io": "^4.8.3",
+    "tesseract.js": "^7.0.0",
     "ts-node-dev": "^2.0.0",
     "zod": "^4.3.6"
   },

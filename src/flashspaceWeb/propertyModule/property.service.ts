@@ -2,7 +2,7 @@ import { PropertyModel } from "./property.model";
 
 export class PropertyService {
   static async createProperty(data: any, partnerId: string) {
-    const propertyData = {
+    const propertyData: any = {
       name: data.name,
       address: data.address,
       city: data.city,
@@ -12,7 +12,19 @@ export class PropertyService {
       images: data.images || [],
       partner: partnerId,
       spaceId: data.spaceId,
+      googleMapLink: data.googleMapLink,
     };
+
+    if (data.googleMapLink && !data.location) {
+      const coords = await this.extractCoordsFromLink(data.googleMapLink);
+      if (coords) {
+        propertyData.location = {
+          type: "Point",
+          coordinates: [coords.lng, coords.lat],
+        };
+      }
+    }
+
     const property = new PropertyModel(propertyData);
     return await property.save();
   }
@@ -33,6 +45,20 @@ export class PropertyService {
     if (data.kycRejectionReason)
       updateData.kycRejectionReason = data.kycRejectionReason;
     if (data.spaceId) updateData.spaceId = data.spaceId;
+    if (data.partner) updateData.partner = data.partner;
+    if (data.googleMapLink) {
+      updateData.googleMapLink = data.googleMapLink;
+      // Also update location if link is provided and no explicit location is sent
+      if (!data.location) {
+        const coords = await this.extractCoordsFromLink(data.googleMapLink);
+        if (coords) {
+          updateData.location = {
+            type: "Point",
+            coordinates: [coords.lng, coords.lat],
+          };
+        }
+      }
+    }
 
     if (Object.keys(updateData).length === 0) return null;
 
@@ -41,6 +67,46 @@ export class PropertyService {
       { $set: updateData },
       { new: true, runValidators: true },
     );
+  }
+
+  private static async extractCoordsFromLink(link: string) {
+    let targetLink = link;
+
+    // Resolve short links (maps.app.goo.gl or goo.gl/maps)
+    if (link.includes("goo.gl")) {
+      try {
+        const https = require("https");
+        targetLink = await new Promise((resolve) => {
+          https
+            .get(link, (res: any) => {
+              if (res.headers.location) {
+                resolve(res.headers.location);
+              } else {
+                resolve(link);
+              }
+            })
+            .on("error", () => resolve(link));
+        });
+      } catch (err) {
+        console.error("Failed to resolve short link:", err);
+      }
+    }
+
+    // Improved regex to catch various formats
+    // 1. Match @lat,lng
+    // 2. Match q=lat,lng or ll=lat,lng or cbll=lat,lng
+    // 3. Fallback to any lat,lng pair found in URL
+    const atMatch = targetLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const qMatch = targetLink.match(/[q|ll|cbll]=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    const genericMatch = targetLink.match(/(-?\d+\.\d+),(-?\d+\.\d+)/);
+
+    const match = atMatch || qMatch || genericMatch;
+
+    if (match) {
+      return { lat: parseFloat(match[1]), lng: parseFloat(match[2]) };
+    }
+
+    return null;
   }
 
   static async getProperties(query: any) {
@@ -92,6 +158,7 @@ export const flattenProperty = (spaceDoc: any) => {
       images: property.images,
       features: property.features,
       amenities: property.features, // Send as amenities for backwards compatibility if needed
+      googleMapLink: property.googleMapLink,
       property: property, // Optional: Keep reference to original property just in case
     };
   }

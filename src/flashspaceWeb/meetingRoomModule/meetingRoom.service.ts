@@ -5,6 +5,7 @@ import { PropertyModel } from "../propertyModule/property.model";
 import { Types } from "mongoose";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 export class MeetingRoomService {
   static async createRoom(data: any, partnerId: string) {
     let property;
@@ -19,7 +20,7 @@ export class MeetingRoomService {
       ...data,
       property: property._id,
       partner: partnerId,
-      approvalStatus: SpaceApprovalStatus.PENDING_KYC,
+      approvalStatus: data.approvalStatus ?? SpaceApprovalStatus.PENDING_KYC,
     });
     const savedRoom = await meetingRoom.save();
 
@@ -38,8 +39,23 @@ export class MeetingRoomService {
   ) {
     // Dynamic query building based on role
     const query: any = { _id: roomId };
-    if (userRole !== UserRole.ADMIN) {
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
+
+    if (!canManageAllSpaces) {
       query.partner = userId; // Enforce ownership for non-admins
+    }
+
+    const updateData: any = { ...data };
+    if (updateData.partnerId && !updateData.partner) {
+      updateData.partner = updateData.partnerId;
+    }
+    delete updateData.partnerId;
+
+    if (!canManageAllSpaces) {
+      delete updateData.partner;
     }
 
     // Check if room exists and user is authorized
@@ -48,15 +64,22 @@ export class MeetingRoomService {
       throw new Error("Meeting room not found or unauthorized");
     }
 
+    if (!canManageAllSpaces && updateData.isActive === true) {
+      await assertPartnerCanActivateSpace(
+        userId,
+        roomToUpdate.property.toString(),
+      );
+    }
+
     // Update Property Fields
     await PropertyService.updateProperty(
       roomToUpdate.property.toString(),
-      data,
+      updateData,
     );
 
     const room = await MeetingRoomModel.findOneAndUpdate(
       query,
-      { $set: data },
+      { $set: updateData },
       { new: true, runValidators: true },
     ).populate("property");
 
@@ -111,17 +134,27 @@ export class MeetingRoomService {
   }
 
   // ADDED: userRole parameter
-  static async deleteRoom(roomId: string, userId: string, userRole?: string) {
+  static async deleteRoom(
+    roomId: string,
+    userId: string,
+    userRole?: string,
+    restore: boolean = false,
+  ) {
     // Dynamic query building based on role
-    const query: any = { _id: roomId };
-    if (userRole !== UserRole.ADMIN) {
+    const query: any = { _id: roomId, isDeleted: restore };
+    const canManageAllSpaces =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
+
+    if (!canManageAllSpaces) {
       query.partner = userId; // Enforce ownership for non-admins
     }
 
     // Soft delete
     const room = await MeetingRoomModel.findOneAndUpdate(
       query,
-      { isDeleted: true },
+      { isDeleted: !restore, isActive: restore },
       { new: true },
     );
 
