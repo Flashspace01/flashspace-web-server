@@ -317,6 +317,15 @@ adminRoutes.get(
 );
 
 adminRoutes.get(
+  "/documents",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.VIEW_ALL_USERS,
+  ]),
+  AdminController.getAllDocuments,
+);
+
+adminRoutes.get(
   "/spaces/pending",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_SPACES),
   AdminController.getPendingSpaces,

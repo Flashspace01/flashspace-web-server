@@ -53,6 +53,24 @@ export const deleteNotification = async (req: Request, res: Response) => {
   }
 };
 
+export const archiveNotification = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const updated = await NotificationService.toggleArchive(id);
+    res.status(200).json({
+      success: true,
+      message: updated.archived ? "Notification archived" : "Notification unarchived",
+      data: updated
+    });
+  } catch (error) {
+    console.error("Error archiving notification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to archive notification",
+    });
+  }
+};
+
 export const deleteAllForAdmin = async (req: Request, res: Response) => {
   try {
     await NotificationService.deleteAllForAdmin();
