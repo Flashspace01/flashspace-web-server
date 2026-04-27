@@ -1,13 +1,32 @@
 import { Request, Response } from "express";
 import { Space, SpaceStatus } from "../models/space.model";
 import { SpaceMediaService } from "../services/spaceMedia.service";
+import { assertPartnerKycApproved } from "../../shared/utils/partnerKyc.utils";
 
 const spaceMediaService = new SpaceMediaService();
 
 export const createSpace = async (req: Request, res: Response) => {
   try {
     const partnerId = (req as any).user.id;
+    const userRole = (req as any).user?.role;
     const { mediaIds, ...spaceData } = req.body;
+    const canCreateWithoutPartnerKyc =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "space_partner_manager";
+
+    if (!canCreateWithoutPartnerKyc) {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return res.status(403).json({
+          success: false,
+          message:
+            err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        });
+      }
+    }
 
     const space = new Space({
       ...spaceData,

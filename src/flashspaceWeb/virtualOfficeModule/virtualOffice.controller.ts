@@ -11,6 +11,7 @@ import {
 } from "./virtualOffice.validation";
 import { UserRole } from "../authModule/models/user.model";
 import { SpaceApprovalStatus } from "../shared/enums/spaceApproval.enum";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 const sendError = (
   res: Response,
@@ -56,11 +57,26 @@ export const createVirtualOffice = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized: No partner found");
 
     const createBody: any = { ...validation.data.body };
+    const canCreateWithoutPartnerKyc =
+      userRole === UserRole.ADMIN ||
+      userRole === UserRole.SUPER_ADMIN ||
+      userRole === UserRole.SPACE_PARTNER_MANAGER;
 
     // If admin is creating, auto-approve
-    if (userRole === UserRole.ADMIN) {
+    if (canCreateWithoutPartnerKyc) {
       createBody.approvalStatus = SpaceApprovalStatus.ACTIVE;
       createBody.isActive = true;
+    } else {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
     }
 
     const createdOffice = await VirtualOfficeService.createOffice(

@@ -9,6 +9,7 @@ import path from "path";
 import fs from "fs";
 import { assertPartnerCanActivateSpace } from "../shared/utils/spaceActivation.utils";
 import { checkAndAdvanceSpaceStatus } from "../shared/utils/spaceOnboarding.utils";
+import { assertPartnerKycApproved } from "../shared/utils/partnerKyc.utils";
 
 const sendError = (
   res: Response,
@@ -44,6 +45,24 @@ export const createProperty = async (req: Request, res: Response) => {
     if (!partnerId) {
       console.log("❌ createProperty: No partner ID found in request or body");
       return sendError(res, 401, "Unauthorized: No partner found");
+    }
+
+    const canCreateWithoutPartnerKyc =
+      userRole === "admin" ||
+      userRole === "super_admin" ||
+      userRole === "space_partner_manager";
+
+    if (!canCreateWithoutPartnerKyc) {
+      try {
+        await assertPartnerKycApproved(partnerId);
+      } catch (err: any) {
+        return sendError(
+          res,
+          403,
+          err?.message ||
+            "Personal KYC must be approved before adding a new space.",
+        );
+      }
     }
 
     const { partner: _, partnerId: __, ...otherData } = req.body;
