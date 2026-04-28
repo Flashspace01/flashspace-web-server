@@ -376,12 +376,48 @@ export class AdminService {
 
   async getPartnerUsers(): Promise<ApiResponse<any>> {
     try {
-      const partners = await UserModel.find({
-        role: UserRole.PARTNER,
-        isDeleted: { $ne: true },
-      })
-        .sort({ fullName: 1, createdAt: -1 })
-        .select("_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt");
+      const [rolePartners, properties, virtualOffices, coworkingSpaces, meetingRooms] =
+        await Promise.all([
+          UserModel.find({
+            role: { $in: [UserRole.PARTNER, UserRole.SPACE_PARTNER_MANAGER] },
+            isDeleted: { $ne: true },
+          })
+            .sort({ fullName: 1, createdAt: -1 })
+            .select("_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt"),
+          PropertyModel.find({ isDeleted: { $ne: true } })
+            .select("partner")
+            .populate("partner", "_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt"),
+          VirtualOfficeModel.find({ isDeleted: { $ne: true } })
+            .select("partner")
+            .populate("partner", "_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt"),
+          CoworkingSpaceModel.find({ isDeleted: { $ne: true } })
+            .select("partner")
+            .populate("partner", "_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt"),
+          MeetingRoomModel.find({ isDeleted: { $ne: true } })
+            .select("partner")
+            .populate("partner", "_id fullName email phoneNumber role status isEmailVerified createdAt updatedAt"),
+        ]);
+
+      const partnerMap = new Map<string, any>();
+      const addPartner = (partner: any) => {
+        if (!partner) return;
+        const plainPartner = partner.toObject ? partner.toObject() : partner;
+        const id = plainPartner._id?.toString?.();
+        if (id && !plainPartner.isDeleted) {
+          partnerMap.set(id, plainPartner);
+        }
+      };
+
+      rolePartners.forEach(addPartner);
+      [...properties, ...virtualOffices, ...coworkingSpaces, ...meetingRooms].forEach(
+        (item: any) => addPartner(item.partner),
+      );
+
+      const partners = Array.from(partnerMap.values()).sort((a, b) =>
+        String(a.fullName || a.email || "").localeCompare(
+          String(b.fullName || b.email || ""),
+        ),
+      );
 
       return {
         success: true,
@@ -501,10 +537,73 @@ export class AdminService {
     user: any,
     page: number = 1,
     limit: number = 50,
+    filters: { status?: string; partner?: string } = {},
   ): Promise<ApiResponse<any>> {
     try {
       const skip = (page - 1) * limit;
       const query: any = { isDeleted: false };
+      const allowedStatuses = [
+        "pending_payment",
+        "pending_kyc",
+        "active",
+        "expired",
+        "cancelled",
+      ];
+
+      if (filters.status && allowedStatuses.includes(filters.status)) {
+        query.status = filters.status;
+      }
+
+      if (filters.partner && mongoose.Types.ObjectId.isValid(filters.partner)) {
+        const partnerProperties = await PropertyModel.find(
+          { partner: filters.partner },
+          "_id",
+        );
+        const partnerPropertyIds = partnerProperties.map((property: any) => property._id);
+
+        const [virtualOfficeIds, coworkingSpaceIds, meetingRoomIds] =
+          await Promise.all([
+            VirtualOfficeModel.find(
+              {
+                $or: [
+                  { partner: filters.partner },
+                  { property: { $in: partnerPropertyIds } },
+                ],
+              },
+              "_id",
+            ),
+            CoworkingSpaceModel.find(
+              {
+                $or: [
+                  { partner: filters.partner },
+                  { property: { $in: partnerPropertyIds } },
+                ],
+              },
+              "_id",
+            ),
+            MeetingRoomModel.find(
+              {
+                $or: [
+                  { partner: filters.partner },
+                  { property: { $in: partnerPropertyIds } },
+                ],
+              },
+              "_id",
+            ),
+          ]);
+
+        const partnerSpaceIds = [
+          ...virtualOfficeIds,
+          ...coworkingSpaceIds,
+          ...meetingRoomIds,
+        ].map((space: any) => space._id);
+
+        query.$or = [
+          { partner: filters.partner },
+          { spaceId: { $in: partnerSpaceIds } },
+          { "spaceSnapshot._id": { $in: partnerSpaceIds.map((id: any) => id.toString()) } },
+        ];
+      }
 
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
 
@@ -525,10 +624,13 @@ export class AdminService {
 
       const bookings = await BookingModel.find(query)
         .populate("user", "fullName email")
+        .populate("partner", "fullName email")
         .populate("spaceSnapshot", "name city") // Helpful context
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
+
+      const enrichedBookings = await this.enrichBookingsWithSpacePartner(bookings);
 
       const total = await BookingModel.countDocuments(query);
 
@@ -536,7 +638,7 @@ export class AdminService {
         success: true,
         message: "Bookings fetched successfully",
         data: {
-          bookings,
+          bookings: enrichedBookings,
           pagination: {
             total,
             page,
@@ -548,6 +650,141 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch bookings",
+        error: error.message,
+      };
+    }
+  }
+
+  private async enrichBookingsWithSpacePartner(bookings: any[]) {
+    const candidateSpaceIds = new Set<string>();
+
+    bookings.forEach((booking: any) => {
+      const plainBooking = booking.toObject ? booking.toObject() : booking;
+      const ids = [
+        plainBooking.spaceId?.toString?.(),
+        plainBooking.spaceSnapshot?._id?.toString?.(),
+      ].filter(Boolean);
+
+      ids.forEach((id) => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          candidateSpaceIds.add(id);
+        }
+      });
+    });
+
+    const spaceIds = Array.from(candidateSpaceIds);
+
+    if (!spaceIds.length) {
+      return bookings.map((booking: any) =>
+        booking.toObject ? booking.toObject() : booking,
+      );
+    }
+
+    const populateSpacePartner = [
+      { path: "partner", select: "fullName email" },
+      { path: "property", select: "partner", populate: { path: "partner", select: "fullName email" } },
+    ];
+
+    const [virtualOffices, coworkingSpaces, meetingRooms] = await Promise.all([
+      VirtualOfficeModel.find({ _id: { $in: spaceIds } })
+        .select("partner property")
+        .populate(populateSpacePartner),
+      CoworkingSpaceModel.find({ _id: { $in: spaceIds } })
+        .select("partner property")
+        .populate(populateSpacePartner),
+      MeetingRoomModel.find({ _id: { $in: spaceIds } })
+        .select("partner property")
+        .populate(populateSpacePartner),
+    ]);
+
+    const partnerBySpaceId = new Map<string, any>();
+    [...virtualOffices, ...coworkingSpaces, ...meetingRooms].forEach(
+      (space: any) => {
+        if (!space?._id) return;
+
+        const directPartner = space.partner;
+        const propertyPartner =
+          space.property &&
+          typeof space.property === "object" &&
+          (space.property as any).partner;
+        const resolvedPartner = directPartner || propertyPartner;
+
+        if (resolvedPartner) {
+          partnerBySpaceId.set(space._id.toString(), resolvedPartner);
+        }
+      },
+    );
+
+    return bookings.map((booking: any) => {
+      const plainBooking = booking.toObject ? booking.toObject() : booking;
+      const spacePartner =
+        partnerBySpaceId.get(plainBooking.spaceId?.toString?.()) ||
+        partnerBySpaceId.get(plainBooking.spaceSnapshot?._id?.toString?.());
+      const bookingPartner = plainBooking.partner;
+      const hasBookingPartnerName =
+        bookingPartner &&
+        typeof bookingPartner === "object" &&
+        (bookingPartner.fullName || bookingPartner.email);
+
+      return {
+        ...plainBooking,
+        partner: hasBookingPartnerName ? bookingPartner : spacePartner || bookingPartner,
+      };
+    });
+  }
+
+  async updateBookingStatus(
+    user: any,
+    bookingId: string,
+    status: string,
+  ): Promise<ApiResponse<any>> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return { success: false, message: "Booking not found" };
+      }
+
+      const query: any = { _id: bookingId, isDeleted: false };
+      const isAdminOrStaff = STAFF_ROLES.includes(user.role);
+
+      if (!isAdminOrStaff) {
+        const spaceIds = await this.getManagedSpaceIds(user.id);
+        query.spaceId = { $in: spaceIds };
+      }
+
+      const booking = await BookingModel.findOne(query);
+
+      if (!booking) {
+        return { success: false, message: "Booking not found" };
+      }
+
+      booking.status = status;
+      booking.updatedAt = new Date();
+      booking.timeline = [
+        ...(booking.timeline || []),
+        {
+          status,
+          date: new Date(),
+          note: `Status updated by admin to ${status.replace(/_/g, " ")}`,
+          by: user?.id || user?._id?.toString?.() || "admin",
+        },
+      ];
+
+      await booking.save();
+
+      const updatedBooking = await BookingModel.findById(booking._id)
+        .populate("user", "fullName email")
+        .populate("partner", "fullName email")
+        .populate("spaceSnapshot", "name city");
+
+      return {
+        success: true,
+        message: "Booking status updated successfully",
+        data: updatedBooking,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Failed to update booking status",
         error: error.message,
       };
     }
