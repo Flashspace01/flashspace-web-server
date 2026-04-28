@@ -198,7 +198,7 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     let kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
     const firstProperty = await PropertyModel.findOne({ partner: partnerId });
 
-    const kycObject = kyc ? kyc.toObject() : {};
+    const kycObject = (kyc ? kyc.toObject() : {}) as any;
     
     // Construct the data object:
     // 1. Business & Bank details from Property take precedence
@@ -559,6 +559,10 @@ export const reviewSpaceUserKycDocument = async (
     } else if (documentType === "signed_agreement") {
       kyc.signedAgreementStatus = status;
       kyc.signedAgreementRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "draft_agreement") {
+      kyc.draftAgreementStatus = status;
+      kyc.draftAgreementRejectMessage =
         status === "rejected" ? rejectMessage : undefined;
     } else {
       return res.status(400).json({

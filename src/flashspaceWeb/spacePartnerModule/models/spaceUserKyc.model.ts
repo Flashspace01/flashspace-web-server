@@ -189,6 +189,9 @@ export class SpaceUserKyc {
   public draftAgreementStatus!: KycDecisionStatus;
 
   @prop({ trim: true })
+  public draftAgreementRejectMessage?: string;
+
+  @prop({ trim: true })
   public signedAgreementUrl?: string;
 
   @prop({
