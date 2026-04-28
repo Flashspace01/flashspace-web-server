@@ -255,6 +255,8 @@ const coworkingSpaces = [
     popular: true,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767696478/chrome_y4ymlwh9SR_apwgug.png",
+    lat: 28.6506,
+    lng: 77.2300,
   },
   {
     name: "CP Alt F",
@@ -294,6 +296,8 @@ const coworkingSpaces = [
     popular: false,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767696936/chrome_y6UfCoipUj_wkpxel.png",
+    lat: 28.5244,
+    lng: 77.2100,
   },
   {
     name: "Mytime Cowork",
@@ -316,6 +320,8 @@ const coworkingSpaces = [
     popular: true,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767696150/chrome_F5QP1MGRA2_whrsth.png",
+    lat: 28.5200,
+    lng: 77.2000,
   },
   {
     name: "Okhla Alt F",
@@ -355,6 +361,8 @@ const coworkingSpaces = [
     popular: false,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767697269/chrome_e1S9bRUX5L_t3ltud.png",
+    lat: 28.6305,
+    lng: 77.2778,
   },
   {
     name: "Budha Coworking Spaces",
@@ -399,6 +407,8 @@ const coworkingSpaces = [
     popular: false,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767697175/chrome_4eVI3pxb5I_qpev0q.png",
+    lat: 28.5823,
+    lng: 77.0500,
   },
   {
     name: "Getset Spaces",
@@ -416,6 +426,8 @@ const coworkingSpaces = [
     popular: true,
     image:
       "https://res.cloudinary.com/drd4942mc/image/upload/v1767696619/chrome_Usn5xZsDny_b59bwf.png",
+    lat: 28.5588,
+    lng: 77.2028,
   },
   {
     name: "Infrapro - Sector 44",
@@ -1534,6 +1546,10 @@ async function seedDatabase() {
           status: PropertyStatus.ACTIVE,
           kycStatus: KYCStatus.APPROVED,
           isActive: true,
+          location: (space as any).lat && (space as any).lng ? {
+            type: "Point",
+            coordinates: [(space as any).lng, (space as any).lat]
+          } : undefined
         });
 
         return {
@@ -1576,6 +1592,10 @@ async function seedDatabase() {
           status: PropertyStatus.ACTIVE,
           kycStatus: KYCStatus.APPROVED,
           isActive: true,
+          location: (vo as any).lat && (vo as any).lng ? {
+            type: "Point",
+            coordinates: [(vo as any).lng, (vo as any).lat]
+          } : undefined
         });
 
         return {
