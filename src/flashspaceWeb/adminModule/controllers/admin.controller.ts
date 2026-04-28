@@ -86,13 +86,47 @@ export class AdminController {
   static async getAllBookings(req: Request, res: Response) {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
+    const status = req.query.status as string;
+    const partner = req.query.partner as string;
 
-    const result = await adminService.getAllBookings(req.user, page, limit);
+    const result = await adminService.getAllBookings(req.user, page, limit, {
+      status,
+      partner,
+    });
     if (result.success) {
       res.status(200).json(result);
     } else {
       res.status(500).json(result);
     }
+  }
+
+  // PATCH /api/admin/bookings/:bookingId/status
+  static async updateBookingStatus(req: Request, res: Response) {
+    const bookingId = req.params.bookingId as string;
+    const { status } = req.body;
+
+    if (
+      !status ||
+      !["pending_payment", "pending_kyc", "active", "expired", "cancelled"].includes(status)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking status",
+      });
+    }
+
+    const result = await adminService.updateBookingStatus(
+      req.user,
+      bookingId,
+      status,
+    );
+
+    if (result.success) {
+      return res.status(200).json(result);
+    }
+
+    const statusCode = result.message === "Booking not found" ? 404 : 500;
+    return res.status(statusCode).json(result);
   }
 
   // GET /api/admin/clients
