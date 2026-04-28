@@ -487,7 +487,7 @@ export const createOrder = async (req: Request, res: Response) => {
       userName: userName || "Guest",
       userPhone,
       razorpayOrderId: razorpayOrder.id,
-      amount: razorpayOrder.amount, // matches created amount
+      amount: adjustedTotalAmount, // Saved in INR instead of paise
       currency: "INR",
       status: PaymentStatus.PENDING,
       paymentType,

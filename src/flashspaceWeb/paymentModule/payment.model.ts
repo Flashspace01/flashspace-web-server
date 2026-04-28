@@ -58,7 +58,7 @@ export class Payment {
 
   // Payment Details
   @prop({ required: true })
-  public amount!: number; // In paise (₹100 = 10000 paise)
+  public amount!: number; // The actual amount in INR
 
   @prop({ required: true, default: "INR" })
   public currency!: string;
