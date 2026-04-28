@@ -881,6 +881,8 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
       });
     }
 
+    const booking = await BookingModel.findOne({ payment: payment._id });
+
     res.status(200).json({
       success: true,
       data: {
@@ -891,6 +893,7 @@ export const getPaymentStatus = async (req: Request, res: Response) => {
         spaceName: payment.spaceName,
         planName: payment.planName,
         tenure: payment.tenure,
+        bookingId: booking ? booking._id : undefined,
       },
     });
   } catch (error: any) {
