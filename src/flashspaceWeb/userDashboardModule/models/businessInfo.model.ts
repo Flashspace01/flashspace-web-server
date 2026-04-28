@@ -64,6 +64,9 @@ export class BusinessInfo {
   @prop({ type: () => [KYCDocumentItem], default: [] })
   documents?: KYCDocumentItem[];
 
+  @prop({ default: 0, min: 0, max: 100 })
+  progress?: number;
+
   @prop({ default: Date.now })
   updatedAt?: Date;
 }

@@ -2620,17 +2620,17 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     kyc.markModified("documents");
 
     // Update progress
-    // Update progress - only for models that support it
-    if (typeof kyc.kycType !== "undefined") {
-      // KYCDocument or PartnerKYC model
-      kyc.progress = calculateKYCProgress(kyc);
-      if (kyc.overallStatus === "not_started") {
-        kyc.overallStatus = "in_progress";
-      }
-    } else {
-      // BusinessInfo model - uses 'status' not 'overallStatus', no 'progress' field
-      if (kyc.status === "in_progress" || !kyc.status) {
-        kyc.status = "in_progress";
+    // Update progress and status
+    kyc.progress = calculateKYCProgress(kyc);
+    
+    const currentStatus = typeof kyc.overallStatus !== "undefined" ? kyc.overallStatus : kyc.status;
+    const isFinalState = ["not_started", "approved", "rejected", "in_progress"].includes(currentStatus || "");
+    
+    if (isFinalState || !currentStatus) {
+      if (typeof kyc.overallStatus !== "undefined") {
+        kyc.overallStatus = "pending";
+      } else {
+        kyc.status = "pending";
       }
     }
     kyc.updatedAt = new Date();
