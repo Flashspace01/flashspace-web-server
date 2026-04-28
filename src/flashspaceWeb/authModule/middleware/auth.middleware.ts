@@ -393,6 +393,15 @@ export class AuthMiddleware {
     });
   }
 
+  static setTwoFactorDeviceCookie(res: Response, trustedDeviceToken: string): void {
+    const cookieOptions = this.getCookieSecurityOptions();
+
+    res.cookie("twoFactorDevice", trustedDeviceToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+  }
+
   // Clear authentication cookies
   static clearTokenCookies(res: Response): void {
     const cookieOptions = this.getCookieSecurityOptions();

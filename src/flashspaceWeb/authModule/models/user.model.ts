@@ -196,6 +196,9 @@ export class User extends TimeStamps {
   @prop({ select: false })
   public twoFactorSecret?: string;
 
+  @prop({ type: () => [String], default: [], select: false })
+  public trustedTwoFactorDevices!: string[];
+
   // App Preferences
   @prop({
     type: () => Object,

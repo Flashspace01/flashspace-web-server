@@ -10,6 +10,7 @@ export interface SignupRequest {
 export interface LoginRequest {
   email: string;
   password: string;
+  trustedDeviceToken?: string;
 }
 
 export interface AuthResponse {
@@ -31,6 +32,8 @@ export interface AuthResponse {
     accessToken: string;
     refreshToken: string;
   };
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
 }
 
 export interface JwtPayload {
@@ -77,6 +80,11 @@ export interface ChangePasswordRequest {
 }
 
 export interface VerifyOTPRequest {
+  email: string;
+  otp: string;
+}
+
+export interface VerifyLoginOTPRequest {
   email: string;
   otp: string;
 }

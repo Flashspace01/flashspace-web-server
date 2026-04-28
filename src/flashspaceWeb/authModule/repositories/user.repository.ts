@@ -30,7 +30,7 @@ export class UserRepository {
       email: email.toLowerCase(),
       isDeleted: false,
     })
-      .select("+password")
+      .select("+password +trustedTwoFactorDevices")
       .exec();
   }
 

@@ -17,6 +17,11 @@ router.post('/login',
   authController.login
 );
 
+router.post('/verify-login-otp',
+  // AuthMiddleware.rateLimit(5, 15 * 60 * 1000),
+  authController.verifyLoginOTP
+);
+
 // OTP-based verification
 router.post('/verify-otp',
   // AuthMiddleware.rateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes

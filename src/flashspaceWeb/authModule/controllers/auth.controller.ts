@@ -74,7 +74,10 @@ export class AuthController {
   // Login user
   login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const loginData: LoginRequest = req.body;
+      const loginData: LoginRequest = {
+        ...req.body,
+        trustedDeviceToken: req.cookies?.twoFactorDevice,
+      };
 
       // Basic validation
       if (!loginData.email || !loginData.password) {
@@ -89,7 +92,17 @@ export class AuthController {
 
       const result = await this.authService.login(loginData);
 
-      if (result.success && result.tokens) {
+      if (result.success && result.requiresTwoFactor) {
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            requiresTwoFactor: true,
+            email: loginData.email,
+          },
+          error: {},
+        });
+      } else if (result.success && result.tokens) {
         // Set secure cookies
         AuthMiddleware.setTokenCookies(
           res,
@@ -116,6 +129,71 @@ export class AuthController {
       }
     } catch (error) {
       console.error("Login controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        data: {},
+        error: "Internal server error",
+      });
+    }
+  };
+
+  verifyLoginOTP = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { email, otp } = req.body;
+
+      if (!email || !otp) {
+        res.status(400).json({
+          success: false,
+          message: "Email and OTP are required",
+          data: {},
+          error: "Missing required fields",
+        });
+        return;
+      }
+
+      if (!/^\d{6}$/.test(otp)) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid OTP format. Please enter a 6-digit code.",
+          data: {},
+          error: "Invalid OTP format",
+        });
+        return;
+      }
+
+      const result = await this.authService.verifyLoginOTP({ email, otp });
+
+      if (result.success && result.tokens) {
+        AuthMiddleware.setTokenCookies(
+          res,
+          result.tokens.accessToken,
+          result.tokens.refreshToken,
+        );
+
+        if (result.twoFactorToken) {
+          AuthMiddleware.setTwoFactorDeviceCookie(res, result.twoFactorToken);
+        }
+
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            user: result.user,
+            tokens: result.tokens,
+          },
+          error: {},
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message,
+          data: {},
+          error: result.message,
+        });
+      }
+    } catch (error) {
+      console.error("Verify login OTP controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",
@@ -462,6 +540,10 @@ export class AuthController {
             authProvider: user.authProvider,
             isEmailVerified: user.isEmailVerified,
             kycVerified: user.kycVerified,
+            isTwoFactorEnabled: user.isTwoFactorEnabled,
+            preferences: user.preferences,
+            notifications: user.notifications,
+            securityPreferences: user.securityPreferences,
             lastLogin: user.lastLogin,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
@@ -510,6 +592,10 @@ export class AuthController {
                 authProvider: user.authProvider,
                 isEmailVerified: user.isEmailVerified,
                 kycVerified: user.kycVerified,
+                isTwoFactorEnabled: user.isTwoFactorEnabled,
+                preferences: user.preferences,
+                notifications: user.notifications,
+                securityPreferences: user.securityPreferences,
                 lastLogin: user.lastLogin,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
@@ -674,9 +760,23 @@ export class AuthController {
 
       // Verify token with Google and authenticate user
       console.log('Google Auth with Role:', role);
-      const result = await this.authService.googleAuthWithToken(idToken, role);
+      const result = await this.authService.googleAuthWithToken(
+        idToken,
+        role,
+        req.cookies?.twoFactorDevice,
+      );
 
-      if (result.success && result.tokens) {
+      if (result.success && result.requiresTwoFactor) {
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            requiresTwoFactor: true,
+            email: result.user?.email,
+          },
+          error: {},
+        });
+      } else if (result.success && result.tokens) {
         // Set secure cookies
         AuthMiddleware.setTokenCookies(
           res,
@@ -728,9 +828,23 @@ export class AuthController {
       }
 
       console.log('Google Callback - Processing role:', role);
-      const result = await this.authService.googleAuthWithToken(idToken, role);
+      const result = await this.authService.googleAuthWithToken(
+        idToken,
+        role,
+        req.cookies?.twoFactorDevice,
+      );
 
-      if (result.success && result.tokens) {
+      if (result.success && result.requiresTwoFactor) {
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: {
+            requiresTwoFactor: true,
+            email: result.user?.email,
+          },
+          error: {},
+        });
+      } else if (result.success && result.tokens) {
         AuthMiddleware.setTokenCookies(
           res,
           result.tokens.accessToken,
@@ -786,6 +900,13 @@ export class AuthController {
       delete updates.authProvider;
       delete updates.kycVerified;
       delete updates.isEmailVerified;
+      const shouldClearTrustedTwoFactorDevices = updates.isTwoFactorEnabled === false;
+      delete updates.trustedTwoFactorDevices;
+      delete updates.twoFactorSecret;
+
+      if (shouldClearTrustedTwoFactorDevices) {
+        updates.trustedTwoFactorDevices = [];
+      }
 
       // Import UserModel locally to break any circular dependencies in the controller layer
       const { UserModel } = await import("../models/user.model");
@@ -809,14 +930,20 @@ export class AuthController {
       }
 
       res.status(200).json({
-        success: true,
-        message: "Profile updated successfully",
-        data: {
-          id: updatedUser._id.toString(),
-          email: updatedUser.email,
+          success: true,
+          message: "Profile updated successfully",
+          data: {
+            id: updatedUser._id.toString(),
+            _id: updatedUser._id.toString(),
+            email: updatedUser.email,
           fullName: updatedUser.fullName,
           phoneNumber: updatedUser.phoneNumber,
           profilePicture: updatedUser.profilePicture,
+          role: updatedUser.role,
+          authProvider: updatedUser.authProvider,
+          isEmailVerified: updatedUser.isEmailVerified,
+          kycVerified: updatedUser.kycVerified,
+          isTwoFactorEnabled: updatedUser.isTwoFactorEnabled,
           preferences: updatedUser.preferences,
           notifications: updatedUser.notifications,
           securityPreferences: updatedUser.securityPreferences,
