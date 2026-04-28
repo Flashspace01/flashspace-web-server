@@ -13,6 +13,9 @@ export class PartnerKYC {
   @prop({ ref: () => User, required: true })
   user!: Ref<User>;
 
+  @prop({ ref: () => User })
+  linkedUser?: Ref<User>;
+
   @prop({ ref: () => KYCDocument, required: true })
   kycProfile!: Ref<KYCDocument>;
 
@@ -60,6 +63,9 @@ export class PartnerKYC {
 
   @prop({ default: Date.now })
   updatedAt?: Date;
+
+  @prop()
+  accountLinkedAt?: Date;
 }
 
 export const PartnerKYCModel = getModelForClass(PartnerKYC);
