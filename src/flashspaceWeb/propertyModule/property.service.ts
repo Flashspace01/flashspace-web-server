@@ -113,6 +113,86 @@ export class PropertyService {
     return await PropertyModel.find(query);
   }
 
+  static async getActiveCities() {
+    return await PropertyModel.distinct("city", {
+      isActive: true,
+      isDeleted: { $ne: true },
+    });
+  }
+
+  static async getSearchMetadata() {
+    const properties = await PropertyModel.find(
+      { isActive: true, isDeleted: { $ne: true } },
+      { name: 1, city: 1, area: 1, location: 1 },
+    );
+
+    // Group properties by city and area to calculate average coordinates
+    const cityData: Record<string, { latSum: number; lngSum: number; count: number }> = {};
+    const areaData: Record<string, { latSum: number; lngSum: number; count: number; city: string }> = {};
+
+    properties.forEach((p) => {
+      if (
+        Array.isArray(p.location?.coordinates) &&
+        p.location.coordinates.length === 2
+      ) {
+        const [lng, lat] = p.location.coordinates;
+
+        // Update City Averages
+        if (!cityData[p.city]) {
+          cityData[p.city] = { latSum: 0, lngSum: 0, count: 0 };
+        }
+        cityData[p.city].latSum += lat;
+        cityData[p.city].lngSum += lng;
+        cityData[p.city].count += 1;
+
+        // Update Area Averages
+        const areaKey = `${p.city}|${p.area}`;
+        if (!areaData[areaKey]) {
+          areaData[areaKey] = { latSum: 0, lngSum: 0, count: 0, city: p.city };
+        }
+        areaData[areaKey].latSum += lat;
+        areaData[areaKey].lngSum += lng;
+        areaData[areaKey].count += 1;
+      }
+    });
+
+    const cities = Object.keys(cityData).sort().map(name => ({
+      name,
+      coordinates: {
+        lat: cityData[name].latSum / cityData[name].count,
+        lng: cityData[name].lngSum / cityData[name].count
+      }
+    }));
+
+    const areas = Object.keys(areaData).sort().map(key => {
+      const [city, name] = key.split('|');
+      return {
+        name,
+        city,
+        coordinates: {
+          lat: areaData[key].latSum / areaData[key].count,
+          lng: areaData[key].lngSum / areaData[key].count
+        }
+      };
+    });
+
+    const propertyNames = properties.map((p) => ({
+      name: p.name,
+      city: p.city,
+      area: p.area,
+      coordinates:
+        Array.isArray(p.location?.coordinates) &&
+          p.location.coordinates.length === 2
+          ? {
+            lat: p.location.coordinates[1],
+            lng: p.location.coordinates[0],
+          }
+          : undefined,
+    }));
+
+    return { cities, areas, propertyNames };
+  }
+
   static async deleteProperty(propertyId: string) {
     // Could implement soft delete logic here if properties need to be retained independently
     // For now, space deletion handles space-level soft deletes. We might not want to delete
@@ -138,11 +218,11 @@ export const flattenProperty = (spaceDoc: any) => {
     const derivedCoordinates =
       rest.coordinates ||
       (Array.isArray(property.location?.coordinates) &&
-      property.location.coordinates.length === 2
+        property.location.coordinates.length === 2
         ? {
-            lat: property.location.coordinates[1],
-            lng: property.location.coordinates[0],
-          }
+          lat: property.location.coordinates[1],
+          lng: property.location.coordinates[0],
+        }
         : undefined);
 
     return {

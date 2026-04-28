@@ -15,6 +15,7 @@ propertyRoutes.get(
 
 // Public routes
 propertyRoutes.get("/available-cities", PropertyController.getAvailableCities);
+propertyRoutes.get("/search-metadata", PropertyController.getSearchMetadata);
 propertyRoutes.get("/:propertyId", PropertyController.getPropertyById);
 propertyRoutes.get("/:propertyId/spaces", PropertyController.getPropertySpaces);
 
