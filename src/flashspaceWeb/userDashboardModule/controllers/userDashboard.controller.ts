@@ -5,6 +5,7 @@ import path from "path";
 import { BookingModel } from "../../bookingModule/booking.model";
 import { BookingService } from "../../bookingModule/booking.service";
 import { KYCDocumentModel, KYCDocumentItem } from "../models/kyc.model";
+import { PartnerKYCModel } from "../models/partnerKYC.model";
 import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { SupportTicketModel } from "../models/supportTicket.model";
 import { UserModel } from "../../authModule/models/user.model";
@@ -37,19 +38,205 @@ import { PaymentModel, PaymentType } from "../../paymentModule/payment.model";
 import { MeetingModel, MeetingStatus } from "../../meetingSchedulerModule/meeting.model";
 import { MeetingSchedulerService } from "../../meetingSchedulerModule/meetingScheduler.service";
 
+function isApprovedPartnerAccess(partner: any): boolean {
+  const status = String(partner?.status || "").toLowerCase();
+  const documents = Array.isArray(partner?.documents) ? partner.documents : [];
+
+  return (
+    ["approved", "verified", "active"].includes(status) ||
+    !!partner?.linkedUser ||
+    !!partner?.accountLinkedAt ||
+    (documents.length > 0 &&
+      documents.every((doc: any) => String(doc?.status || "").toLowerCase() === "approved"))
+  );
+}
+
+async function getSharedKycProfileIds(userId?: string): Promise<mongoose.Types.ObjectId[]> {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return [];
+
+  const user = await UserModel.findById(userId).select("email");
+  const normalizedEmail = user?.email?.toLowerCase();
+  const profileIds = new Set<string>();
+  const memberships = await PartnerKYCModel.find({
+    isDeleted: { $ne: true },
+    $or: [
+      { linkedUser: userId },
+      ...(normalizedEmail ? [{ email: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }] : []),
+    ],
+  }).select("kycProfile linkedUser status documents accountLinkedAt");
+
+  for (const membership of memberships) {
+    if (!isApprovedPartnerAccess(membership)) continue;
+
+    if (membership.kycProfile) {
+      profileIds.add(String(membership.kycProfile));
+    }
+    if (!membership.linkedUser) {
+      membership.linkedUser = new mongoose.Types.ObjectId(userId) as any;
+      membership.accountLinkedAt = new Date();
+      await membership.save();
+    }
+  }
+
+  return Array.from(profileIds)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+}
+
+async function getAccessibleKycProfileIds(userId?: string): Promise<mongoose.Types.ObjectId[]> {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return [];
+
+  const [ownedProfiles, sharedProfileIds] = await Promise.all([
+    KYCDocumentModel.find({
+      user: userId,
+      isDeleted: { $ne: true },
+    }).select("_id"),
+    getSharedKycProfileIds(userId),
+  ]);
+
+  const profileIds = new Set<string>();
+  ownedProfiles.forEach((profile) => profileIds.add(String(profile._id)));
+  sharedProfileIds.forEach((id) => profileIds.add(String(id)));
+
+  return Array.from(profileIds).map((id) => new mongoose.Types.ObjectId(id));
+}
+
+async function getAccessibleBookingContext(userId?: string) {
+  const userIds = new Set<string>();
+  const profileIds = new Set<string>();
+
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    return { userIds: [], profileIds: [] };
+  }
+
+  userIds.add(userId);
+  const currentUser = await UserModel.findById(userId).select("email");
+  const normalizedEmail = currentUser?.email?.toLowerCase();
+
+  const ownedProfiles = await KYCDocumentModel.find({
+    user: userId,
+    isDeleted: { $ne: true },
+  }).select("_id");
+  ownedProfiles.forEach((profile) => profileIds.add(String(profile._id)));
+
+  const membershipsForCurrentUser = await PartnerKYCModel.find({
+    isDeleted: { $ne: true },
+    $or: [
+      { linkedUser: userId },
+      ...(normalizedEmail
+        ? [{ email: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }]
+        : []),
+    ],
+  }).select("user kycProfile linkedUser status documents accountLinkedAt");
+
+  for (const membership of membershipsForCurrentUser) {
+    if (!isApprovedPartnerAccess(membership)) continue;
+
+    if (membership.user) userIds.add(String(membership.user));
+    if (membership.kycProfile) profileIds.add(String(membership.kycProfile));
+    if (!membership.linkedUser) {
+      membership.linkedUser = new mongoose.Types.ObjectId(userId) as any;
+      membership.accountLinkedAt = new Date();
+      await membership.save();
+    }
+  }
+
+  const partnersForOwnedProfiles = profileIds.size
+    ? await PartnerKYCModel.find({
+      kycProfile: { $in: Array.from(profileIds).map((id) => new mongoose.Types.ObjectId(id)) },
+      isDeleted: { $ne: true },
+    }).select("linkedUser email status documents accountLinkedAt")
+    : [];
+
+  const partnerEmails: string[] = [];
+  for (const partner of partnersForOwnedProfiles) {
+    if (!isApprovedPartnerAccess(partner)) continue;
+
+    if (partner.linkedUser) userIds.add(String(partner.linkedUser));
+    if (partner.email) partnerEmails.push(String(partner.email).toLowerCase());
+  }
+
+  if (partnerEmails.length > 0) {
+    const linkedUsers = await UserModel.find({
+      email: { $in: partnerEmails },
+      isDeleted: { $ne: true },
+    }).select("_id");
+    linkedUsers.forEach((user) => userIds.add(String(user._id)));
+  }
+
+  return {
+    userIds: Array.from(userIds).map((id) => new mongoose.Types.ObjectId(id)),
+    profileIds: Array.from(profileIds).map((id) => new mongoose.Types.ObjectId(id)),
+  };
+}
+
+async function buildSharedBookingFilter(userId?: string, extra: Record<string, any> = {}) {
+  const context = await getAccessibleBookingContext(userId);
+  const access: any[] = context.userIds.length
+    ? [{ user: { $in: context.userIds } }]
+    : [{ user: userId }];
+
+  if (context.profileIds.length > 0) {
+    access.push({ kycProfile: { $in: context.profileIds } });
+  }
+
+  return {
+    ...extra,
+    isDeleted: { $ne: true },
+    $or: access,
+  };
+}
+
+async function getSharedBookingInvoiceAccess(userId?: string) {
+  const context = await getAccessibleBookingContext(userId);
+  if (!context.profileIds.length && !context.userIds.length) {
+    return {
+      accessibleProfileIds: [],
+      accessibleUserIds: [],
+      bookingIds: [],
+      bookingNumbers: [] as string[],
+    };
+  }
+
+  const bookings = await BookingModel.find({
+    $or: [
+      ...(context.userIds.length ? [{ user: { $in: context.userIds } }] : []),
+      ...(context.profileIds.length ? [{ kycProfile: { $in: context.profileIds } }] : []),
+    ],
+    isDeleted: { $ne: true },
+  }).select("_id bookingNumber");
+
+  return {
+    accessibleProfileIds: context.profileIds,
+    accessibleUserIds: context.userIds,
+    bookingIds: bookings.map((booking) => booking._id),
+    bookingNumbers: bookings.map((booking) => booking.bookingNumber).filter(Boolean),
+  };
+}
+
 // ============ DASHBOARD ============
 
 export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    const activeBookingFilter = await buildSharedBookingFilter(userId, {
+      status: "active",
+    });
+    const allBookingFilter = await buildSharedBookingFilter(userId);
+    const invoiceAccess = await getSharedBookingInvoiceAccess(userId);
+    const invoiceAccessOr: any[] = invoiceAccess.accessibleUserIds?.length
+      ? [{ user: { $in: invoiceAccess.accessibleUserIds } }]
+      : [{ user: userId }];
+    if (invoiceAccess.bookingIds.length > 0) {
+      invoiceAccessOr.push({ booking: { $in: invoiceAccess.bookingIds } });
+    }
+    if (invoiceAccess.bookingNumbers.length > 0) {
+      invoiceAccessOr.push({ bookingNumber: { $in: invoiceAccess.bookingNumbers } });
+    }
 
     // Get active bookings count from both models
     const [activeBookingsMain, activeSeatBookings] = await Promise.all([
-      BookingModel.countDocuments({
-        user: userId,
-        status: "active",
-        isDeleted: false,
-      }),
+      BookingModel.countDocuments(activeBookingFilter),
       SeatBookingModel.countDocuments({
         user: userId,
         status: "confirmed",
@@ -60,17 +247,13 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
     // Get pending invoices total
     const pendingInvoices = await InvoiceModel.aggregate([
-      { $match: { user: userId, status: "pending", isDeleted: false } },
+      { $match: { status: "pending", isDeleted: false, $or: invoiceAccessOr } },
       { $group: { _id: null, total: { $sum: "$total" } } },
     ]);
 
     // Get next booking (upcoming expiry) from both models
     const [nextBookingMain, nextSeatBooking] = await Promise.all([
-      BookingModel.findOne({
-        user: userId,
-        status: "active",
-        isDeleted: false,
-      })
+      BookingModel.findOne(activeBookingFilter)
         .sort({ endDate: 1 })
         .select("endDate"),
       SeatBookingModel.findOne({
@@ -97,8 +280,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
     // Get recent activity (last 5 bookings/invoices) from both models
     const [recentBookingsMain, recentSeatBookings] = await Promise.all([
       BookingModel.find({
-        user: userId,
-        isDeleted: false,
+        ...allBookingFilter,
       })
         .sort({ createdAt: -1 })
         .limit(3)
@@ -132,7 +314,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 
     // Usage breakdown
     const usageBreakdownMain = await BookingModel.aggregate([
-      { $match: { user: userId, isDeleted: false } },
+      { $match: allBookingFilter },
       { $group: { _id: "$type", count: { $sum: 1 } } },
     ]);
 
@@ -162,9 +344,8 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       BookingModel.aggregate([
         {
           $match: {
-            user: userId,
+            ...allBookingFilter,
             createdAt: { $gte: sixMonthsAgo },
-            isDeleted: false,
           },
         },
         {
@@ -252,8 +433,6 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
 };
 
 // ============ PARTNER BOOKINGS ============
-
-import { PartnerKYCModel } from "../models/partnerKYC.model";
 
 export const getAllPartnerSpaces = async (req: Request, res: Response) => {
   try {
@@ -1374,9 +1553,10 @@ export const getAllBookings = async (req: Request, res: Response) => {
     else if (type === "coworking_space") normalizedType = "CoworkingSpace";
     else if (type === "meeting_room") normalizedType = "MeetingRoom";
 
-    const filter: any = { user: userId, isDeleted: { $ne: true } };
-    if (normalizedType) filter.type = normalizedType;
-    if (status) filter.status = status;
+    const extraFilter: any = {};
+    if (normalizedType) extraFilter.type = normalizedType;
+    if (status) extraFilter.status = status;
+    const filter = await buildSharedBookingFilter(userId, extraFilter);
 
     const limitNum = Number(limit) || 100;
     const skip = (Number(page) - 1) * limitNum;
@@ -1560,7 +1740,10 @@ export const getAllBookings = async (req: Request, res: Response) => {
     // 4. Combine and Re-sort
     // Note: This merging logic is simplified. For large datasets, a more robust paginated merge would be needed.
     const allBookings = [
-      ...bookingsRaw.map((b) => b.toObject()),
+      ...bookingsRaw.map((b) => ({
+        ...b.toObject(),
+        sharedAccess: String((b as any).user) !== String(userId),
+      })),
       ...normalizedSeatBookings,
       ...fallbackBookingsFromPayments,
     ]
@@ -1613,16 +1796,15 @@ export const getBookingById = async (req: Request, res: Response) => {
     const { bookingId } = req.params;
 
     // 1. Try finding in main BookingModel
-    let booking = await BookingModel.findOne({
-      _id: bookingId,
-      user: userId,
-      isDeleted: false,
-    });
+    let booking = await BookingModel.findOne(
+      await buildSharedBookingFilter(userId, { _id: bookingId }),
+    );
 
     if (booking) {
       // AUTO-FIX: Transition pending_kyc to active if user is already verified
-      const user = await UserModel.findById(userId);
-      if (user?.kycVerified && booking.status === "pending_kyc") {
+      const ownsBooking = String((booking as any).user) === String(userId);
+      const user = ownsBooking ? await UserModel.findById(userId) : null;
+      if (ownsBooking && user?.kycVerified && booking.status === "pending_kyc") {
         booking.status = "active";
         booking.kycStatus = "approved";
         
@@ -1639,6 +1821,7 @@ export const getBookingById = async (req: Request, res: Response) => {
       }
 
       const bookingObj = booking.toObject() as any;
+      bookingObj.sharedAccess = String(bookingObj.user) !== String(userId);
       if (bookingObj.endDate) {
         const now = new Date();
         const end = new Date(bookingObj.endDate);
@@ -1829,11 +2012,35 @@ export const linkBookingToProfile = async (req: Request, res: Response) => {
         .status(400)
         .json({ success: false, message: "Profile ID required" });
     }
+    if (!mongoose.Types.ObjectId.isValid(profileId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Profile ID format" });
+    }
 
-    // Verify profile exists and belongs to user
+    const profileObjectId = new mongoose.Types.ObjectId(profileId);
+    const currentUser = await UserModel.findById(userId).select("email");
+    const normalizedEmail = currentUser?.email?.toLowerCase();
+    const approvedPartnerAccess = await PartnerKYCModel.findOne({
+      kycProfile: profileObjectId,
+      status: "approved",
+      isDeleted: { $ne: true },
+      $or: [
+        { linkedUser: userId },
+        ...(normalizedEmail ? [{ email: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }] : []),
+      ],
+    });
+    if (approvedPartnerAccess && !approvedPartnerAccess.linkedUser) {
+      approvedPartnerAccess.linkedUser = new mongoose.Types.ObjectId(userId as string) as any;
+      approvedPartnerAccess.accountLinkedAt = new Date();
+      await approvedPartnerAccess.save();
+    }
+
+    // Verify profile exists and is owned by the user or shared with the user.
     const profile = await KYCDocumentModel.findOne({
-      _id: profileId,
-      user: userId,
+      _id: profileObjectId,
+      isDeleted: { $ne: true },
+      $or: [{ user: userId }, ...(approvedPartnerAccess ? [{}] : [])],
     });
     if (!profile) {
       return res
@@ -1923,6 +2130,21 @@ export const getKYCStatus = async (req: Request, res: Response) => {
         user: userObject,
         isDeleted: { $ne: true },
       });
+      if (!kyc) {
+        const sharedProfileIds = await getSharedKycProfileIds(userId);
+        if (sharedProfileIds.some((id) => id.equals(profileObject))) {
+          kyc = await KYCDocumentModel.findOne({
+            _id: profileObject,
+            isDeleted: { $ne: true },
+          });
+          if (kyc) {
+            kyc = {
+              ...kyc.toObject(),
+              sharedAccess: true,
+            };
+          }
+        }
+      }
       console.log("[getKYCStatus] KYC: ", kyc);
       // 2. If not found, try BusinessInfoModel
       if (!kyc) {
@@ -2041,6 +2263,13 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       user: userId,
       isDeleted: { $ne: true },
     });
+    const sharedProfileIds = await getSharedKycProfileIds(userId);
+    const sharedProfiles = sharedProfileIds.length
+      ? await KYCDocumentModel.find({
+        _id: { $in: sharedProfileIds },
+        isDeleted: { $ne: true },
+      })
+      : [];
     console.log(
       `[getKYCStatus] Found ${businessProfiles.length} business profiles`,
     );
@@ -2122,6 +2351,10 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       ...individualProfiles,
       ...mappedBusinessProfiles,
       ...mappedPartnerProfiles,
+      ...sharedProfiles.map((profile: any) => ({
+        ...profile.toObject(),
+        sharedAccess: true,
+      })),
     ];
 
     res.status(200).json({ success: true, data: allProfiles });
@@ -3224,7 +3457,18 @@ export const getAllInvoices = async (req: Request, res: Response) => {
     const userId = req.user?.id;
     const { status, fromDate, toDate, page = 1, limit = 100 } = req.query;
 
-    const filter: any = { user: userId, isDeleted: false };
+    const invoiceAccess = await getSharedBookingInvoiceAccess(userId);
+    const invoiceAccessOr: any[] = invoiceAccess.accessibleUserIds?.length
+      ? [{ user: { $in: invoiceAccess.accessibleUserIds } }]
+      : [{ user: userId }];
+    if (invoiceAccess.bookingIds.length > 0) {
+      invoiceAccessOr.push({ booking: { $in: invoiceAccess.bookingIds } });
+    }
+    if (invoiceAccess.bookingNumbers.length > 0) {
+      invoiceAccessOr.push({ bookingNumber: { $in: invoiceAccess.bookingNumbers } });
+    }
+
+    const filter: any = { isDeleted: false, $or: invoiceAccessOr };
     if (status) filter.status = status;
     if (fromDate || toDate) {
       filter.createdAt = {};
@@ -3243,7 +3487,7 @@ export const getAllInvoices = async (req: Request, res: Response) => {
         .limit(_limit),
       InvoiceModel.countDocuments(filter),
       InvoiceModel.aggregate([
-        { $match: { user: userId, isDeleted: false } },
+        { $match: filter },
         {
           $group: {
             _id: null,
@@ -3293,10 +3537,21 @@ export const getInvoiceById = async (req: Request, res: Response) => {
         .json({ success: false, message: "Invalid Invoice ID format" });
     }
 
+    const invoiceAccess = await getSharedBookingInvoiceAccess(userId);
+    const invoiceAccessOr: any[] = invoiceAccess.accessibleUserIds?.length
+      ? [{ user: { $in: invoiceAccess.accessibleUserIds } }]
+      : [{ user: userId }];
+    if (invoiceAccess.bookingIds.length > 0) {
+      invoiceAccessOr.push({ booking: { $in: invoiceAccess.bookingIds } });
+    }
+    if (invoiceAccess.bookingNumbers.length > 0) {
+      invoiceAccessOr.push({ bookingNumber: { $in: invoiceAccess.bookingNumbers } });
+    }
+
     const invoice = await InvoiceModel.findOne({
       _id: invoiceId,
-      user: userId,
       isDeleted: false,
+      $or: invoiceAccessOr,
     });
 
     if (!invoice) {

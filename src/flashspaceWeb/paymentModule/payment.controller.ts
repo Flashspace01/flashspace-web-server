@@ -5,6 +5,7 @@ import { PaymentModel, PaymentStatus, PaymentType } from "./payment.model";
 import { BookingModel } from "../bookingModule/booking.model";
 import { InvoiceModel } from "../invoiceModule/invoice.model";
 import { KYCDocumentModel } from "../userDashboardModule/models/kyc.model";
+import { PartnerKYCModel } from "../userDashboardModule/models/partnerKYC.model";
 import { VirtualOfficeModel } from "../virtualOfficeModule/virtualOffice.model";
 import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.model";
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
@@ -36,6 +37,60 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || "",
   key_secret: process.env.RAZORPAY_KEY_SECRET || "",
 });
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isApprovedPartnerAccess(partner: any): boolean {
+  const status = String(partner?.status || "").toLowerCase();
+  const documents = Array.isArray(partner?.documents) ? partner.documents : [];
+
+  return (
+    ["approved", "verified", "active"].includes(status) ||
+    !!partner?.linkedUser ||
+    !!partner?.accountLinkedAt ||
+    (documents.length > 0 &&
+      documents.every((doc: any) => String(doc?.status || "").toLowerCase() === "approved"))
+  );
+}
+
+async function resolveApprovedBookingProfile(userId: any) {
+  const user = await UserModel.findById(userId).select("email kycVerified");
+  const normalizedEmail = user?.email?.toLowerCase();
+
+  const sharedPartnerProfile = await PartnerKYCModel.findOne({
+    isDeleted: { $ne: true },
+    $or: [
+      { linkedUser: userId },
+      ...(normalizedEmail
+        ? [{ email: new RegExp(`^${escapeRegExp(normalizedEmail)}$`, "i") }]
+        : []),
+    ],
+  }).select("kycProfile linkedUser status documents accountLinkedAt");
+
+  if (sharedPartnerProfile?.kycProfile && isApprovedPartnerAccess(sharedPartnerProfile)) {
+    if (!sharedPartnerProfile.linkedUser) {
+      sharedPartnerProfile.linkedUser = userId;
+      sharedPartnerProfile.accountLinkedAt = new Date();
+      await sharedPartnerProfile.save();
+    }
+
+    const profile = await KYCDocumentModel.findOne({
+      _id: sharedPartnerProfile.kycProfile,
+      overallStatus: "approved",
+      isDeleted: { $ne: true },
+    }).select("_id linkedBookings");
+
+    if (profile) return profile;
+  }
+
+  return KYCDocumentModel.findOne({
+    user: userId,
+    overallStatus: "approved",
+    isDeleted: { $ne: true },
+  }).select("_id linkedBookings");
+}
 
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
@@ -147,7 +202,8 @@ async function createBookingAndInvoice(payment: any) {
 
     // Check User KYC status before creating booking
     const bookingUser = await UserModel.findById(payment.user);
-    const isUserVerified = bookingUser?.kycVerified === true;
+    const approvedBookingProfile = await resolveApprovedBookingProfile(payment.user);
+    const isUserVerified = bookingUser?.kycVerified === true || !!approvedBookingProfile;
 
     // Create booking
     let booking: any = null;
@@ -175,8 +231,9 @@ async function createBookingAndInvoice(payment: any) {
         payment: payment._id,
         razorpayOrderId: payment.razorpayOrderId,
         razorpayPaymentId: payment.razorpayPaymentId,
+        kycProfile: approvedBookingProfile?._id,
         status: isUserVerified ? "active" : "pending_kyc",
-        kycStatus: isUserVerified ? "approved" : "not_started",
+        kycStatus: approvedBookingProfile ? "approved" : isUserVerified ? "approved" : "not_started",
         timeline: [
           {
             status: "payment_received",
@@ -195,6 +252,15 @@ async function createBookingAndInvoice(payment: any) {
           "GST Registration Support",
         ],
       });
+
+      if (
+        approvedBookingProfile &&
+        !approvedBookingProfile.linkedBookings?.includes(booking._id.toString())
+      ) {
+        approvedBookingProfile.linkedBookings = approvedBookingProfile.linkedBookings || [];
+        approvedBookingProfile.linkedBookings.push(booking._id.toString());
+        await approvedBookingProfile.save();
+      }
     }
 
     // Generate invoice number
@@ -375,7 +441,10 @@ export const createOrder = async (req: Request, res: Response) => {
 
     // Server-side KYC Check: Only allow verified users to book (Admins bypass check)
     const isSpecialRole = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.SUPPORT, UserRole.SALES].includes(req.user?.role as any);
-    if (!isSpecialRole && !req.user?.kycVerified) {
+    const approvedBookingProfile = isSpecialRole
+      ? null
+      : await resolveApprovedBookingProfile(resolvedUserId);
+    if (!isSpecialRole && !req.user?.kycVerified && !approvedBookingProfile) {
       return res.status(403).json({
         success: false,
         message: "KYC verification is required to book a space. Please complete your profile verification first.",

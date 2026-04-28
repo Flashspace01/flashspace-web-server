@@ -14,6 +14,7 @@ import { BusinessInfoModel } from "../../userDashboardModule/models/businessInfo
 import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { ApiResponse } from "../../authModule/types/auth.types";
 import { PasswordUtil } from "../../authModule/utils/password.util";
+import { EmailUtil } from "../../authModule/utils/email.util";
 import mongoose from "mongoose";
 import { NotificationService } from "../../notificationModule/services/notification.service";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -27,6 +28,64 @@ import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancial
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
 export class AdminService {
+  private async ensurePartnerLoginAccount(partner: any): Promise<any> {
+    const email = String(partner.email || "").trim().toLowerCase();
+    if (!email) {
+      throw new Error("Partner email is required to create login access");
+    }
+
+    let linkedUser = await UserModel.findOne({
+      email,
+      isDeleted: { $ne: true },
+    }).select("+password");
+
+    let resetToken: string | null = null;
+
+    if (!linkedUser) {
+      resetToken = EmailUtil.generateVerificationToken();
+      const randomPassword = PasswordUtil.generateRandomPassword(18);
+      const hashedPassword = await PasswordUtil.hash(randomPassword);
+
+      linkedUser = await UserModel.create({
+        email,
+        fullName: partner.fullName || email.split("@")[0],
+        phoneNumber: partner.phone,
+        password: hashedPassword,
+        authProvider: AuthProvider.LOCAL,
+        role: UserRole.USER,
+        isEmailVerified: true,
+        kycVerified: true,
+        isActive: true,
+        resetPasswordToken: resetToken,
+        resetPasswordExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+    } else {
+      const updates: any = {
+        kycVerified: true,
+        isActive: true,
+      };
+      if (!linkedUser.fullName && partner.fullName) updates.fullName = partner.fullName;
+      if (!linkedUser.phoneNumber && partner.phone) updates.phoneNumber = partner.phone;
+      if (!linkedUser.isEmailVerified) updates.isEmailVerified = true;
+      linkedUser = await UserModel.findByIdAndUpdate(linkedUser._id, updates, {
+        new: true,
+      });
+    }
+
+    partner.linkedUser = linkedUser?._id;
+    partner.accountLinkedAt = new Date();
+
+    if (resetToken && linkedUser) {
+      try {
+        await EmailUtil.sendPasswordResetEmail(email, resetToken, linkedUser.fullName);
+      } catch (emailError) {
+        console.error("[ensurePartnerLoginAccount] Failed to send setup email:", emailError);
+      }
+    }
+
+    return linkedUser;
+  }
+
   /**
    * Helper to get all space IDs managed by a user (Partner or Space Manager)
    */
@@ -1123,7 +1182,7 @@ export class AdminService {
           await UserModel.findByIdAndUpdate(doc.user, { kycVerified: true });
         } else if (type === "partner") {
           doc.status = "approved";
-          await UserModel.findByIdAndUpdate(doc.user, { kycVerified: true });
+          await this.ensurePartnerLoginAccount(doc);
         }
 
         doc.progress = 100;
@@ -1134,9 +1193,6 @@ export class AdminService {
           await UserModel.findByIdAndUpdate(doc.user, { kycVerified: false });
         } else {
           doc.status = "rejected";
-          if (type === "partner") {
-            await UserModel.findByIdAndUpdate(doc.user, { kycVerified: false });
-          }
           doc.rejectionReason = rejectionReason;
         }
 
@@ -1342,10 +1398,18 @@ export class AdminService {
 
             if (action === "reject") {
               partner.status = "rejected";
-              // Sync User verification status
-              await UserModel.findByIdAndUpdate(partner.user, {
-                kycVerified: false,
-              });
+            } else {
+              const allPartnerDocumentsApproved =
+                partner.documents?.length > 0 &&
+                partner.documents.every(
+                  (partnerDoc: any) => partnerDoc.status === "approved",
+                );
+
+              if (allPartnerDocumentsApproved) {
+                partner.status = "approved";
+                partner.rejectionReason = undefined;
+                await this.ensurePartnerLoginAccount(partner);
+              }
             }
 
             partner.updatedAt = new Date();
@@ -1759,15 +1823,9 @@ export class AdminService {
         partner.rejectionReason = rejectionReason;
       } else {
         partner.rejectionReason = undefined; // Clear rejection reason if approved
+        await this.ensurePartnerLoginAccount(partner);
       }
       await partner.save();
-
-      // Sync user kycVerified flag
-      if (partner.user) {
-        await UserModel.findByIdAndUpdate(partner.user, {
-          kycVerified: action === "approve",
-        });
-      }
 
       // Recalculate partnerCount in the user's KYC document
       // Rely on user ID to find the main KYC profile

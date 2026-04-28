@@ -50,7 +50,7 @@ export const addPartner = async (req: Request, res: Response) => {
       user: userId,
       kycProfile: profileId,
       fullName,
-      email,
+      email: String(email).trim().toLowerCase(),
       phone,
       panNumber,
       aadhaarNumber,
@@ -127,6 +127,7 @@ export const getPartners = async (req: Request, res: Response) => {
     // Query PartnerKYCModel for partners linked to this profile
     const partners = await PartnerKYCModel.find({
       user: userId,
+      kycProfile: profileId,
       isDeleted: { $ne: true },
     }).sort({ createdAt: -1 });
 
