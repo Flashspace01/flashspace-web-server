@@ -40,6 +40,27 @@ export const verifyPaymentSchema = z.object({
     razorpay_payment_id: z.string().optional(), // Can be missing if DEV
     razorpay_signature: z.string().optional(), // Can be missing if DEV
     devMode: z.boolean().optional(),
+    // Allow recovery data for simulation or external proxy orders
+    recoveryData: z
+      .object({
+        userId: objectIdSchema.optional(),
+        userName: z.string().optional(),
+        userEmail: z.string().email().optional(),
+        userPhone: z.string().optional(),
+        spaceId: objectIdSchema.optional(),
+        spaceModel: z
+          .enum(["VirtualOffice", "CoworkingSpace", "MeetingRoom"])
+          .optional(),
+        spaceName: z.string().optional(),
+        planName: z.string().optional(),
+        planKey: z.string().optional(),
+        tenure: z.number().optional(),
+        yearlyPrice: z.number().optional(),
+        totalAmount: z.number().optional(),
+        paymentType: z.nativeEnum(PaymentType).optional(),
+        startDate: z.string().optional(),
+      })
+      .optional(),
   }),
 });
 
