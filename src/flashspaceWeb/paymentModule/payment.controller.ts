@@ -605,7 +605,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
             {
               invoiceNumber: devBookingData.invoiceNumber,
               type: "invoice_generated",
-              actionUrl: "/dashboard/documents",
+              actionUrl: "/dashboard/payments",
             },
           );
         }
@@ -824,7 +824,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
         {
           invoiceNumber: prodBookingData.invoiceNumber,
           type: "invoice_generated",
-          actionUrl: "/dashboard/documents",
+          actionUrl: "/dashboard/payments",
         },
       );
     }

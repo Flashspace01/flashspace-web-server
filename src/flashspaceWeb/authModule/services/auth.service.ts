@@ -3,7 +3,8 @@ import { PasswordUtil } from "../utils/password.util";
 import { JwtUtil } from "../utils/jwt.util";
 import { EmailUtil } from "../utils/email.util";
 import { OTPUtil } from "../utils/otp.util";
-import { User } from "../models/user.model";
+import { User, UserModel } from "../models/user.model";
+import crypto from "crypto";
 import {
   SignupRequest,
   LoginRequest,
@@ -24,6 +25,38 @@ export class AuthService {
 
   constructor() {
     this.userRepository = new UserRepository();
+  }
+
+  private hashTrustedDeviceToken(token?: string): string | null {
+    if (!token) return null;
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
+  private generateTrustedDeviceToken(): string {
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  private buildUserResponse(user: any) {
+    return {
+      id: user._id.toString(),
+      _id: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      profilePicture: user.profilePicture,
+      role: user.role,
+      authProvider: user.authProvider,
+      isEmailVerified: user.isEmailVerified,
+      kycVerified: user.kycVerified,
+      isTwoFactorEnabled: user.isTwoFactorEnabled,
+      preferences: user.preferences,
+      notifications: user.notifications,
+      securityPreferences: user.securityPreferences,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      credits: user.credits || 0,
+    };
   }
 
   async signup(signupData: SignupRequest): Promise<AuthResponse> {
@@ -143,8 +176,7 @@ export class AuthService {
 
   async login(loginData: LoginRequest): Promise<AuthResponse> {
     try {
-      const { email, password } = loginData;
-      console.log("Login request:", loginData);
+      const { email, password, trustedDeviceToken } = loginData;
       // Find user with password field for authentication
       const user = await this.userRepository.findByEmailForAuth(email);
       if (!user) {
@@ -184,6 +216,42 @@ export class AuthService {
         };
       }
 
+      const trustedDeviceHash = this.hashTrustedDeviceToken(trustedDeviceToken);
+      const isTrustedDevice =
+        !!trustedDeviceHash &&
+        Array.isArray((user as any).trustedTwoFactorDevices) &&
+        (user as any).trustedTwoFactorDevices.includes(trustedDeviceHash);
+
+      if (user.isTwoFactorEnabled && !isTrustedDevice) {
+        const otpData = OTPUtil.generateWithExpiry(10);
+
+        await this.userRepository.updateEmailVerificationOTP(
+          user.email,
+          otpData.otp,
+          otpData.expiresAt,
+        );
+
+        try {
+          await EmailUtil.sendLoginOTP(
+            user.email,
+            otpData.otp,
+            user.fullName,
+          );
+        } catch (emailError) {
+          console.error("Error sending 2FA login OTP:", emailError);
+          return {
+            success: false,
+            message: "Unable to send login OTP. Please try again.",
+          };
+        }
+
+        return {
+          success: true,
+          message: "Two-factor authentication required. OTP sent to your email.",
+          requiresTwoFactor: true,
+          user: this.buildUserResponse(user),
+        };
+      }
 
       // Generate tokens
       const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
@@ -208,15 +276,7 @@ export class AuthService {
       return {
         success: true,
         message: "Login successful",
-        user: {
-          id: user._id.toString(),
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          isEmailVerified: user.isEmailVerified,
-          kycVerified: user.kycVerified,
-          credits: user.credits || 0,
-        },
+        user: this.buildUserResponse(user),
         tokens,
       };
     } catch (error) {
@@ -231,9 +291,109 @@ export class AuthService {
     }
   }
 
+  async verifyLoginOTP(verifyData: VerifyOTPRequest): Promise<AuthResponse> {
+    try {
+      const { email, otp } = verifyData;
+      const user = await this.userRepository.findByEmailWithOTP(email);
+
+      if (!user || user.isDeleted || !user.isActive) {
+        return {
+          success: false,
+          message: "Invalid verification request",
+        };
+      }
+
+      if (!user.isTwoFactorEnabled) {
+        return {
+          success: false,
+          message: "Two-factor authentication is not enabled for this account",
+        };
+      }
+
+      if (!user.emailVerificationOTP || !user.emailVerificationOTPExpiry) {
+        return {
+          success: false,
+          message: "No OTP found. Please login again to request a new code.",
+        };
+      }
+
+      const verificationResult = OTPUtil.verify(
+        otp,
+        user.emailVerificationOTP,
+        user.emailVerificationOTPExpiry,
+        user.emailVerificationOTPAttempts,
+      );
+
+      if (!verificationResult.isValid) {
+        if (verificationResult.isExpired || verificationResult.attemptsExceeded) {
+          await this.userRepository.clearOTPData(user._id.toString());
+          return {
+            success: false,
+            message: verificationResult.message,
+          };
+        }
+
+        await this.userRepository.incrementOTPAttempts(user._id.toString());
+        const remainingAttempts = 3 - (user.emailVerificationOTPAttempts + 1);
+        return {
+          success: false,
+          message:
+            remainingAttempts > 0
+              ? `Invalid OTP. You have ${remainingAttempts} attempt${remainingAttempts !== 1 ? "s" : ""} remaining.`
+              : "Invalid OTP. Maximum attempts exceeded.",
+        };
+      }
+
+      await this.userRepository.clearOTPData(user._id.toString());
+
+      const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      };
+
+      const tokens = JwtUtil.generateTokenPair(tokenPayload);
+      await this.userRepository.addRefreshToken(
+        user._id.toString(),
+        tokens.refreshToken,
+      );
+
+      const trustedDeviceToken = this.generateTrustedDeviceToken();
+      const trustedDeviceHash = this.hashTrustedDeviceToken(trustedDeviceToken);
+
+      await UserModel.findByIdAndUpdate(user._id, {
+        lastLogin: new Date(),
+        ...(trustedDeviceHash
+          ? { $addToSet: { trustedTwoFactorDevices: trustedDeviceHash } }
+          : {}),
+      });
+
+      return {
+        success: true,
+        message: "Login verified successfully",
+        user: this.buildUserResponse({
+          ...((user as any).toObject ? (user as any).toObject() : user),
+          lastLogin: new Date(),
+        }),
+        tokens,
+        twoFactorToken: trustedDeviceToken,
+      };
+    } catch (error) {
+      console.error("Verify login OTP error:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "An error occurred during OTP verification",
+      };
+    }
+  }
+
   async googleAuthWithToken(
     idToken: string,
     role?: string,
+    trustedDeviceToken?: string,
   ): Promise<AuthResponse> {
     try {
       // Import GoogleUtil
@@ -259,7 +419,7 @@ export class AuthService {
       }
 
       // Continue with existing Google auth logic
-      return await this.googleAuth(profile);
+      return await this.googleAuth(profile, trustedDeviceToken);
     } catch (error) {
       console.error("Google token auth error:", error);
       return {
@@ -269,7 +429,10 @@ export class AuthService {
     }
   }
 
-  async googleAuth(profile: GoogleProfile): Promise<AuthResponse> {
+  async googleAuth(
+    profile: GoogleProfile,
+    trustedDeviceToken?: string,
+  ): Promise<AuthResponse> {
     try {
       const email = profile.emails[0].value;
       let user = await this.userRepository.findByEmail(email);
@@ -280,18 +443,15 @@ export class AuthService {
           user.authProvider === AuthProvider.GOOGLE &&
           user.googleId === profile.id
         ) {
-          // Update last login
-          await this.userRepository.update(user._id.toString(), {
-            lastLogin: new Date(),
-          });
+          // Existing Google account. Last login is updated only after 2FA passes.
         } else if (user.authProvider === AuthProvider.LOCAL) {
           // Link Google account to existing local account
-          await this.userRepository.update(user._id.toString(), {
+          const linkedUser = await this.userRepository.update(user._id.toString(), {
             googleId: profile.id,
             authProvider: AuthProvider.GOOGLE,
             isEmailVerified: true, // Google emails are pre-verified
-            lastLogin: new Date(),
           });
+          if (linkedUser) user = linkedUser;
         } else {
           return {
             success: false,
@@ -320,33 +480,71 @@ export class AuthService {
         }
       }
 
+      const userWithTrustedDevices = await UserModel.findById(user._id)
+        .select("+trustedTwoFactorDevices")
+        .exec();
+      const authUser = userWithTrustedDevices || user;
+      const trustedDeviceHash = this.hashTrustedDeviceToken(trustedDeviceToken);
+      const isTrustedDevice =
+        !!trustedDeviceHash &&
+        Array.isArray((authUser as any)?.trustedTwoFactorDevices) &&
+        (authUser as any).trustedTwoFactorDevices.includes(
+          trustedDeviceHash,
+        );
+
+      if (Boolean((authUser as any).isTwoFactorEnabled) && !isTrustedDevice) {
+        const otpData = OTPUtil.generateWithExpiry(10);
+
+        await this.userRepository.updateEmailVerificationOTP(
+          authUser.email,
+          otpData.otp,
+          otpData.expiresAt,
+        );
+
+        try {
+          await EmailUtil.sendLoginOTP(authUser.email, otpData.otp, authUser.fullName);
+        } catch (emailError) {
+          console.error("Error sending Google 2FA login OTP:", emailError);
+          return {
+            success: false,
+            message: "Unable to send login OTP. Please try again.",
+          };
+        }
+
+        return {
+          success: true,
+          message: "Two-factor authentication required. OTP sent to your email.",
+          requiresTwoFactor: true,
+          user: this.buildUserResponse(authUser),
+        };
+      }
+
+      await this.userRepository.update(authUser._id.toString(), {
+        lastLogin: new Date(),
+      });
+
       // Generate tokens
       const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
-        userId: user._id.toString(),
-        email: user.email,
-        role: user.role,
+        userId: authUser._id.toString(),
+        email: authUser.email,
+        role: authUser.role,
       };
 
       const tokens = JwtUtil.generateTokenPair(tokenPayload);
 
       // Save refresh token
       await this.userRepository.addRefreshToken(
-        user._id.toString(),
+        authUser._id.toString(),
         tokens.refreshToken,
       );
 
       return {
         success: true,
         message: "Google authentication successful",
-        user: {
-          id: user._id.toString(),
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          isEmailVerified: user.isEmailVerified,
-          kycVerified: user.kycVerified,
-          credits: user.credits || 0,
-        },
+        user: this.buildUserResponse({
+          ...((authUser as any).toObject ? (authUser as any).toObject() : authUser),
+          lastLogin: new Date(),
+        }),
         tokens,
       };
     } catch (error) {
