@@ -50,6 +50,7 @@ import {
   getPartnerSpaceBookingAnalytics,
   getPartnerPropertyAnalytics,
   convertPartnerRequest,
+  uploadBookingDocument,
 } from "../controllers/userDashboard.controller";
 
 const router = Router();
