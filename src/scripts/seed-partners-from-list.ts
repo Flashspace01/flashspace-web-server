@@ -90,18 +90,20 @@ async function seed() {
         await mongoose.connect(process.env.DB_URI || 'mongodb://127.0.0.1:27017/flash');
         console.log('Connected to DB...');
         
-        const defaultPasswordHash = await bcrypt.hash('Flash@2026', 12);
-
         for (const p of partners) {
-            console.log(`\nProcessing: ${p.space_name} (${p.email})`);
+            const email = p.email.toLowerCase().trim();
+            console.log(`\nProcessing: ${p.space_name} (${email})`);
+            
+            // Password is the email in lowercase
+            const passwordHash = await bcrypt.hash(email, 12);
             
             // 1. Find or Create User
-            let user = await mongoose.connection.db!.collection('users').findOne({ email: p.email.toLowerCase() });
+            let user = await mongoose.connection.db!.collection('users').findOne({ email });
             
             if (!user) {
                 const newUser = {
-                    email: p.email.toLowerCase(),
-                    password: defaultPasswordHash,
+                    email,
+                    password: passwordHash,
                     fullName: p.partner_name === 'NA' ? p.space_name : p.partner_name,
                     phoneNumber: p.mobile_number === 'NA' ? '' : p.mobile_number.split('/')[0].trim(),
                     role: 'partner',
@@ -114,9 +116,14 @@ async function seed() {
                 };
                 const res = await mongoose.connection.db!.collection('users').insertOne(newUser);
                 user = { ...newUser, _id: res.insertedId };
-                console.log(`- Created User: ${user._id}`);
+                console.log(`- Created User: ${user._id} (Password set to email)`);
             } else {
-                console.log(`- User already exists: ${user._id}`);
+                // Update password for existing user as requested
+                await mongoose.connection.db!.collection('users').updateOne(
+                    { _id: user._id },
+                    { $set: { password: passwordHash, updatedAt: new Date() } }
+                );
+                console.log(`- User already exists: ${user._id} (Password updated to email)`);
             }
 
             // 2. Find Property and Link

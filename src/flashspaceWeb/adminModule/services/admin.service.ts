@@ -714,6 +714,67 @@ export class AdminService {
     }
   }
 
+  async getTrackProgressData(): Promise<ApiResponse<any>> {
+    try {
+      const bookings = await BookingModel.find({ isDeleted: false })
+        .populate("user", "fullName kycVerified")
+        .populate("kycProfile", "overallStatus")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const userIds = bookings.map((b: any) => b.user?._id?.toString()).filter(Boolean);
+
+      // Fetch all approved partner KYCs for these users in one go
+      const approvedPartnerKycs = await PartnerKYCModel.find({
+        user: { $in: userIds },
+        status: "approved",
+        isDeleted: { $ne: true }
+      }).lean();
+
+      const data = bookings.map((booking: any) => {
+        const docs = booking.documents || [];
+        
+        const draftSubmitted = docs.some((doc: any) => doc.type === 'draft_agreement');
+        const draftVerified = docs.some((doc: any) => doc.type === 'signed_agreement' && doc.status === 'approved');
+        const supportingDocReceived = docs.some((doc: any) => 
+          ['noc', 'utility_bill', 'electricity_bill', 'other_support'].includes(doc.type)
+        );
+
+        // Partner KYC is approved if there's an approved PartnerKYC record linking this user and this partner
+        const partnerKycApproved = approvedPartnerKycs.some(
+          (pk: any) =>
+            pk.user.toString() === booking.user?._id?.toString() &&
+            pk.linkedUser?.toString() === booking.partner?.toString()
+        );
+
+        return {
+          id: booking._id,
+          bookingId: booking.bookingNumber,
+          userName: booking.user?.fullName || "N/A",
+          spaceBooked: booking.spaceSnapshot?.name || "N/A",
+          userKycApprovedByAdmin: booking.user?.kycVerified || false,
+          userKycApprovedBySpace: partnerKycApproved,
+          draftSubmitted,
+          draftVerified,
+          supportingDocReceived
+        };
+      });
+
+      return {
+        success: true,
+        message: "Track progress data fetched successfully",
+        data
+      };
+    } catch (error: any) {
+      console.error("Error in getTrackProgressData:", error);
+      return {
+        success: false,
+        message: "Failed to fetch track progress data",
+        error: error.message
+      };
+    }
+  }
+
   private async enrichBookingsWithSpacePartner(bookings: any[]) {
     const candidateSpaceIds = new Set<string>();
 
