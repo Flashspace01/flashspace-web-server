@@ -3844,7 +3844,7 @@ export const uploadBookingDocument = async (req: Request, res: Response) => {
         .json({ success: false, message: "No file uploaded" });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    if (!mongoose.Types.ObjectId.isValid(bookingId as string)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid Booking ID format" });
