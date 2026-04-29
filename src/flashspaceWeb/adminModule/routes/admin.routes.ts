@@ -24,6 +24,15 @@ export const adminRoutes = Router();
 // 1. Authenticate all users
 adminRoutes.use(AuthMiddleware.authenticate);
 
+adminRoutes.get(
+  "/track-progress",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_SPACES,
+    Permission.VIEW_ALL_SPACES,
+  ]),
+  AdminController.getTrackProgressData,
+);
+
 // 1.1 Partner Management (Renamed for troubleshooting)
 adminRoutes.get(
   "/space-partners",
@@ -183,6 +192,7 @@ adminRoutes.get(
   ]),
   AdminController.getAllBookings,
 );
+
 adminRoutes.patch(
   "/bookings/:bookingId/status",
   RBACMiddleware.requireAnyPermission([

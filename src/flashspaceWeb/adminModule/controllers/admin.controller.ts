@@ -100,6 +100,17 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/track-progress
+  static async getTrackProgressData(req: Request, res: Response) {
+    console.log("[DEBUG] Hit getTrackProgressData endpoint");
+    const result = await adminService.getTrackProgressData();
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(500).json(result);
+    }
+  }
+
   // PATCH /api/admin/bookings/:bookingId/status
   static async updateBookingStatus(req: Request, res: Response) {
     const bookingId = req.params.bookingId as string;
