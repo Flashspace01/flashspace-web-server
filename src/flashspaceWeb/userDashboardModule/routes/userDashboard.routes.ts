@@ -37,6 +37,12 @@ import {
   getPartnerPropertyBookings,
   getPartnerClients,
   getPartnerClientBookings,
+  getPartnerBookingRequests,
+  reviewPartnerBookingKycDocument,
+  uploadPartnerBookingDocument,
+  uploadUserBookingDocument,
+  submitUserBookingRequest,
+  reviewPartnerBookingDocument,
   getPartnerClientDetails,
   getAllPartnerSpaces,
   getUserMails,
@@ -77,6 +83,14 @@ router.get(
 );
 router.get("/partner/clients", getPartnerClients);
 router.get("/partner/client-bookings", getPartnerClientBookings);
+router.get("/partner/booking-requests", getPartnerBookingRequests);
+router.post("/partner/booking-requests/:bookingId/kyc-documents/review", reviewPartnerBookingKycDocument);
+router.post(
+  "/partner/booking-requests/:bookingId/documents",
+  uploadKYCFile.single("file"),
+  uploadPartnerBookingDocument,
+);
+router.post("/partner/booking-requests/:bookingId/documents/review", reviewPartnerBookingDocument);
 router.get("/partner/clients/:clientId", getPartnerClientDetails);
 router.get("/partner/team-members", getTeamMembers);
 router.post("/partner/team-members", createTeamMember);
@@ -88,6 +102,12 @@ router.get("/bookings/property/:spaceId", getBookingsByProperty);
 router.get("/bookings/:bookingId", getBookingById);
 router.patch("/bookings/:bookingId/auto-renew", toggleAutoRenew);
 router.post("/bookings/:bookingId/link-profile", linkBookingToProfile);
+router.post(
+  "/bookings/:bookingId/documents",
+  uploadKYCFile.single("file"),
+  uploadUserBookingDocument,
+);
+router.post("/bookings/:bookingId/submit-request", submitUserBookingRequest);
 
 // ============ KYC ============
 router.get("/kyc", getKYCStatus);
