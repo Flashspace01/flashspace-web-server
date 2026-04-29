@@ -64,6 +64,24 @@ class BookingDocument {
   url?: string;
 
   @prop()
+  fileUrl?: string;
+
+  @prop({
+    enum: ["pending", "approved", "rejected", "available"],
+    default: "available",
+  })
+  status?: string;
+
+  @prop()
+  rejectionReason?: string;
+
+  @prop()
+  uploadedBy?: string;
+
+  @prop()
+  reviewedAt?: Date;
+
+  @prop()
   generatedAt?: Date;
 }
 
@@ -150,6 +168,15 @@ export class Booking {
 
   @prop({ type: () => [BookingDocument], default: [] })
   documents?: BookingDocument[];
+
+  @prop({
+    enum: ["draft", "submitted", "in_review", "completed"],
+    default: "draft",
+  })
+  partnerRequestStatus?: string;
+
+  @prop()
+  partnerRequestSubmittedAt?: Date;
 
   @prop()
   startDate?: Date;

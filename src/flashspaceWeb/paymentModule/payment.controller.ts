@@ -165,8 +165,8 @@ async function createBookingAndInvoice(payment: any) {
     }
 
     if (spaceData) {
-      partnerId = spaceData.partner;
       const property = spaceData.property || {};
+      partnerId = spaceData.partner || property.partner;
       spaceSnapshot = {
         _id: spaceData._id?.toString(),
         name: property.name || payment.spaceName,

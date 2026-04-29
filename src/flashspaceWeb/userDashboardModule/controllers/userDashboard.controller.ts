@@ -51,6 +51,84 @@ function isApprovedPartnerAccess(partner: any): boolean {
   );
 }
 
+const formatBookingDocUrl = (req: Request, url?: string) => {
+  if (!url || url === "#") return "";
+  if (url.startsWith("http")) return url;
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
+async function getPartnerScopeIds(partnerId: string) {
+  const partnerObjectId = new mongoose.Types.ObjectId(partnerId);
+  const user = await UserModel.findById(partnerObjectId).select("parentPartnerId isTeamMember");
+  const ids = new Set<string>([partnerObjectId.toString()]);
+
+  if (user?.parentPartnerId) {
+    ids.add(user.parentPartnerId.toString());
+  }
+
+  return Array.from(ids).map((id) => new mongoose.Types.ObjectId(id));
+}
+
+async function getPartnerOwnedSpaceIds(partnerId: string) {
+  const partnerIds = await getPartnerScopeIds(partnerId);
+  const partnerProperties = await PropertyModel.find({
+    partner: { $in: partnerIds },
+    isDeleted: { $ne: true },
+  }).select("_id");
+  const propertyIds = partnerProperties.map((property: any) => property._id);
+
+  const [voSpaces, coworkingSpaces, meetingRooms] = await Promise.all([
+    VirtualOfficeModel.find({
+      isDeleted: { $ne: true },
+      $or: [{ partner: { $in: partnerIds } }, { property: { $in: propertyIds } }],
+    }).select("_id"),
+    CoworkingSpaceModel.find({
+      isDeleted: { $ne: true },
+      $or: [{ partner: { $in: partnerIds } }, { property: { $in: propertyIds } }],
+    }).select("_id"),
+    MeetingRoomModel.find({
+      isDeleted: { $ne: true },
+      $or: [{ partner: { $in: partnerIds } }, { property: { $in: propertyIds } }],
+    }).select("_id"),
+  ]);
+
+  return [
+    ...voSpaces.map((space: any) => space._id),
+    ...coworkingSpaces.map((space: any) => space._id),
+    ...meetingRooms.map((space: any) => space._id),
+  ];
+}
+
+async function findPartnerAccessibleBooking(partnerId: string, bookingId: string) {
+  const partnerIds = await getPartnerScopeIds(partnerId);
+  const ownedSpaceIds = await getPartnerOwnedSpaceIds(partnerId);
+  const idQuery = mongoose.Types.ObjectId.isValid(bookingId)
+    ? { _id: new mongoose.Types.ObjectId(bookingId) }
+    : { bookingNumber: bookingId };
+
+  return BookingModel.findOne({
+    ...idQuery,
+    isDeleted: { $ne: true },
+    $or: [{ partner: { $in: partnerIds } }, { spaceId: { $in: ownedSpaceIds } }],
+  }).populate("user", "fullName email phoneNumber phone");
+}
+
+async function resolveBookingSpacePartnerId(booking: any) {
+  let space: any = null;
+
+  if (booking.type === "VirtualOffice") {
+    space = await VirtualOfficeModel.findById(booking.spaceId).populate("property");
+  } else if (booking.type === "CoworkingSpace") {
+    space = await CoworkingSpaceModel.findById(booking.spaceId).populate("property");
+  } else if (booking.type === "MeetingRoom") {
+    space = await MeetingRoomModel.findById(booking.spaceId).populate("property");
+  }
+
+  const property = space?.property as any;
+  return space?.partner || property?.partner || booking.partner;
+}
+
 async function getSharedKycProfileIds(userId?: string): Promise<mongoose.Types.ObjectId[]> {
   if (!userId || !mongoose.Types.ObjectId.isValid(userId)) return [];
 
@@ -1229,6 +1307,399 @@ export const getPartnerClientBookings = async (req: Request, res: Response) => {
       success: false,
       message: "Failed to fetch partner bookings",
     });
+  }
+};
+
+export const getPartnerBookingRequests = async (req: Request, res: Response) => {
+  try {
+    const partnerId = req.user?.id;
+    if (!partnerId || !mongoose.Types.ObjectId.isValid(partnerId)) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const partnerIds = await getPartnerScopeIds(partnerId);
+    const ownedSpaceIds = await getPartnerOwnedSpaceIds(partnerId);
+    const bookings = await BookingModel.find({
+      isDeleted: { $ne: true },
+      partnerRequestStatus: { $in: ["submitted", "in_review", "completed"] },
+      $or: [{ partner: { $in: partnerIds } }, { spaceId: { $in: ownedSpaceIds } }],
+    })
+      .populate("user", "fullName email phoneNumber phone")
+      .populate("kycProfile")
+      .sort({ createdAt: -1 });
+
+    const userIds = [
+      ...new Set(bookings.map((booking: any) => String(booking.user?._id || booking.user)).filter(Boolean)),
+    ];
+    const profileIds = [
+      ...new Set(bookings.map((booking: any) => String((booking.kycProfile as any)?._id || booking.kycProfile || "")).filter(Boolean)),
+    ];
+
+    const [businessInfos, partnerKycs] = await Promise.all([
+      BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: { $ne: true } }),
+      PartnerKYCModel.find({
+        $or: [
+          { kycProfile: { $in: profileIds } },
+          { user: { $in: userIds } },
+        ],
+        isDeleted: { $ne: true },
+      }),
+    ]);
+
+    const businessByUser = new Map(businessInfos.map((info: any) => [String(info.user), info]));
+    const partnersByProfile = new Map<string, any[]>();
+    partnerKycs.forEach((partner: any) => {
+      const key = String(partner.kycProfile || "");
+      partnersByProfile.set(key, [...(partnersByProfile.get(key) || []), partner]);
+    });
+
+    const normalizeDoc = (doc: any) => ({
+      id: String(doc._id || doc.type || doc.name),
+      type: doc.type || "document",
+      name: doc.name || doc.type || "Document",
+      status: doc.status || "pending",
+      partnerReviewStatus: doc.partnerReviewStatus || "pending",
+      fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
+      uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
+      rejectionReason: doc.rejectionReason || "",
+      partnerRejectionReason: doc.partnerRejectionReason || "",
+      partnerReviewedAt: doc.partnerReviewedAt,
+    });
+
+    const data = bookings.map((booking: any) => {
+      const user = booking.user as any;
+      const clientUserId = String(user?._id || booking.user || "");
+      const kycProfile = booking.kycProfile as any;
+      const businessInfo = businessByUser.get(clientUserId);
+      const bookingDocs = (booking.documents || []).map(normalizeDoc);
+      const draftAgreement = bookingDocs.find((doc: any) => doc.type === "draft_agreement");
+      const signedAgreement = bookingDocs.find((doc: any) => doc.type === "signed_agreement");
+      const finalAgreement = bookingDocs.find((doc: any) => doc.type === "final_agreement");
+
+      return {
+        id: String(booking._id),
+        bookingId: String(booking._id),
+        bookingNumber: booking.bookingNumber,
+        client: {
+          id: clientUserId,
+          name: user?.fullName || "Client",
+          email: user?.email || "",
+          phone: user?.phoneNumber || user?.phone || "",
+          companyName: kycProfile?.businessInfo?.companyName || businessInfo?.companyName || user?.fullName || "N/A",
+        },
+        space: {
+          id: String(booking.spaceId || ""),
+          name: booking.spaceSnapshot?.name || "Workspace",
+          address: booking.spaceSnapshot?.address || "",
+          city: booking.spaceSnapshot?.city || "",
+          image: booking.spaceSnapshot?.image || "",
+          type: booking.type,
+        },
+        plan: {
+          name: booking.plan?.name || "Plan",
+          tenure: booking.plan?.tenure || 0,
+          tenureUnit: booking.plan?.tenureUnit || "months",
+          price: booking.plan?.finalPrice || booking.plan?.price || 0,
+        },
+        status: booking.status,
+        kycStatus: booking.kycStatus || "not_started",
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        createdAt: booking.createdAt,
+        kyc: {
+          profileId: String(kycProfile?._id || ""),
+          profileName: kycProfile?.profileName || kycProfile?.businessInfo?.companyName || "KYC Profile",
+          kycType: kycProfile?.kycType || "individual",
+          overallStatus: kycProfile?.overallStatus || "pending",
+          personalDocuments: (kycProfile?.documents || []).map(normalizeDoc),
+          businessDocuments: (businessInfo?.documents || []).map(normalizeDoc),
+          partnerDocuments: (partnersByProfile.get(String(kycProfile?._id || "")) || []).map((partner: any) => ({
+            id: String(partner._id),
+            name: partner.fullName,
+            email: partner.email,
+            status: partner.status || "pending",
+            documents: (partner.documents || []).map(normalizeDoc),
+          })),
+        },
+        agreement: {
+          draftAgreement,
+          signedAgreement,
+          finalAgreement,
+          supportingDocuments: bookingDocs.filter((doc: any) =>
+            ["noc", "utility_bill", "electricity_bill", "other_support"].includes(doc.type),
+          ),
+          documents: bookingDocs,
+        },
+      };
+    });
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Get partner booking requests error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch booking requests",
+    });
+  }
+};
+
+export const reviewPartnerBookingKycDocument = async (req: Request, res: Response) => {
+  try {
+    const partnerId = req.user?.id;
+    const { bookingId } = req.params;
+    const { profileModel = "kyc", profileId, documentType, documentId, action, rejectionReason } = req.body;
+
+    if (!partnerId || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({ success: false, message: "Invalid review request" });
+    }
+
+    const booking = await findPartnerAccessibleBooking(partnerId, String(bookingId));
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    let profile: any = null;
+    if (profileModel === "partner") {
+      profile = await PartnerKYCModel.findById(profileId);
+    } else if (profileModel === "business") {
+      profile = await BusinessInfoModel.findById(profileId);
+    } else {
+      profile = await KYCDocumentModel.findById(profileId || booking.kycProfile);
+    }
+
+    if (!profile || !Array.isArray(profile.documents)) {
+      return res.status(404).json({ success: false, message: "Document profile not found" });
+    }
+
+    const doc = profile.documents.find((item: any) =>
+      (documentId && String(item._id) === String(documentId)) ||
+      (documentType && item.type === documentType),
+    );
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+
+    doc.partnerReviewStatus = action === "approve" ? "approved" : "rejected";
+    doc.partnerRejectionReason = action === "reject" ? rejectionReason || "Document rejected by partner" : undefined;
+    doc.partnerReviewedAt = new Date();
+    doc.partnerReviewedBy = partnerId;
+    profile.updatedAt = new Date();
+    profile.markModified("documents");
+    await profile.save();
+
+    const kycProfile: any = await KYCDocumentModel.findById(booking.kycProfile);
+    if (kycProfile?.documents?.length && kycProfile.documents.every((item: any) => item.status === "approved")) {
+      booking.kycStatus = "approved";
+      if (booking.status === "pending_kyc") booking.status = "active";
+      await booking.save();
+    }
+
+    return res.status(200).json({ success: true, message: `Document ${action}d successfully` });
+  } catch (error) {
+    console.error("Review partner booking KYC document error:", error);
+    return res.status(500).json({ success: false, message: "Failed to review document" });
+  }
+};
+
+export const uploadPartnerBookingDocument = async (req: Request, res: Response) => {
+  try {
+    const partnerId = req.user?.id;
+    const { bookingId } = req.params;
+    const { documentType = "draft_agreement", name } = req.body;
+    const file = req.file;
+
+    if (!partnerId || !file) {
+      return res.status(400).json({ success: false, message: "File is required" });
+    }
+
+    const booking: any = await findPartnerAccessibleBooking(partnerId, String(bookingId));
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const fileUrl = getMulterFileUrl(file.filename, documentType);
+    const documents = booking.documents || [];
+    const existingIndex = documents.findIndex((doc: any) => doc.type === documentType);
+    const docEntry = {
+      name: name || file.originalname || documentType,
+      type: documentType,
+      url: fileUrl,
+      fileUrl,
+      status: documentType === "signed_agreement" ? "pending" : "available",
+      uploadedBy: "partner",
+      generatedAt: new Date(),
+    };
+
+    if (existingIndex >= 0) {
+      documents[existingIndex] = { ...documents[existingIndex], ...docEntry };
+    } else {
+      documents.push(docEntry);
+    }
+
+    booking.documents = documents;
+    booking.updatedAt = new Date();
+    booking.markModified("documents");
+    await booking.save();
+
+    return res.status(200).json({ success: true, message: "Document uploaded successfully", data: docEntry });
+  } catch (error) {
+    console.error("Upload partner booking document error:", error);
+    return res.status(500).json({ success: false, message: "Failed to upload document" });
+  }
+};
+
+export const uploadUserBookingDocument = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const bookingId = String(req.params.bookingId || "");
+    const { documentType = "signed_agreement", name } = req.body;
+    const file = req.file;
+
+    if (!userId || !bookingId.trim() || !file) {
+      return res.status(400).json({ success: false, message: "File is required" });
+    }
+
+    const bookingLookup = mongoose.Types.ObjectId.isValid(bookingId)
+      ? { _id: new mongoose.Types.ObjectId(bookingId) }
+      : { bookingNumber: bookingId };
+
+    const booking: any = await BookingModel.findOne(
+      await buildSharedBookingFilter(userId, bookingLookup),
+    );
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const fileUrl = getMulterFileUrl(file.filename, documentType);
+    const documents = booking.documents || [];
+    const existingIndex = documents.findIndex((doc: any) => doc.type === documentType);
+    const docEntry = {
+      name: name || file.originalname || documentType,
+      type: documentType,
+      url: fileUrl,
+      fileUrl,
+      status: "pending",
+      uploadedBy: "user",
+      generatedAt: new Date(),
+    };
+
+    if (existingIndex >= 0) {
+      documents[existingIndex] = { ...documents[existingIndex], ...docEntry };
+    } else {
+      documents.push(docEntry);
+    }
+
+    booking.documents = documents;
+    booking.updatedAt = new Date();
+    booking.markModified("documents");
+    await booking.save();
+
+    return res.status(200).json({ success: true, message: "Document uploaded successfully", data: docEntry });
+  } catch (error) {
+    console.error("Upload user booking document error:", error);
+    return res.status(500).json({ success: false, message: "Failed to upload document" });
+  }
+};
+
+export const submitUserBookingRequest = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const bookingId = String(req.params.bookingId || "");
+
+    if (!userId || !bookingId.trim()) {
+      return res.status(400).json({ success: false, message: "Invalid booking request" });
+    }
+
+    const bookingLookup = mongoose.Types.ObjectId.isValid(bookingId)
+      ? { _id: new mongoose.Types.ObjectId(bookingId) }
+      : { bookingNumber: bookingId };
+
+    const booking: any = await BookingModel.findOne(
+      await buildSharedBookingFilter(userId, bookingLookup),
+    );
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const resolvedPartnerId = await resolveBookingSpacePartnerId(booking);
+    if (resolvedPartnerId) {
+      booking.partner = resolvedPartnerId;
+    }
+
+    booking.partnerRequestStatus = "submitted";
+    booking.partnerRequestSubmittedAt = new Date();
+    booking.updatedAt = new Date();
+    booking.timeline = booking.timeline || [];
+    booking.timeline.push({
+      status: "submitted_to_space_partner",
+      date: new Date(),
+      note: "Booking details submitted to space partner for document and agreement processing.",
+      by: "User",
+    });
+
+    await booking.save();
+
+    if (resolvedPartnerId) {
+      try {
+        await NotificationService.notifyUser(
+          resolvedPartnerId.toString(),
+          "New Booking Request",
+          `A booking request ${booking.bookingNumber} has been submitted for your review.`,
+          NotificationType.INFO,
+          {
+            bookingId: booking._id,
+            bookingNumber: booking.bookingNumber,
+            actionUrl: "/spaceportal/booking-requests",
+            type: "booking_request",
+          },
+        );
+      } catch (notificationError) {
+        console.error("[submitUserBookingRequest] Notification failed:", notificationError);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking request sent to space partner",
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Submit user booking request error:", error);
+    return res.status(500).json({ success: false, message: "Failed to submit booking request" });
+  }
+};
+
+export const reviewPartnerBookingDocument = async (req: Request, res: Response) => {
+  try {
+    const partnerId = req.user?.id;
+    const { bookingId } = req.params;
+    const { documentType = "signed_agreement", action, rejectionReason } = req.body;
+
+    if (!partnerId || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({ success: false, message: "Invalid review request" });
+    }
+
+    const booking: any = await findPartnerAccessibleBooking(partnerId, String(bookingId));
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    const doc = (booking.documents || []).find((item: any) => item.type === documentType);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+
+    doc.status = action === "approve" ? "approved" : "rejected";
+    doc.rejectionReason = action === "reject" ? rejectionReason || "Document rejected by partner" : undefined;
+    doc.reviewedAt = new Date();
+    booking.markModified("documents");
+    await booking.save();
+
+    return res.status(200).json({ success: true, message: `Document ${action}d successfully` });
+  } catch (error) {
+    console.error("Review partner booking document error:", error);
+    return res.status(500).json({ success: false, message: "Failed to review document" });
   }
 };
 

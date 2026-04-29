@@ -104,6 +104,18 @@ export class KYCDocumentItem {
 
   @prop({ ref: () => User })
   verifiedBy?: Ref<User>;
+
+  @prop({ enum: ["pending", "approved", "rejected"], default: "pending" })
+  partnerReviewStatus?: string;
+
+  @prop()
+  partnerRejectionReason?: string;
+
+  @prop()
+  partnerReviewedAt?: Date;
+
+  @prop({ ref: () => User })
+  partnerReviewedBy?: Ref<User>;
 }
 
 @modelOptions({ options: { allowMixed: Severity.ALLOW } })
