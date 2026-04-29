@@ -1763,6 +1763,7 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
 
     // 4. Map to frontend ClientDetails format
     const details = {
+      bookingId: mainBooking._id,
       id: mainBooking.bookingNumber,
       companyName:
         businessInfo?.companyName ||
@@ -3822,6 +3823,108 @@ export const deleteKYCProfile = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete profile",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Upload a document for a specific booking (Partner only)
+ */
+export const uploadBookingDocument = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { bookingId } = req.params;
+    const { documentType } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid Booking ID format" });
+    }
+
+    const booking = await BookingModel.findById(bookingId);
+    if (!booking) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
+    }
+
+    // Check if the user is the partner of this booking
+    if (String(booking.partner) !== String(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized. You are not the partner of this booking.",
+      });
+    }
+
+    const fileUrl = getMulterFileUrl(file.filename, documentType);
+
+    // Backup to store
+    const uploadSubDir =
+      documentType === "video_kyc" ? "video-kyc" : "kyc-documents";
+    const localFilePath = path.join(
+      __dirname,
+      "../../../../uploads",
+      uploadSubDir,
+      file.filename,
+    );
+
+    await backupUploadedFile(fileUrl, localFilePath, {
+      originalName: file.originalname,
+      contentType: file.mimetype,
+      source: "booking-document",
+    });
+
+    // Add to booking documents
+    const docEntry = {
+      name: file.originalname,
+      type: documentType || "final_agreement",
+      url: fileUrl,
+      generatedAt: new Date(),
+    };
+
+    booking.documents = booking.documents || [];
+    // Remove existing of same type if any
+    booking.documents = booking.documents.filter((d) => d.type !== docEntry.type);
+    booking.documents.push(docEntry);
+
+    await booking.save();
+
+    // Notify User
+    try {
+      await NotificationService.notifyUser(
+        String(booking.user),
+        "New Document Uploaded",
+        `A new ${docEntry.type.replace(/_/g, " ")} has been uploaded for your booking ${booking.bookingNumber}.`,
+        NotificationType.INFO,
+        {
+          bookingId: booking._id,
+          bookingNumber: booking.bookingNumber,
+          documentType: docEntry.type,
+        }
+      );
+    } catch (notifError) {
+      console.error("Failed to notify user about booking document:", notifError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Booking document uploaded successfully",
+      data: docEntry,
+    });
+  } catch (error: any) {
+    console.error("Upload booking document error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload booking document",
       error: error.message,
     });
   }
