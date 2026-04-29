@@ -178,6 +178,31 @@ export class SpaceUserKyc {
   @prop({ trim: true })
   public videoKycRejectMessage?: string;
 
+  // ------------------- AGREEMENT DOCUMENTS -------------------
+  @prop({ trim: true })
+  public draftAgreementUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public draftAgreementStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public draftAgreementRejectMessage?: string;
+
+  @prop({ trim: true })
+  public signedAgreementUrl?: string;
+
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  public signedAgreementStatus!: KycDecisionStatus;
+
+  @prop({ trim: true })
+  public signedAgreementRejectMessage?: string;
+
   // ------------------- OVERALL KYC DECISION -------------------
 
   @prop({

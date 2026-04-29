@@ -13,6 +13,17 @@ import { MeetingRoomModel } from "../../meetingRoomModule/meetingRoom.model";
 import { SpaceApprovalStatus } from "../../shared/enums/spaceApproval.enum";
 import { UserModel } from "../../authModule/models/user.model";
 import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.utils";
+import { NotificationService } from "../../notificationModule/services/notification.service";
+import { NotificationType } from "../../notificationModule/models/Notification";
+
+// Helper to get the effective partner ID (handles team members)
+const getEffectivePartnerId = async (userId: string): Promise<string> => {
+  const user = await UserModel.findById(userId);
+  if (user?.isTeamMember && user.parentPartnerId) {
+    return user.parentPartnerId.toString();
+  }
+  return userId;
+};
 
 // Create or update space user KYC business information
 export const upsertSpaceUserKycBusinessInfo = async (
@@ -27,6 +38,8 @@ export const upsertSpaceUserKycBusinessInfo = async (
         .json({ success: false, message: "Unauthorized: user not found" });
     }
 
+    const partnerId = await getEffectivePartnerId(userId);
+
     const {
       companyName,
       companyType,
@@ -40,7 +53,7 @@ export const upsertSpaceUserKycBusinessInfo = async (
     } = req.body;
 
     // Find the first property to save these details
-    let property = await PropertyModel.findOne({ partner: userId });
+    let property = await PropertyModel.findOne({ partner: partnerId });
     
     if (!property) {
       return res.status(404).json({
@@ -56,14 +69,11 @@ export const upsertSpaceUserKycBusinessInfo = async (
       property.registeredAddress = registeredAddress;
     if (contactPhone !== undefined) property.contactPhone = contactPhone;
     
-    // We can still store other non-property fields in KYC if needed, 
-    // but the request says GST, PAN, and Bank details should go to Property.
-
     await property.save();
 
     return res.status(200).json({
       success: true,
-      message: "Business information saved to property successfully (v2)",
+      message: "Business information saved successfully",
       data: property,
     });
   } catch (error) {
@@ -88,6 +98,8 @@ export const upsertSpaceUserKycBankInfo = async (
         .json({ success: false, message: "Unauthorized: user not found" });
     }
 
+    const partnerId = await getEffectivePartnerId(userId);
+
     const {
       accountHolderName,
       bankName,
@@ -98,7 +110,7 @@ export const upsertSpaceUserKycBankInfo = async (
     } = req.body;
 
     // Find the first property to save these details
-    let property = await PropertyModel.findOne({ partner: userId });
+    let property = await PropertyModel.findOne({ partner: partnerId });
     
     if (!property) {
       return res.status(404).json({
@@ -118,7 +130,7 @@ export const upsertSpaceUserKycBankInfo = async (
 
     return res.status(200).json({
       success: true,
-      message: "Bank information saved to property successfully",
+      message: "Bank information saved successfully",
       data: property,
     });
   } catch (error) {
@@ -180,50 +192,42 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
         .json({ success: false, message: "Unauthorized: user not found" });
     }
 
-    const kyc = await SpaceUserKycModel.findOne({ userId });
-    if (!kyc) {
-      return res.status(404).json({
-        success: false,
-        message: "KYC record not found",
-      });
-    }
+    const partnerId = await getEffectivePartnerId(userId);
+    const partnerUser = await UserModel.findById(partnerId);
 
-    const user = await UserModel.findById(userId);
-    const firstProperty = await PropertyModel.findOne({ partner: userId });
-    const kycObject = kyc.toObject();
-    const {
-      userId: kycUserId,
-      overallStatus,
-      kycStatus,
-    } = kycObject;
+    let kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
+    const firstProperty = await PropertyModel.findOne({ partner: partnerId });
 
-    // Construct the data object as requested:
-    // 1. Business & Bank details from Property
-    // 2. Documents & Status from SpaceUserKyc
+    const kycObject = (kyc ? kyc.toObject() : {}) as any;
+    
+    // Construct the data object:
+    // 1. Business & Bank details from Property take precedence
+    // 2. Personal info from User takes precedence
+    // 3. Status from SpaceUserKyc
     
     const data = {
       ...kycObject,
-      userId: kycUserId ?? userId,
-      overallStatus: overallStatus ?? "not_started",
-      kycStatus: kycStatus ?? "not_started",
+      userId: userId,
+      overallStatus: kycObject.overallStatus ?? "not_started",
+      kycStatus: kycObject.kycStatus ?? "not_started",
 
       // Basic Info from User/Property
-      fullName: user?.fullName || kyc?.fullName || "",
-      email: user?.email || kyc?.email || "",
-      phoneNumber: user?.phoneNumber || kyc?.phoneNumber || "",
+      fullName: partnerUser?.fullName || kycObject.fullName || "",
+      email: partnerUser?.email || kycObject.email || "",
+      phoneNumber: partnerUser?.phoneNumber || kycObject.phoneNumber || "",
 
-      // Ensure Property fields take precedence over KYC fields for business/bank
-      companyName: firstProperty?.companyName || firstProperty?.name || kyc?.companyName || "",
-      gstNumber: firstProperty?.gstNumber || kyc?.gstNumber || "",
-      panNumber: firstProperty?.panNumber || kyc?.panNumber || "",
-      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kyc?.registeredAddress || "",
-      contactPhone: firstProperty?.contactPhone || user?.phoneNumber || kyc?.contactPhone || "",
-      accountHolderName: firstProperty?.accountHolderName || kyc?.accountHolderName || "",
-      bankName: firstProperty?.bankName || kyc?.bankName || "",
-      accountNumber: firstProperty?.accountNumber || kyc?.accountNumber || "",
-      ifscCode: firstProperty?.ifscCode || kyc?.ifscCode || "",
-      branch: firstProperty?.branch || kyc?.branch || "",
-      accountType: firstProperty?.accountType || kyc?.accountType || "Current Account",
+      // Ensure Property fields take precedence
+      companyName: firstProperty?.companyName || firstProperty?.name || kycObject.companyName || "",
+      gstNumber: firstProperty?.gstNumber || kycObject.gstNumber || "",
+      panNumber: firstProperty?.panNumber || kycObject.panNumber || "",
+      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kycObject.registeredAddress || "",
+      contactPhone: firstProperty?.contactPhone || partnerUser?.phoneNumber || kycObject.contactPhone || "",
+      accountHolderName: firstProperty?.accountHolderName || kycObject.accountHolderName || "",
+      bankName: firstProperty?.bankName || kycObject.bankName || "",
+      accountNumber: firstProperty?.accountNumber || kycObject.accountNumber || "",
+      ifscCode: firstProperty?.ifscCode || kycObject.ifscCode || "",
+      branch: firstProperty?.branch || kycObject.branch || "",
+      accountType: firstProperty?.accountType || kycObject.accountType || "Current Account",
     };
 
     return res.status(200).json({
@@ -239,7 +243,6 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
     });
   }
 };
-
 // Create or update space user KYC personal information
 export const upsertSpaceUserKyc = async (req: Request, res: Response) => {
   try {
@@ -249,6 +252,8 @@ export const upsertSpaceUserKyc = async (req: Request, res: Response) => {
         .status(401)
         .json({ success: false, message: "Unauthorized: user not found" });
     }
+
+    const partnerId = await getEffectivePartnerId(userId);
 
     const {
       fullName,
@@ -274,10 +279,10 @@ export const upsertSpaceUserKyc = async (req: Request, res: Response) => {
       });
     }
 
-    let kyc = await SpaceUserKycModel.findOne({ userId });
+    let kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
     if (!kyc) {
       kyc = new SpaceUserKycModel({
-        userId,
+        userId: partnerId,
         fullName,
         email,
         phoneNumber,
@@ -346,13 +351,14 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
       });
     }
 
-    let kyc = await SpaceUserKycModel.findOne({ userId });
-    const user = await UserModel.findById(userId);
+    const partnerId = await getEffectivePartnerId(userId);
+    let kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
+    const user = await UserModel.findById(partnerId);
 
     if (!kyc) {
       // Auto-create a skeleton KYC record if it doesn't exist during upload
       kyc = new SpaceUserKycModel({
-        userId,
+        userId: partnerId,
         fullName: user?.fullName || "Partner",
         email: user?.email || "",
         phoneNumber: user?.phoneNumber || "",
@@ -421,6 +427,16 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
       kyc.bankDetailsProofUrl = fileUrl;
       kyc.bankDetailsProofStatus = "pending";
       kyc.bankDetailsProofRejectMessage = undefined;
+    } else if (documentType === "signed_agreement") {
+      deleteOldFile(kyc.signedAgreementUrl, false);
+      kyc.signedAgreementUrl = fileUrl;
+      kyc.signedAgreementStatus = "pending";
+      kyc.signedAgreementRejectMessage = undefined;
+    } else if (documentType === "draft_agreement") {
+      deleteOldFile(kyc.draftAgreementUrl, false);
+      kyc.draftAgreementUrl = fileUrl;
+      kyc.draftAgreementStatus = "approved"; // Draft is usually approved by admin/partner
+      kyc.draftAgreementRejectMessage = undefined;
     } else {
       return res.status(400).json({
         success: false,
@@ -430,6 +446,38 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
     }
 
     await kyc.save();
+
+    // Trigger Notifications
+    try {
+      if (documentType === "signed_agreement") {
+        // Notify Partner/Admin that a user has uploaded a signed agreement
+        await NotificationService.notifyAdmin(
+          "Signed Agreement Uploaded",
+          `Partner ${user?.fullName || partnerId} has uploaded a signed agreement for review.`,
+          NotificationType.INFO,
+          { userId: partnerId, kycId: kyc._id, documentType }
+        );
+      } else if (documentType === "draft_agreement") {
+        // Notify User that a draft agreement is ready
+        await NotificationService.notifyUser(
+          partnerId,
+          "Draft Agreement Ready",
+          "A draft agreement has been uploaded for your booking. Please review, sign, and upload it back.",
+          NotificationType.SUCCESS,
+          { kycId: kyc._id, documentType }
+        );
+      } else {
+        // General KYC doc upload notification to Admin
+        await NotificationService.notifyAdmin(
+          "KYC Document Uploaded",
+          `Partner ${user?.fullName || partnerId} uploaded ${documentType.replace(/_/g, ' ')}.`,
+          NotificationType.INFO,
+          { userId: partnerId, kycId: kyc._id, documentType }
+        );
+      }
+    } catch (notifErr) {
+      console.error("[spaceKYC] Notification failed during upload:", notifErr);
+    }
 
     return res.status(201).json({
       success: true,
@@ -508,6 +556,14 @@ export const reviewSpaceUserKycDocument = async (
       kyc.videoKycStatus = status;
       kyc.videoKycRejectMessage =
         status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "signed_agreement") {
+      kyc.signedAgreementStatus = status;
+      kyc.signedAgreementRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
+    } else if (documentType === "draft_agreement") {
+      kyc.draftAgreementStatus = status;
+      kyc.draftAgreementRejectMessage =
+        status === "rejected" ? rejectMessage : undefined;
     } else {
       return res.status(400).json({
         success: false,
@@ -523,6 +579,25 @@ export const reviewSpaceUserKycDocument = async (
     kyc.kycStatus = status;
 
     await kyc.save();
+
+    // Trigger Notification to User about document status change
+    try {
+      const statusLabel = status === "approved" ? "Verified" : "Rejected";
+      const iconType = status === "approved" ? NotificationType.SUCCESS : NotificationType.WARNING;
+      const message = status === "approved" 
+        ? `Your document (${documentType.replace(/_/g, ' ')}) has been verified successfully.`
+        : `Your document (${documentType.replace(/_/g, ' ')}) was rejected. Reason: ${rejectMessage || 'Please re-upload a clear copy.'}`;
+
+      await NotificationService.notifyUser(
+        userId,
+        `Document ${statusLabel}`,
+        message,
+        iconType,
+        { kycId: kyc._id, documentType, status }
+      );
+    } catch (notifErr) {
+      console.error("[spaceKYC] Notification failed during review:", notifErr);
+    }
 
     return res.status(200).json({
       success: true,
@@ -637,7 +712,8 @@ export const submitSpaceUserKyc = async (req: Request, res: Response) => {
         .json({ success: false, message: "Unauthorized: user not found" });
     }
 
-    const kyc = await SpaceUserKycModel.findOne({ userId });
+    const partnerId = await getEffectivePartnerId(userId);
+    const kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
     if (!kyc) {
       return res.status(404).json({
         success: false,
