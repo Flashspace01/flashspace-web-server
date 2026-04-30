@@ -259,7 +259,7 @@ export const updatePartner = async (req: Request, res: Response) => {
       address,
     } = req.body;
 
-    if (!Types.ObjectId.isValid(partnerId)) {
+    if (!Types.ObjectId.isValid(partnerId as string)) {
       return res.status(400).json({
         success: false,
         message: "Invalid Partner ID",
