@@ -185,6 +185,9 @@ app.get("/api/super-test", (req, res) => {
 app.get("/api/test-route", (req, res) => {
   res.json({ success: true, message: "GOT IT - Server is running the latest code" });
 });
+app.get("/api/ultimate-test", (req, res) => {
+  res.json({ success: true, message: "ULTIMATE TEST - Route is alive" });
+});
 app.use("/api", mainRoutes);
 
 // 404 Handler for /api
@@ -206,4 +209,4 @@ app.use((req, res) => {
 
 // TART - force nodemon restart 2555159050858
 // TART - force nodemon restart 2555159050857
-// TART - force nodemon restart ${Date.now() + 1}
+// TART - force nodemon restart ${Date.now()}

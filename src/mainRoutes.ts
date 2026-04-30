@@ -70,7 +70,12 @@ mainRoutes.use("/payment", paymentRoutes);
 // /api/user (Dashboard APIs)
 mainRoutes.use("/user", userDashboardRoutes);
 // /api/spacePartner
+console.log("[DEBUG] Registering /api/spacePartner routes...");
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
+
+mainRoutes.get("/spacePartner/direct-test", (req, res) => {
+  res.json({ success: true, message: "Direct spacePartner test working" });
+});
 // /api/meetings (Meeting Scheduler APIs)
 mainRoutes.use("/meetings", meetingSchedulerRoutes);
 // /api/coupons
