@@ -28,6 +28,25 @@ import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancial
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
 export class AdminService {
+  private mapPartnerKYC(partner: any): any {
+    const raw =
+      typeof partner.toObject === "function" ? partner.toObject() : partner;
+
+    return {
+      ...raw,
+      partnerProfileId: raw.kycProfile?.toString?.() || raw.kycProfile,
+      partnerInfo: {
+        fullName: raw.fullName,
+        email: raw.email,
+        phone: raw.phone,
+        panNumber: raw.panNumber,
+        aadhaarNumber: raw.aadhaarNumber,
+        verified: raw.status === "approved",
+      },
+      overallStatus: raw.status,
+    };
+  }
+
   private async ensurePartnerLoginAccount(partner: any): Promise<any> {
     const email = String(partner.email || "").trim().toLowerCase();
     if (!email) {
@@ -540,12 +559,109 @@ export class AdminService {
         .sort({ updatedAt: -1 })
         .lean();
 
+      const profileIds = kycDocs.map((doc: any) => doc._id);
+      const userIds = kycDocs
+        .map((doc: any) => doc.user?._id || doc.user)
+        .filter(Boolean);
+
+      const [
+        pendingPartnerCountsByProfile,
+        pendingPartnerCountsByUser,
+        pendingBusinessCountsByProfile,
+        pendingBusinessCountsByUser,
+      ] = await Promise.all([
+        PartnerKYCModel.aggregate([
+          {
+            $match: {
+              isDeleted: { $ne: true },
+              status: "pending",
+              kycProfile: { $in: profileIds },
+            },
+          },
+          { $group: { _id: "$kycProfile", count: { $sum: 1 } } },
+        ]),
+        PartnerKYCModel.aggregate([
+          {
+            $match: {
+              isDeleted: { $ne: true },
+              status: "pending",
+              user: { $in: userIds },
+            },
+          },
+          { $group: { _id: "$user", count: { $sum: 1 } } },
+        ]),
+        BusinessInfoModel.aggregate([
+          {
+            $match: {
+              isDeleted: { $ne: true },
+              status: "pending",
+              kycProfile: { $in: profileIds },
+            },
+          },
+          { $group: { _id: "$kycProfile", count: { $sum: 1 } } },
+        ]),
+        BusinessInfoModel.aggregate([
+          {
+            $match: {
+              isDeleted: { $ne: true },
+              status: "pending",
+              user: { $in: userIds },
+            },
+          },
+          { $group: { _id: "$user", count: { $sum: 1 } } },
+        ]),
+      ]);
+
+      const partnerCountByProfile = new Map(
+        pendingPartnerCountsByProfile.map((item: any) => [
+          item._id.toString(),
+          item.count,
+        ]),
+      );
+      const partnerCountByUser = new Map(
+        pendingPartnerCountsByUser.map((item: any) => [
+          item._id.toString(),
+          item.count,
+        ]),
+      );
+      const businessCountByProfile = new Map(
+        pendingBusinessCountsByProfile.map((item: any) => [
+          item._id.toString(),
+          item.count,
+        ]),
+      );
+      const businessCountByUser = new Map(
+        pendingBusinessCountsByUser.map((item: any) => [
+          item._id.toString(),
+          item.count,
+        ]),
+      );
+
+      const kycDocsWithLiveCounts = kycDocs.map((doc: any) => {
+        const profileId = doc._id.toString();
+        const userId = (doc.user?._id || doc.user)?.toString?.();
+        const partnerCount = Math.max(
+          partnerCountByProfile.get(profileId) || 0,
+          userId ? partnerCountByUser.get(userId) || 0 : 0,
+        );
+        const businessInfoCount = Math.max(
+          businessCountByProfile.get(profileId) || 0,
+          userId ? businessCountByUser.get(userId) || 0 : 0,
+        );
+
+        return {
+          ...doc,
+          partnerCount,
+          businessInfoCount,
+        };
+      });
+
       return {
         success: true,
         message: includeApproved
           ? "KYC requests fetched successfully"
           : "Pending KYC requests fetched successfully",
-        data: kycDocs,
+        data: kycDocsWithLiveCounts,
       };
     } catch (error: any) {
       return {
@@ -1281,20 +1397,22 @@ export class AdminService {
 
         if (type === "partner") {
           const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-            user: userObjectId,
+            ...(doc.kycProfile ? { kycProfile: doc.kycProfile } : { user: userObjectId }),
             status: "pending",
+            isDeleted: { $ne: true },
           });
           await KYCDocumentModel.findOneAndUpdate(
-            { user: userObjectId },
+            doc.kycProfile ? { _id: doc.kycProfile } : { user: userObjectId },
             { partnerCount: pendingPartnerCount },
           );
         } else if (type === "business") {
           const pendingBusinessCount = await BusinessInfoModel.countDocuments({
-            user: userObjectId,
+            ...(doc.kycProfile ? { kycProfile: doc.kycProfile } : { user: userObjectId }),
             status: "pending",
+            isDeleted: { $ne: true },
           });
           await KYCDocumentModel.findOneAndUpdate(
-            { user: userObjectId },
+            doc.kycProfile ? { _id: doc.kycProfile } : { user: userObjectId },
             { businessInfoCount: pendingBusinessCount },
           );
         }
@@ -1420,10 +1538,29 @@ export class AdminService {
     try {
       const kyc = await KYCDocumentModel.findById(kycId);
 
-      if (!kyc) {
-        // Fallback: Check PartnerKYC
-        try {
-          const partner = await PartnerKYCModel.findById(kycId);
+      if (kyc && kyc.documents) {
+        const doc = kyc.documents.find(
+          (d: any) => (d._id && d._id.toString() === docId) || d.type === docId
+        );
+        if (doc) {
+          doc.status = action === "approve" ? "approved" : "rejected";
+          if (action === "reject") {
+            doc.rejectionReason = rejectionReason;
+            kyc.overallStatus = "rejected";
+            await UserModel.findByIdAndUpdate(kyc.user, { kycVerified: false });
+          } else {
+            doc.rejectionReason = undefined;
+          }
+          doc.verifiedAt = new Date();
+          kyc.updatedAt = new Date();
+          await kyc.save();
+          return { success: true, message: `Document ${action}ed successfully`, data: kyc };
+        }
+      }
+
+      // Fallback: Check PartnerKYC
+      try {
+        const partner = await PartnerKYCModel.findById(kycId);
           if (partner) {
             if (!partner.documents) {
               return {
@@ -1483,13 +1620,13 @@ export class AdminService {
             const userId = partner.user;
             if (userId) {
               const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-                user: userId,
+                ...(partner.kycProfile ? { kycProfile: partner.kycProfile } : { user: userId }),
                 status: "pending",
-                isDeleted: false,
+                isDeleted: { $ne: true },
               });
 
               await KYCDocumentModel.findOneAndUpdate(
-                { user: userId },
+                partner.kycProfile ? { _id: partner.kycProfile } : { user: userId },
                 { partnerCount: pendingPartnerCount },
               );
             }
@@ -1580,56 +1717,7 @@ export class AdminService {
           console.error("Inner error checking BusinessInfo doc:", innerError);
         }
 
-        return { success: false, message: "KYC profile not found" };
-      }
-
-      if (!kyc.documents) {
-        return { success: false, message: "No documents found in profile" };
-      }
-
-      // Find the specific document (using _id of subdocument)
-      const doc = kyc.documents.find(
-        (d: any) => d._id && d._id.toString() === docId,
-      );
-
-      if (!doc) {
-        // Fallback: try finding by type if _id match fails (backward compatibility)
-        const docByType = kyc.documents.find((d) => d.type === docId);
-        if (docByType) {
-          docByType.status = action === "approve" ? "approved" : "rejected";
-          if (action === "reject") {
-            docByType.rejectionReason = rejectionReason;
-          } else {
-            docByType.rejectionReason = undefined;
-          }
-          docByType.verifiedAt = new Date();
-        } else {
-          return { success: false, message: "Document not found" };
-        }
-      } else {
-        doc.status = action === "approve" ? "approved" : "rejected";
-        if (action === "reject") {
-          doc.rejectionReason = rejectionReason;
-        } else {
-          doc.rejectionReason = undefined;
-        }
-        doc.verifiedAt = new Date();
-      }
-
-      if (action === "reject") {
-        kyc.overallStatus = "rejected";
-        // Sync User verification status
-        await UserModel.findByIdAndUpdate(kyc.user, { kycVerified: false });
-      }
-
-      kyc.updatedAt = new Date();
-      await kyc.save();
-
-      return {
-        success: true,
-        message: `Document ${action}ed successfully`,
-        data: kyc,
-      };
+      return { success: false, message: "KYC profile or document not found" };
     } catch (error: any) {
       console.error("Review KYC Document error:", error);
       return {
@@ -1854,13 +1942,95 @@ export class AdminService {
       return {
         success: true,
         message: "Partners fetched successfully",
-        data: partners,
+        data: partners.map((partner) => this.mapPartnerKYC(partner)),
       };
     } catch (error: any) {
       console.error("Get partners by user error:", error);
       return {
         success: false,
         message: "Failed to fetch partners",
+        error: error.message,
+      };
+    }
+  }
+
+  async getPartnerKYCList(
+    filters: {
+      userId?: string;
+      profileId?: string;
+      search?: string;
+      status?: string;
+    } = {},
+  ): Promise<ApiResponse<any>> {
+    try {
+      const query: any = {
+        isDeleted: false,
+        status: { $nin: ["in_progress", "not_started"] },
+      };
+
+      if (filters.userId) {
+        query.user = filters.userId;
+      }
+
+      if (filters.profileId) {
+        query.kycProfile = filters.profileId;
+      }
+
+      if (filters.status && filters.status !== "all") {
+        query.status = filters.status;
+      }
+
+      if (filters.search) {
+        query.$or = [
+          { fullName: { $regex: filters.search, $options: "i" } },
+          { email: { $regex: filters.search, $options: "i" } },
+          { phone: { $regex: filters.search, $options: "i" } },
+        ];
+      }
+
+      const partners = await PartnerKYCModel.find(query).sort({
+        createdAt: -1,
+      });
+
+      return {
+        success: true,
+        message: "Partner KYC records fetched successfully",
+        data: partners.map((partner) => this.mapPartnerKYC(partner)),
+      };
+    } catch (error: any) {
+      console.error("Get partner KYC list error:", error);
+      return {
+        success: false,
+        message: "Failed to fetch partner KYC records",
+        error: error.message,
+      };
+    }
+  }
+
+  async getPartnerKYCById(id: string): Promise<ApiResponse<any>> {
+    try {
+      const partner = await PartnerKYCModel.findById(id).populate(
+        "user",
+        "fullName email phoneNumber",
+      );
+
+      if (!partner) {
+        return {
+          success: false,
+          message: "Partner KYC not found",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Partner KYC fetched successfully",
+        data: this.mapPartnerKYC(partner),
+      };
+    } catch (error: any) {
+      console.error("Get partner KYC by id error:", error);
+      return {
+        success: false,
+        message: "Failed to fetch partner KYC",
         error: error.message,
       };
     }
@@ -1896,12 +2066,13 @@ export class AdminService {
       const userId = partner.user;
       if (userId) {
         const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-          user: userId,
+          ...(partner.kycProfile ? { kycProfile: partner.kycProfile } : { user: userId }),
           status: "pending",
+          isDeleted: { $ne: true },
         });
 
         await KYCDocumentModel.findOneAndUpdate(
-          { user: userId },
+          partner.kycProfile ? { _id: partner.kycProfile } : { user: userId },
           { partnerCount: pendingPartnerCount },
         );
       }
@@ -2129,12 +2300,17 @@ export class AdminService {
       // Recalculate businessInfoCount in main KYC Profile
       if (businessInfo.user) {
         const pendingBusinessCount = await BusinessInfoModel.countDocuments({
-          user: businessInfo.user,
+          ...(businessInfo.kycProfile
+            ? { kycProfile: businessInfo.kycProfile }
+            : { user: businessInfo.user }),
           status: "pending",
+          isDeleted: { $ne: true },
         });
 
         await KYCDocumentModel.findOneAndUpdate(
-          { user: businessInfo.user },
+          businessInfo.kycProfile
+            ? { _id: businessInfo.kycProfile }
+            : { user: businessInfo.user },
           { businessInfoCount: pendingBusinessCount },
         );
       }

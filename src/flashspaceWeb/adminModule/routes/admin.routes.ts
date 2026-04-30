@@ -253,6 +253,24 @@ adminRoutes.get(
 );
 
 adminRoutes.get(
+  "/kyc/partners",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getPartnerKYCList,
+);
+
+adminRoutes.get(
+  "/kyc/partners/:id",
+  RBACMiddleware.requireAnyPermission([
+    Permission.MANAGE_ALL_USERS,
+    Permission.MANAGE_OWN_SPACES,
+  ]),
+  AdminController.getPartnerKYCById,
+);
+
+adminRoutes.get(
   "/kyc/:id",
   RBACMiddleware.requireAnyPermission([
     Permission.MANAGE_ALL_USERS,

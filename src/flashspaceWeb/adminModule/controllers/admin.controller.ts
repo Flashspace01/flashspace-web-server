@@ -315,6 +315,32 @@ export class AdminController {
     }
   }
 
+  // GET /api/admin/kyc/partners
+  static async getPartnerKYCList(req: Request, res: Response) {
+    const { userId, profileId, search, status } = req.query;
+    const result = await adminService.getPartnerKYCList({
+      userId: userId as string,
+      profileId: profileId as string,
+      search: search as string,
+      status: status as string,
+    });
+
+    res.status(result.success ? 200 : 500).json(result);
+  }
+
+  // GET /api/admin/kyc/partners/:id
+  static async getPartnerKYCById(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const result = await adminService.getPartnerKYCById(id);
+
+    if (result.success) {
+      return res.status(200).json(result);
+    }
+
+    const statusCode = result.message === "Partner KYC not found" ? 404 : 500;
+    return res.status(statusCode).json(result);
+  }
+
   // PUT /api/admin/kyc/partner/:partnerId/status
   static async updatePartnerStatus(req: Request, res: Response) {
     const partnerId = req.params.partnerId as string;
