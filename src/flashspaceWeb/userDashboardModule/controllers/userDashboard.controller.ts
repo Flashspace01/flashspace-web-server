@@ -1094,7 +1094,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         { partnerId: userId },
         { assignee: userId }
       ],
-      status: { $in: ["resolved", "closed"] },
+      status: "resolved",
     }).populate("user", "fullName email phoneNumber")
       .populate("bookingId", "spaceSnapshot")
       .lean();

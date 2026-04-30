@@ -74,7 +74,7 @@ export class TicketValidation {
    */
   static validateUpdateTicket(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
-      status: Joi.string().valid('open', 'in_progress', 'escalated', 'resolved', 'closed').optional(),
+      status: Joi.string().valid('open', 'in_progress', 'escalated', 'resolved').optional(),
       assignee: Joi.string().optional(),
       priority: Joi.string().valid('low', 'medium', 'high').optional(),
       category: Joi.string().valid(

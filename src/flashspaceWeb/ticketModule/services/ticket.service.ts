@@ -159,7 +159,7 @@ export class TicketService {
 
     if (
       data.sender === "user" &&
-      (ticket.status === TicketStatus.CLOSED || ticket.status === TicketStatus.RESOLVED)
+      (ticket.status === TicketStatus.RESOLVED)
     ) {
       ticket.status = TicketStatus.OPEN;
     }
@@ -272,7 +272,6 @@ export class TicketService {
     if (data.deadline) updateObj.deadline = data.deadline;
 
     if (data.status === TicketStatus.RESOLVED) updateObj.resolvedAt = new Date();
-    else if (data.status === TicketStatus.CLOSED) updateObj.closedAt = new Date();
 
     const ticket = await TicketModel.findByIdAndUpdate(
       new Types.ObjectId(ticketId),
@@ -392,27 +391,7 @@ export class TicketService {
   }
 
   static async closeTicket(ticketId: string) {
-    const ticket = await TicketModel.findByIdAndUpdate(
-      ticketId,
-      { status: TicketStatus.CLOSED, closedAt: new Date() },
-      { new: true },
-    )
-      .populate("user", "fullName email phoneNumber")
-      .populate("assignee", "fullName email role");
-
-    if (!ticket) throw new Error("Ticket not found");
-
-    const targetUserId = (ticket.user as any)._id ? (ticket.user as any)._id.toString() : ticket.user.toString();
-
-    NotificationService.notifyUser(
-      targetUserId,
-      `Ticket Closed: ${ticket.ticketNumber}`,
-      `Your ticket has been closed.`,
-      NotificationType.INFO,
-      { ticketId: ticket._id },
-    );
-
-    return ticket;
+    return this.resolveTicket(ticketId);
   }
 
   // ============ PARTNER METHODS ============
@@ -516,14 +495,14 @@ export class TicketService {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) throw new Error("Ticket not found or access denied");
 
-    ticket.status = TicketStatus.CLOSED;
-    ticket.closedAt = new Date();
+    ticket.status = TicketStatus.RESOLVED;
+    ticket.resolvedAt = new Date();
     await ticket.save();
 
     NotificationService.notifyUser(
       ticket.user.toString(),
-      `Query Closed: ${ticket.ticketNumber}`,
-      `Your query has been closed by the partner.`,
+      `Query Resolved: ${ticket.ticketNumber}`,
+      `Your query has been resolved by the partner.`,
       NotificationType.INFO,
       { ticketId: ticket._id },
     );
@@ -734,9 +713,10 @@ export class TicketService {
     ticket.feedbackSubmittedAt = new Date();
     
     // Auto-close if it was resolved
-    if (ticket.status === TicketStatus.RESOLVED) {
-      ticket.status = TicketStatus.CLOSED;
-      ticket.closedAt = new Date();
+    // Auto-resolve if feedback is submitted (optional, keeping current logic but using RESOLVED)
+    if (ticket.status !== TicketStatus.RESOLVED) {
+      ticket.status = TicketStatus.RESOLVED;
+      ticket.resolvedAt = new Date();
     }
 
     await ticket.save();

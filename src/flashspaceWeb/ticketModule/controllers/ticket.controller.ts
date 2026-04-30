@@ -502,7 +502,7 @@ export const closeTicket = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: "Ticket closed successfully",
+      message: "Ticket resolved successfully",
       data: ticket,
     });
   } catch (error: any) {
@@ -625,7 +625,7 @@ export const partnerCloseTicket = async (
 
     res.status(200).json({
       success: true,
-      message: "Ticket closed successfully",
+      message: "Ticket resolved successfully",
       data: ticket,
     });
   } catch (error: any) {

@@ -15,7 +15,6 @@ export enum TicketStatus {
   IN_PROGRESS = "in_progress",
   ESCALATED = "escalated",
   RESOLVED = "resolved",
-  CLOSED = "closed",
 }
 
 export enum TicketPriority {
@@ -176,8 +175,7 @@ export class Ticket extends TimeStamps {
 
   updateStatus(newStatus: TicketStatus) {
     this.status = newStatus;
-      if (newStatus === TicketStatus.RESOLVED) this.resolvedAt = new Date();
-    else if (newStatus === TicketStatus.CLOSED) this.closedAt = new Date();
+    if (newStatus === TicketStatus.RESOLVED) this.resolvedAt = new Date();
   }
 }
 
