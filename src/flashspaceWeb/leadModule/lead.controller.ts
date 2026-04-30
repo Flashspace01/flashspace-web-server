@@ -61,8 +61,9 @@ export const createLead = async (req: Request, res: Response) => {
         </div>
       `;
       
-      await EmailUtil.sendEmail({ to: adminEmail, subject, html });
-      console.log("✅ Admin notification email sent");
+      EmailUtil.sendEmail({ to: adminEmail, subject, html })
+        .then(() => console.log("✅ Admin notification email sent"))
+        .catch(err => console.error("⚠️ Failed to send admin notification email:", err.message));
     } catch (emailError: any) {
       console.error("⚠️ Failed to send admin notification email:", emailError.message);
     }
