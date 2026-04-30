@@ -123,13 +123,9 @@ export class AuthService {
       const user = await this.userRepository.create(userData);
 
       // Send welcome email (non-blocking)
-      try {
-        await EmailUtil.sendWelcomeEmail(email, fullName);
-        console.log("✅ Welcome email sent to:", email);
-      } catch (emailError) {
-        console.error("Error sending welcome email:", emailError);
-        // Continue even if email fails
-      }
+      EmailUtil.sendWelcomeEmail(email, fullName)
+        .then(() => console.log("✅ Welcome email sent to:", email))
+        .catch((emailError) => console.error("Error sending welcome email:", emailError));
 
       // Generate tokens so the user is logged in immediately after signup
       const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
@@ -231,19 +227,10 @@ export class AuthService {
           otpData.expiresAt,
         );
 
-        try {
-          await EmailUtil.sendLoginOTP(
-            user.email,
-            otpData.otp,
-            user.fullName,
-          );
-        } catch (emailError) {
-          console.error("Error sending 2FA login OTP:", emailError);
-          return {
-            success: false,
-            message: "Unable to send login OTP. Please try again.",
-          };
-        }
+        // Send OTP (non-blocking)
+        EmailUtil.sendLoginOTP(user.email, otpData.otp, user.fullName).catch(
+          (emailError) => console.error("Error sending 2FA login OTP:", emailError),
+        );
 
         return {
           success: true,
@@ -472,12 +459,10 @@ export class AuthService {
 
         user = await this.userRepository.create(userData);
 
-        // Send welcome email
-        try {
-          await EmailUtil.sendWelcomeEmail(email, profile.displayName);
-        } catch (emailError) {
-          console.error("Error sending welcome email:", emailError);
-        }
+        // Send welcome email (non-blocking)
+        EmailUtil.sendWelcomeEmail(email, profile.displayName).catch((emailError) =>
+          console.error("Error sending welcome email:", emailError),
+        );
       }
 
       const userWithTrustedDevices = await UserModel.findById(user._id)
@@ -501,15 +486,11 @@ export class AuthService {
           otpData.expiresAt,
         );
 
-        try {
-          await EmailUtil.sendLoginOTP(authUser.email, otpData.otp, authUser.fullName);
-        } catch (emailError) {
-          console.error("Error sending Google 2FA login OTP:", emailError);
-          return {
-            success: false,
-            message: "Unable to send login OTP. Please try again.",
-          };
-        }
+        // Send OTP (non-blocking)
+        EmailUtil.sendLoginOTP(authUser.email, otpData.otp, authUser.fullName).catch(
+          (emailError) =>
+            console.error("Error sending Google 2FA login OTP:", emailError),
+        );
 
         return {
           success: true,
@@ -623,20 +604,10 @@ export class AuthService {
         },
       });
 
-      // Send reset email
-      try {
-        await EmailUtil.sendPasswordResetEmail(
-          email,
-          resetToken,
-          user.fullName,
-        );
-      } catch (emailError) {
-        console.error("Error sending reset email:", emailError);
-        return {
-          success: false,
-          message: "Error sending password reset email",
-        };
-      }
+      // Send reset email (non-blocking)
+      EmailUtil.sendPasswordResetEmail(email, resetToken, user.fullName).catch(
+        (emailError) => console.error("Error sending reset email:", emailError),
+      );
 
       return {
         success: true,
@@ -969,12 +940,10 @@ export class AuthService {
         };
       }
 
-      // Send welcome email
-      try {
-        await EmailUtil.sendWelcomeEmail(email, user.fullName);
-      } catch (emailError) {
-        console.error("Error sending welcome email:", emailError);
-      }
+      // Send welcome email (non-blocking)
+      EmailUtil.sendWelcomeEmail(email, user.fullName).catch((emailError) =>
+        console.error("Error sending welcome email:", emailError),
+      );
 
       // Generate tokens
       const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
@@ -1062,21 +1031,13 @@ export class AuthService {
         otpData.expiresAt,
       );
 
-      // Send OTP email
-      try {
-        await EmailUtil.sendEmailVerificationOTP(
-          email,
-          otpData.otp,
-          user.fullName,
-        );
-        console.log("✅ New verification OTP sent to:", email);
-      } catch (emailError) {
-        console.error("Error sending verification OTP:", emailError);
-        return {
-          success: false,
-          message: "Failed to send verification code. Please try again.",
-        };
-      }
+      // Send OTP email (non-blocking)
+      EmailUtil.sendEmailVerificationOTP(
+        email,
+        otpData.otp,
+        user.fullName,
+      ).then(() => console.log("✅ New verification OTP sent to:", email))
+      .catch((emailError) => console.error("Error sending verification OTP:", emailError));
 
       return {
         success: true,

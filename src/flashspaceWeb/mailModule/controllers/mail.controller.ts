@@ -40,46 +40,44 @@ export const createMail = async (req: Request, res: Response) => {
     await newMail.save();
 
     // Notify client user (if account exists for the provided email)
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const clientUser = await UserModel.findOne({
-        email: normalizedEmail,
-        isDeleted: { $ne: true },
-      })
-        .select("_id")
-        .lean();
+    (async () => {
+      try {
+        const normalizedEmail = email.trim().toLowerCase();
+        const clientUser = await UserModel.findOne({
+          email: normalizedEmail,
+          isDeleted: { $ne: true },
+        })
+          .select("_id fullName")
+          .lean();
 
-      if (clientUser?._id) {
-        // 1. In-app notification
-        await NotificationService.notifyUser(
-          clientUser._id.toString(),
-          "New Mail Record Added",
-          `A new mail item from ${sender} has been logged for ${space}.`,
-          NotificationType.INFO,
-          {
-            mailId: newMail._id,
-            type: "mail_record",
-            sender,
-            space,
-            actionUrl: "/dashboard/mail-records",
-          },
-          { preferenceKey: "push" },
-        );
+        if (clientUser?._id) {
+          // 1. In-app notification
+          NotificationService.notifyUser(
+            clientUser._id.toString(),
+            "New Mail Record Added",
+            `A new mail item from ${sender} has been logged for ${space}.`,
+            NotificationType.INFO,
+            {
+              mailId: newMail._id,
+              type: "mail_record",
+              sender,
+              space,
+              actionUrl: "/dashboard/mail-records",
+            },
+            { preferenceKey: "push" },
+          ).catch(err => console.error("[createMail] Notification failed:", err));
 
-        // 2. Email notification
-        try {
-          await EmailUtil.sendMailRecordEmail(
+          // 2. Email notification
+          EmailUtil.sendMailRecordEmail(
             normalizedEmail,
             (clientUser as any).fullName || client,
             { sender, type, office: space }
-          );
-        } catch (emailErr) {
-          console.error("[createMail] Email failed:", emailErr);
+          ).catch(emailErr => console.error("[createMail] Email failed:", emailErr));
         }
+      } catch (notifError) {
+        console.error("[createMail] Background notification process failed:", notifError);
       }
-    } catch (notifError) {
-      console.error("[createMail] Failed to notify client user:", notifError);
-    }
+    })();
 
     res.status(201).json({ success: true, data: newMail });
   } catch (error) {

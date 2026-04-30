@@ -95,11 +95,9 @@ export class AdminService {
     partner.accountLinkedAt = new Date();
 
     if (resetToken && linkedUser) {
-      try {
-        await EmailUtil.sendPasswordResetEmail(email, resetToken, linkedUser.fullName);
-      } catch (emailError) {
-        console.error("[ensurePartnerLoginAccount] Failed to send setup email:", emailError);
-      }
+      EmailUtil.sendPasswordResetEmail(email, resetToken, linkedUser.fullName).catch(
+        (emailError) => console.error("[ensurePartnerLoginAccount] Failed to send setup email:", emailError),
+      );
     }
 
     return linkedUser;

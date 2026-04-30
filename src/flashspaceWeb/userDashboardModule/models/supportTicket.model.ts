@@ -45,7 +45,7 @@ export class SupportTicket {
   priority?: string;
 
   @prop({
-    enum: ["open", "in_progress", "waiting_customer", "resolved", "closed"],
+    enum: ["open", "in_progress", "waiting_customer", "resolved"],
     default: "open",
   })
   status?: string;

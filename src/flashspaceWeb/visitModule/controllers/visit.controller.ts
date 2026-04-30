@@ -70,46 +70,44 @@ export const createVisit = async (req: Request, res: Response) => {
     await newVisit.save();
 
     // Notify client user (if account exists for the provided email)
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const clientUser = await UserModel.findOne({
-        email: normalizedEmail,
-        isDeleted: { $ne: true },
-      })
-        .select("_id")
-        .lean();
+    (async () => {
+      try {
+        const normalizedEmail = email.trim().toLowerCase();
+        const clientUser = await UserModel.findOne({
+          email: normalizedEmail,
+          isDeleted: { $ne: true },
+        })
+          .select("_id fullName")
+          .lean();
 
-      if (clientUser?._id) {
-        // 1. In-app notification
-        await NotificationService.notifyUser(
-          clientUser._id.toString(),
-          "New Visit Record Added",
-          `A visitor entry for ${visitor} has been logged at ${space}.`,
-          NotificationType.INFO,
-          {
-            visitId: newVisit._id,
-            type: "visit_record",
-            visitor,
-            space,
-            actionUrl: "/dashboard/visit-records",
-          },
-          { preferenceKey: "loginAlerts" },
-        );
+        if (clientUser?._id) {
+          // 1. In-app notification
+          NotificationService.notifyUser(
+            clientUser._id.toString(),
+            "New Visit Record Added",
+            `A visitor entry for ${visitor} has been logged at ${space}.`,
+            NotificationType.INFO,
+            {
+              visitId: newVisit._id,
+              type: "visit_record",
+              visitor,
+              space,
+              actionUrl: "/dashboard/visit-records",
+            },
+            { preferenceKey: "loginAlerts" },
+          ).catch(err => console.error("[createVisit] Notification failed:", err));
 
-        // 2. Email notification
-        try {
-          await EmailUtil.sendVisitRecordEmail(
+          // 2. Email notification
+          EmailUtil.sendVisitRecordEmail(
             normalizedEmail,
             (clientUser as any).fullName || client,
             { visitor, purpose, office: space }
-          );
-        } catch (emailErr) {
-          console.error("[createVisit] Email failed:", emailErr);
+          ).catch(emailErr => console.error("[createVisit] Email failed:", emailErr));
         }
+      } catch (notifError) {
+        console.error("[createVisit] Background notification process failed:", notifError);
       }
-    } catch (notifError) {
-      console.error("[createVisit] Failed to notify client user:", notifError);
-    }
+    })();
 
     res.status(201).json({ success: true, data: newVisit });
   } catch (error: any) {
