@@ -7,7 +7,7 @@ dotenv.config();
 
 const migrate = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/flashspace";
+    const mongoUri = process.env.DB_URI || "mongodb://127.0.0.1:27017/flash";
     console.log("Connecting to MongoDB...");
     await mongoose.connect(mongoUri);
     console.log("Connected to MongoDB");
