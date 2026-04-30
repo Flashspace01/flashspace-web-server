@@ -67,7 +67,7 @@ export const addPartner = async (req: Request, res: Response) => {
 
     // Recalculate partnerCount in KYC Profile
     const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-      user: userId,
+      kycProfile: profileId,
       status: "pending",
       isDeleted: { $ne: true },
     });
@@ -184,7 +184,7 @@ export const removePartner = async (req: Request, res: Response) => {
 
     if (kycProfile && partner.user) {
       const pendingPartnerCount = await PartnerKYCModel.countDocuments({
-        user: partner.user,
+        kycProfile: partner.kycProfile,
         status: "pending",
         isDeleted: { $ne: true },
       });
