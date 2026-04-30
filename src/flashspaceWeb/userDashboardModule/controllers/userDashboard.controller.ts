@@ -1329,21 +1329,41 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       .sort({ createdAt: -1 });
 
     const userIds = [
-      ...new Set(bookings.map((booking: any) => String(booking.user?._id || booking.user)).filter(Boolean)),
+      ...new Set(
+        bookings
+          .map((booking: any) => {
+            const uid = booking.user?._id || booking.user;
+            return uid ? String(uid) : "";
+          })
+          .filter((id) => id && id !== "null" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id)),
+      ),
     ];
     const profileIds = [
-      ...new Set(bookings.map((booking: any) => String((booking.kycProfile as any)?._id || booking.kycProfile || "")).filter(Boolean)),
+      ...new Set(
+        bookings
+          .map((booking: any) => {
+            const pid = (booking.kycProfile as any)?._id || booking.kycProfile;
+            return pid ? String(pid) : "";
+          })
+          .filter((id) => id && id !== "null" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id)),
+      ),
     ];
 
+    // Build PartnerKYC query safely — MongoDB $or with empty array is invalid
+    const partnerKycOrConditions: any[] = [];
+    if (profileIds.length > 0) partnerKycOrConditions.push({ kycProfile: { $in: profileIds } });
+    if (userIds.length > 0) partnerKycOrConditions.push({ user: { $in: userIds } });
+
     const [businessInfos, partnerKycs] = await Promise.all([
-      BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: { $ne: true } }),
-      PartnerKYCModel.find({
-        $or: [
-          { kycProfile: { $in: profileIds } },
-          { user: { $in: userIds } },
-        ],
-        isDeleted: { $ne: true },
-      }),
+      userIds.length > 0
+        ? BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: { $ne: true } })
+        : Promise.resolve([]),
+      partnerKycOrConditions.length > 0
+        ? PartnerKYCModel.find({
+            $or: partnerKycOrConditions,
+            isDeleted: { $ne: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const businessByUser = new Map(businessInfos.map((info: any) => [String(info.user), info]));
@@ -1353,25 +1373,33 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       partnersByProfile.set(key, [...(partnersByProfile.get(key) || []), partner]);
     });
 
-    const normalizeDoc = (doc: any) => ({
-      id: String(doc._id || doc.type || doc.name),
-      type: doc.type || "document",
-      name: doc.name || doc.type || "Document",
-      status: doc.status || "pending",
-      partnerReviewStatus: doc.partnerReviewStatus || "pending",
-      fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
-      uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
-      rejectionReason: doc.rejectionReason || "",
-      partnerRejectionReason: doc.partnerRejectionReason || "",
-      partnerReviewedAt: doc.partnerReviewedAt,
-    });
+    const normalizeDoc = (doc: any) => {
+      if (!doc) return null;
+      return {
+        id: String(doc._id || doc.type || doc.name || "unknown"),
+        type: doc.type || "document",
+        name: doc.name || doc.type || "Document",
+        status: doc.status || "pending",
+        partnerReviewStatus: doc.partnerReviewStatus || "pending",
+        fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
+        uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
+        rejectionReason: doc.rejectionReason || "",
+        partnerRejectionReason: doc.partnerRejectionReason || "",
+        partnerReviewedAt: doc.partnerReviewedAt,
+      };
+    };
+
+    const safeNormalizeDocs = (docs: any) => {
+      if (!docs || !Array.isArray(docs)) return [];
+      return docs.map(normalizeDoc).filter(Boolean);
+    };
 
     const data = bookings.map((booking: any) => {
       const user = booking.user as any;
       const clientUserId = String(user?._id || booking.user || "");
       const kycProfile = booking.kycProfile as any;
       const businessInfo = businessByUser.get(clientUserId);
-      const bookingDocs = (booking.documents || []).map(normalizeDoc);
+      const bookingDocs = safeNormalizeDocs(booking.documents);
       const draftAgreement = bookingDocs.find((doc: any) => doc.type === "draft_agreement");
       const signedAgreement = bookingDocs.find((doc: any) => doc.type === "signed_agreement");
       const finalAgreement = bookingDocs.find((doc: any) => doc.type === "final_agreement");
@@ -1411,20 +1439,20 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           profileName: kycProfile?.profileName || kycProfile?.businessInfo?.companyName || "KYC Profile",
           kycType: kycProfile?.kycType || "individual",
           overallStatus: kycProfile?.overallStatus || "pending",
-          personalDocuments: (kycProfile?.documents || []).map(normalizeDoc),
-          businessDocuments: (businessInfo?.documents || []).map(normalizeDoc),
+          personalDocuments: safeNormalizeDocs(kycProfile?.documents),
+          businessDocuments: safeNormalizeDocs(businessInfo?.documents),
           partnerDocuments: (partnersByProfile.get(String(kycProfile?._id || "")) || []).map((partner: any) => ({
             id: String(partner._id),
-            name: partner.fullName,
-            email: partner.email,
+            name: partner.fullName || "",
+            email: partner.email || "",
             status: partner.status || "pending",
-            documents: (partner.documents || []).map(normalizeDoc),
+            documents: safeNormalizeDocs(partner.documents),
           })),
         },
         agreement: {
-          draftAgreement,
-          signedAgreement,
-          finalAgreement,
+          draftAgreement: draftAgreement || null,
+          signedAgreement: signedAgreement || null,
+          finalAgreement: finalAgreement || null,
           supportingDocuments: bookingDocs.filter((doc: any) =>
             ["noc", "utility_bill", "electricity_bill", "other_support"].includes(doc.type),
           ),
@@ -1434,8 +1462,8 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
     });
 
     return res.status(200).json({ success: true, data });
-  } catch (error) {
-    console.error("Get partner booking requests error:", error);
+  } catch (error: any) {
+    console.error("Get partner booking requests error:", error?.message, error?.stack);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch booking requests",

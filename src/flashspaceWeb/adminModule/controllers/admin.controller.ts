@@ -239,7 +239,7 @@ export class AdminController {
       res.status(statusCode).json(result);
     }
   }
-
+  
   // PUT /api/admin/kyc/:id/document/:docId/review
   static async reviewKYCDocument(req: Request, res: Response) {
     const { id, docId } = req.params as { id: string; docId: string };
