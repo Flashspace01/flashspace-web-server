@@ -1570,6 +1570,27 @@ export const uploadPartnerBookingDocument = async (req: Request, res: Response) 
     booking.markModified("documents");
     await booking.save();
 
+    // Notify User
+    if (documentType === "draft_agreement") {
+      try {
+        const targetUserId = booking.user?._id || booking.user;
+        await NotificationService.notifyUser(
+          String(targetUserId),
+          "Draft Agreement Ready",
+          `A draft agreement has been uploaded for your booking ${booking.bookingNumber}. Please review and sign it.`,
+          NotificationType.SUCCESS,
+          {
+            bookingId: booking._id,
+            bookingNumber: booking.bookingNumber,
+            documentType: "draft_agreement",
+            actionUrl: `/dashboard/bookings?openBooking=${booking._id}`,
+          },
+        );
+      } catch (notifError) {
+        console.error("[uploadPartnerBookingDocument] Notification failed:", notifError);
+      }
+    }
+
     return res.status(200).json({ success: true, message: "Document uploaded successfully", data: docEntry });
   } catch (error) {
     console.error("Upload partner booking document error:", error);
@@ -1622,6 +1643,30 @@ export const uploadUserBookingDocument = async (req: Request, res: Response) => 
     booking.updatedAt = new Date();
     booking.markModified("documents");
     await booking.save();
+
+    // Notify Space Partner
+    if (documentType === "signed_agreement") {
+      try {
+        const partnerId = await resolveBookingSpacePartnerId(booking);
+        if (partnerId) {
+          const targetPartnerId = (partnerId as any)?._id || partnerId;
+          await NotificationService.notifyUser(
+            targetPartnerId.toString(),
+            "Signed Agreement Uploaded",
+            `User has uploaded the signed agreement for booking ${booking.bookingNumber}.`,
+            NotificationType.INFO,
+            {
+              bookingId: booking._id,
+              bookingNumber: booking.bookingNumber,
+              documentType: "signed_agreement",
+              actionUrl: "/spaceportal/booking-requests",
+            },
+          );
+        }
+      } catch (notifError) {
+        console.error("[uploadUserBookingDocument] Notification failed:", notifError);
+      }
+    }
 
     return res.status(200).json({ success: true, message: "Document uploaded successfully", data: docEntry });
   } catch (error) {
@@ -1723,6 +1768,31 @@ export const reviewPartnerBookingDocument = async (req: Request, res: Response) 
     doc.reviewedAt = new Date();
     booking.markModified("documents");
     await booking.save();
+
+    // Notify User
+    try {
+      const statusLabel = action === "approve" ? "Approved" : "Rejected";
+      const iconType = action === "approve" ? NotificationType.SUCCESS : NotificationType.WARNING;
+      const targetUserId = booking.user?._id || booking.user;
+
+      await NotificationService.notifyUser(
+        String(targetUserId),
+        `Agreement ${statusLabel}`,
+        action === "approve" 
+          ? `Your signed agreement for booking ${booking.bookingNumber} has been approved.` 
+          : `Your signed agreement for booking ${booking.bookingNumber} was rejected. Reason: ${rejectionReason || 'Please re-upload a clear signed copy.'}`,
+        iconType,
+        {
+          bookingId: booking._id,
+          bookingNumber: booking.bookingNumber,
+          documentType,
+          status: doc.status,
+          actionUrl: `/dashboard/bookings?openBooking=${booking._id}`,
+        }
+      );
+    } catch (notifError) {
+      console.error("[reviewPartnerBookingDocument] Notification failed:", notifError);
+    }
 
     return res.status(200).json({ success: true, message: `Document ${action}d successfully` });
   } catch (error) {
