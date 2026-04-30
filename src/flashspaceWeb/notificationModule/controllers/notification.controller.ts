@@ -22,7 +22,18 @@ export const getUserNotifications = async (req: Request, res: Response) => {
   try {
     // Assuming req.user is populated by authMiddleware
     const userId = (req as any).user.id || (req as any).user._id;
-    const notifications = await NotificationService.getUserNotifications(userId);
+    const archivedQuery = String(req.query.archived || "").toLowerCase();
+    const archiveFilter =
+      archivedQuery === "only" || archivedQuery === "true"
+        ? "archived"
+        : archivedQuery === "all"
+          ? "all"
+          : "active";
+    const notifications = await NotificationService.getUserNotifications(
+      userId,
+      100,
+      archiveFilter,
+    );
     res.status(200).json({
       success: true,
       data: notifications,
