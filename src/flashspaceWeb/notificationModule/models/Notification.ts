@@ -41,6 +41,4 @@ const NotificationSchema: Schema = new Schema({
     metadata: { type: Schema.Types.Mixed },
 }, { timestamps: true });
 
-NotificationSchema.index({ deletedAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
-
 export const NotificationModel = mongoose.model<INotification>('Notification', NotificationSchema);

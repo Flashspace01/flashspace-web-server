@@ -195,28 +195,32 @@ export class NotificationService {
         metadata?: any,
         options?: NotifyUserOptions,
     ) {
+        const resolvedPreferenceKey =
+            options?.preferenceKey ||
+            this.inferPreferenceKeyFromNotification({ title, message, metadata }) ||
+            undefined;
         const shouldSend = await this.isPreferenceEnabled(
             userId,
-            options?.preferenceKey,
+            resolvedPreferenceKey,
         );
 
         if (!shouldSend) {
             console.log(
-                `[Notification] Skipped for user ${userId}. Preference '${options?.preferenceKey}' is disabled.`,
+                `[Notification] Skipped for user ${userId}. Preference '${resolvedPreferenceKey}' is disabled.`,
             );
             return null;
         }
 
         let metadataWithPreference = metadata;
-        if (options?.preferenceKey) {
+        if (resolvedPreferenceKey) {
             if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-                metadataWithPreference = { ...metadata, __preferenceKey: options.preferenceKey };
+                metadataWithPreference = { ...metadata, __preferenceKey: resolvedPreferenceKey };
             } else if (typeof metadata === "undefined") {
-                metadataWithPreference = { __preferenceKey: options.preferenceKey };
+                metadataWithPreference = { __preferenceKey: resolvedPreferenceKey };
             } else {
                 metadataWithPreference = {
                     value: metadata,
-                    __preferenceKey: options.preferenceKey,
+                    __preferenceKey: resolvedPreferenceKey,
                 };
             }
         }
@@ -237,37 +241,46 @@ export class NotificationService {
     }
 
     static async markAllAsRead(userId: string) {
-        return await NotificationModel.updateMany({ recipient: userId, read: false }, { read: true });
+        return await NotificationModel.updateMany(
+            { recipient: userId, read: false, archived: { $ne: true } },
+            { read: true },
+        );
     }
 
-    static async getUserNotifications(userId: string, limit = 100) {
-        const preferences = await this.getUserPreferences(userId);
-        
+    static async getUserNotifications(
+        userId: string,
+        limit = 100,
+        archiveFilter: "active" | "archived" | "all" = "active",
+    ) {
         const query: any = { recipient: userId };
+        if (archiveFilter === "active") {
+            query.archived = { $ne: true };
+        } else if (archiveFilter === "archived") {
+            query.archived = true;
+        }
 
         console.log(`[NotificationService] Fetching all notifications for user ${userId}`);
 
-        const notifications = await NotificationModel.find(query)
+        return await NotificationModel.find(query)
             .sort({ createdAt: -1 })
             .limit(limit);
-
-        return notifications
-            .filter((notification) => {
-                const preferenceKey = this.inferPreferenceKeyFromNotification(notification);
-                if (!preferenceKey) return true;
-                return preferences[preferenceKey];
-            })
-            .slice(0, limit);
     }
 
     static async getAdminNotifications(limit = 10000) {
-        return await NotificationModel.find({ recipientType: NotificationRecipientType.ADMIN })
+        return await NotificationModel.find({
+            recipientType: NotificationRecipientType.ADMIN,
+            archived: { $ne: true },
+        })
             .sort({ createdAt: -1 })
             .limit(limit);
     }
 
     static async deleteNotification(notificationId: string) {
-        return await NotificationModel.findByIdAndDelete(notificationId);
+        return await NotificationModel.findByIdAndUpdate(
+            notificationId,
+            { $set: { archived: true }, $unset: { deletedAt: "" } },
+            { new: true },
+        );
     }
 
     static async toggleArchive(notificationId: string) {
@@ -275,19 +288,21 @@ export class NotificationService {
         if (!notification) throw new Error("Notification not found");
         
         notification.archived = !notification.archived;
-        if (notification.archived) {
-            notification.deletedAt = new Date(); // Set TTL start
-        } else {
-            notification.deletedAt = undefined; // Clear TTL
-        }
+        notification.deletedAt = undefined;
         return await notification.save();
     }
 
     static async deleteAllForUser(userId: string) {
-        return await NotificationModel.deleteMany({ recipient: userId });
+        return await NotificationModel.updateMany(
+            { recipient: userId, archived: { $ne: true } },
+            { $set: { archived: true }, $unset: { deletedAt: "" } },
+        );
     }
 
     static async deleteAllForAdmin() {
-        return await NotificationModel.deleteMany({ recipientType: NotificationRecipientType.ADMIN });
+        return await NotificationModel.updateMany(
+            { recipientType: NotificationRecipientType.ADMIN, archived: { $ne: true } },
+            { $set: { archived: true }, $unset: { deletedAt: "" } },
+        );
     }
 }
