@@ -188,11 +188,13 @@ import {
   getPartners,
   removePartner,
   getPartnerDetails,
+  updatePartner,
 } from "../controllers/partnerKYC.controller";
 
 router.post("/kyc/partner", addPartner);
 router.get("/kyc/partner/:profileId", getPartners);
 router.get("/kyc/partner-details/:partnerId", getPartnerDetails);
+router.put("/kyc/partner/:partnerId", updatePartner);
 router.delete("/kyc/partner/:partnerId", removePartner);
 
 export default router;

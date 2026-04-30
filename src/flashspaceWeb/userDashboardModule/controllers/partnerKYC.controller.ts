@@ -243,3 +243,64 @@ export const getPartnerDetails = async (req: Request, res: Response) => {
     });
   }
 };
+
+// Update a partner
+export const updatePartner = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { partnerId } = req.params;
+    const {
+      fullName,
+      email,
+      phone,
+      panNumber,
+      aadhaarNumber,
+      dob,
+      address,
+    } = req.body;
+
+    if (!Types.ObjectId.isValid(partnerId as string)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Partner ID",
+      });
+    }
+
+    const partner = await PartnerKYCModel.findOne({
+      _id: partnerId,
+      user: userId,
+      isDeleted: false,
+    });
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        message: "Partner not found",
+      });
+    }
+
+    // Update fields if provided
+    if (fullName) partner.fullName = fullName;
+    if (email) partner.email = String(email).trim().toLowerCase();
+    if (phone) partner.phone = phone;
+    if (panNumber) partner.panNumber = panNumber;
+    if (aadhaarNumber) partner.aadhaarNumber = aadhaarNumber;
+    if (dob) partner.dob = dob;
+    if (address) partner.address = address;
+
+    await partner.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Partner updated successfully",
+      data: partner,
+    });
+  } catch (error) {
+    console.error("Update partner error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update partner",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
