@@ -435,7 +435,27 @@ async function seed() {
                     { property: property._id },
                     { $set: { partner: user._id } }
                 );
-                console.log(`- Updated all associated spaces`);
+                
+                // 4. Link Bookings belonging to these spaces
+                // We find bookings where the spaceId is in any of the spaces we just updated
+                // Or more simply, where the property matches the snapshot property (if available) 
+                // OR where the partner was the previous owner of these spaces.
+                // Best way: Update bookings where spaceId matches any space from this property.
+                const spaceIds = (await mongoose.connection.db!.collection('coworkingspaces').find({ property: property._id }).toArray()).map(s => s._id);
+                const voIds = (await mongoose.connection.db!.collection('virtualoffices').find({ property: property._id }).toArray()).map(s => s._id);
+                const mrIds = (await mongoose.connection.db!.collection('meetingrooms').find({ property: property._id }).toArray()).map(s => s._id);
+                
+                const allSpaceIds = [...spaceIds, ...voIds, ...mrIds];
+                
+                if (allSpaceIds.length > 0) {
+                    const bookingUpdateResult = await mongoose.connection.db!.collection('bookings').updateMany(
+                        { spaceId: { $in: allSpaceIds } },
+                        { $set: { partner: user._id } }
+                    );
+                    console.log(`- Updated ${bookingUpdateResult.modifiedCount} associated bookings`);
+                }
+
+                console.log(`- Updated all associated spaces and bookings`);
 
             } else {
                 console.warn(`- !!! NO PROPERTY FOUND for ${p.space_name}`);

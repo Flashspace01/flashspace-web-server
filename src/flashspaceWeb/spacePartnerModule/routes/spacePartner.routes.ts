@@ -13,15 +13,28 @@ import {
   deleteTeamMember,
   getTeamMembers,
 } from "../controllers/teamMember.controller";
+import { getPartnerTrackProgressData } from "../controllers/trackProgress.controller";
 
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { uploadKYCFile } from "../../userDashboardModule/config/multer.config";
 
+console.log("[DEBUG] spacePartner.routes.ts is being loaded...");
 export const spacePartnerRoutes = Router();
+console.log("[DEBUG] spacePartnerRoutes instance created.");
 
 // Base middleware for all space partner routes
 spacePartnerRoutes.use(AuthMiddleware.authenticate);
 // spacePartnerRoutes.use(requireSpacePartner);
+
+spacePartnerRoutes.get("/test", (req, res) => {
+  res.json({ success: true, message: "Space Partner routes are working" });
+});
+
+// Track Progress route
+spacePartnerRoutes.get("/track-progress", (req, res, next) => {
+  console.log("[DEBUG] Request received at /api/spacePartner/track-progress");
+  next();
+}, getPartnerTrackProgressData);
 
 // Accept/reject space details (admin or reviewer)
 spacePartnerRoutes.put("/space-details/:id/accept", acceptSpaceDetails);
@@ -72,3 +85,5 @@ spacePartnerRoutes.post(
   spaceKycController.uploadSpaceUserKycFile,
 );
 spacePartnerRoutes.post("/kyc/submit", spaceKycController.submitSpaceUserKyc);
+
+

@@ -735,10 +735,12 @@ export class AdminService {
         const docs = booking.documents || [];
         
         const draftSubmitted = docs.some((doc: any) => doc.type === 'draft_agreement');
-        const draftVerified = docs.some((doc: any) => doc.type === 'signed_agreement' && doc.status === 'approved');
+        const draftVerified = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement') && doc.status === 'approved');
         const supportingDocReceived = docs.some((doc: any) => 
           ['noc', 'utility_bill', 'electricity_bill', 'other_support'].includes(doc.type)
         );
+
+        const agreementReceived = docs.some((doc: any) => doc.type === 'signed_agreement' || doc.type === 'agreement');
 
         // Partner KYC is approved if there's an approved PartnerKYC record linking this user and this partner
         const partnerKycApproved = approvedPartnerKycs.some(
@@ -756,6 +758,7 @@ export class AdminService {
           userKycApprovedBySpace: partnerKycApproved,
           draftSubmitted,
           draftVerified,
+          agreementReceived,
           supportingDocReceived
         };
       });
