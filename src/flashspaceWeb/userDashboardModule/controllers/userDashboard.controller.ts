@@ -1326,7 +1326,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
     })
       .populate("user", "fullName email phoneNumber phone")
       .populate("kycProfile")
-      .sort({ createdAt: -1 });
+      .sort({ partnerRequestSubmittedAt: -1, createdAt: -1 });
 
     const userIds = [
       ...new Set(
@@ -1350,9 +1350,19 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
     ];
 
     // Build PartnerKYC query safely — MongoDB $or with empty array is invalid
+    const selectedPartnerKycIds = [
+      ...new Set(
+        bookings
+          .flatMap((booking: any) => Array.isArray(booking.selectedPartnerKycIds) ? booking.selectedPartnerKycIds : [])
+          .map((id: any) => String(id || ""))
+          .filter((id) => id && id !== "null" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id)),
+      ),
+    ];
+
     const partnerKycOrConditions: any[] = [];
     if (profileIds.length > 0) partnerKycOrConditions.push({ kycProfile: { $in: profileIds } });
     if (userIds.length > 0) partnerKycOrConditions.push({ user: { $in: userIds } });
+    if (selectedPartnerKycIds.length > 0) partnerKycOrConditions.push({ _id: { $in: selectedPartnerKycIds } });
 
     const [businessInfos, partnerKycs] = await Promise.all([
       userIds.length > 0
@@ -1403,11 +1413,24 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       const draftAgreement = bookingDocs.find((doc: any) => doc.type === "draft_agreement");
       const signedAgreement = bookingDocs.find((doc: any) => doc.type === "signed_agreement");
       const finalAgreement = bookingDocs.find((doc: any) => doc.type === "final_agreement");
+      const selectedPartnerIds = new Set(
+        (Array.isArray(booking.selectedPartnerKycIds) ? booking.selectedPartnerKycIds : [])
+          .map((id: any) => String(id || ""))
+          .filter(Boolean),
+      );
+      const profilePartners = partnersByProfile.get(String(kycProfile?._id || "")) || [];
+      const partnerDocuments = selectedPartnerIds.size
+        ? profilePartners.filter((partner: any) =>
+            selectedPartnerIds.has(String(partner._id)),
+          )
+        : [];
 
       return {
         id: String(booking._id),
         bookingId: String(booking._id),
         bookingNumber: booking.bookingNumber,
+        partnerRequestStatus: booking.partnerRequestStatus || "submitted",
+        partnerRequestSubmittedAt: booking.partnerRequestSubmittedAt,
         client: {
           id: clientUserId,
           name: user?.fullName || "Client",
@@ -1436,18 +1459,21 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
         createdAt: booking.createdAt,
         kyc: {
           profileId: String(kycProfile?._id || ""),
+          businessProfileId: String(businessInfo?._id || ""),
           profileName: kycProfile?.profileName || kycProfile?.businessInfo?.companyName || "KYC Profile",
           kycType: kycProfile?.kycType || "individual",
           overallStatus: kycProfile?.overallStatus || "pending",
           personalDocuments: safeNormalizeDocs(kycProfile?.documents),
           businessDocuments: safeNormalizeDocs(businessInfo?.documents),
-          partnerDocuments: (partnersByProfile.get(String(kycProfile?._id || "")) || []).map((partner: any) => ({
-            id: String(partner._id),
-            name: partner.fullName || "",
-            email: partner.email || "",
-            status: partner.status || "pending",
-            documents: safeNormalizeDocs(partner.documents),
-          })),
+          partnerDocuments: partnerDocuments
+            .map((partner: any) => ({
+              id: String(partner._id),
+              name: partner.fullName || "",
+              email: partner.email || "",
+              status: partner.status || "pending",
+              documents: safeNormalizeDocs(partner.documents),
+            }))
+            .filter((partner: any) => partner.documents.length > 0),
         },
         agreement: {
           draftAgreement: draftAgreement || null,
@@ -1488,14 +1514,34 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
 
     let profile: any = null;
     if (profileModel === "partner") {
+      const selectedPartnerIds = (Array.isArray((booking as any).selectedPartnerKycIds)
+        ? (booking as any).selectedPartnerKycIds
+        : []
+      ).map((id: any) => String(id));
+
+      if (!selectedPartnerIds.includes(String(profileId))) {
+        return res.status(403).json({ success: false, message: "Partner document is not part of this booking request" });
+      }
+
       profile = await PartnerKYCModel.findById(profileId);
     } else if (profileModel === "business") {
-      profile = await BusinessInfoModel.findById(profileId);
+      profile = mongoose.Types.ObjectId.isValid(String(profileId || ""))
+        ? await BusinessInfoModel.findById(profileId)
+        : null;
+
+      if (!profile) {
+        const clientUserId = (booking.user as any)?._id || booking.user;
+        profile = await BusinessInfoModel.findOne({
+          user: clientUserId,
+          isDeleted: { $ne: true },
+        });
+      }
     } else {
       profile = await KYCDocumentModel.findById(profileId || booking.kycProfile);
     }
 
     if (!profile || !Array.isArray(profile.documents)) {
+      console.log("[DEBUG] Document profile not found. profile:", !!profile, "isArray:", Array.isArray(profile?.documents), "profileModel:", profileModel, "profileId:", profileId);
       return res.status(404).json({ success: false, message: "Document profile not found" });
     }
 
@@ -1679,6 +1725,11 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const bookingId = String(req.params.bookingId || "");
+    const requestedPartnerIds = Array.isArray(req.body?.selectedPartnerKycIds)
+      ? req.body.selectedPartnerKycIds
+          .map((id: any) => String(id || ""))
+          .filter((id: string) => mongoose.Types.ObjectId.isValid(id))
+      : [];
 
     if (!userId || !bookingId.trim()) {
       return res.status(400).json({ success: false, message: "Invalid booking request" });
@@ -1698,6 +1749,20 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
     const resolvedPartnerId = await resolveBookingSpacePartnerId(booking);
     if (resolvedPartnerId) {
       booking.partner = resolvedPartnerId;
+    }
+
+    if (requestedPartnerIds.length > 0) {
+      const kycProfileId = String((booking.kycProfile as any)?._id || booking.kycProfile || "");
+      const validSelectedPartners = await PartnerKYCModel.find({
+        _id: { $in: requestedPartnerIds },
+        kycProfile: kycProfileId,
+        user: booking.user,
+        isDeleted: { $ne: true },
+      }).select("_id");
+
+      booking.selectedPartnerKycIds = validSelectedPartners.map((partner: any) => partner._id);
+    } else {
+      booking.selectedPartnerKycIds = [];
     }
 
     booking.partnerRequestStatus = "submitted";

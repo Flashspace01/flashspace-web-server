@@ -1368,20 +1368,14 @@ export class AdminService {
         // Reject
         if (type === "kyc") {
           doc.overallStatus = "rejected";
+          doc.rejectionReason = rejectionReason;
           await UserModel.findByIdAndUpdate(doc.user, { kycVerified: false });
         } else {
           doc.status = "rejected";
           doc.rejectionReason = rejectionReason;
         }
 
-        if (doc.documents) {
-          doc.documents.forEach((d: any) => {
-            d.status = "rejected";
-            if (rejectionReason) d.rejectionReason = rejectionReason;
-            d.verifiedAt = new Date();
-          });
-        }
-
+        // Removed the loop that rejected all documents automatically to allow granular review
         doc.progress = 0;
       }
 

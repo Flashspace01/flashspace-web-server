@@ -157,6 +157,9 @@ export class KYCDocument {
   })
   overallStatus?: string;
 
+  @prop()
+  rejectionReason?: string;
+
   @prop({
     enum: [
       "not_started",

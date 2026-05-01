@@ -154,7 +154,7 @@ export class AdminController {
       search,
       status,
     );
-    if (result.success) {
+    if (result.success) {/*  */
       res.status(200).json(result);
     } else {
       res.status(500).json(result);

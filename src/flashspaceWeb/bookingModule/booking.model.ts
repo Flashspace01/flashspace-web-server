@@ -157,6 +157,9 @@ export class Booking {
   @prop({ ref: () => KYCDocument })
   kycProfile?: Ref<KYCDocument>; // Reference to the KYC profile used for this booking
 
+  @prop({ type: () => [mongoose.Types.ObjectId], default: [] })
+  selectedPartnerKycIds?: mongoose.Types.ObjectId[];
+
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],
     default: "not_started",
