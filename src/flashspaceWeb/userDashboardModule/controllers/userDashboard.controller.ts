@@ -1601,7 +1601,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
               // 1. If selection exists, follow it strictly (even if empty)
               if (selected !== undefined && selected !== null) {
                 if (selected.length === 0) return false;
-                return selected.some(id => String(id) === String(partner._id));
+                return selected.some((id: any) => String(id) === String(partner._id));
               }
 
               // 2. If selection is missing (undefined/null):
@@ -1684,7 +1684,7 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       if (found) {
         targetProfile = p;
         targetDoc = found;
-        if (p.constructor.modelName) profileType = p.constructor.modelName;
+        if ((p.constructor as any).modelName) profileType = (p.constructor as any).modelName;
         break;
       }
     }
