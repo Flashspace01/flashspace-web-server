@@ -196,6 +196,9 @@ export class Booking {
   @prop({ type: () => [String], default: [] })
   features?: string[];
 
+  @prop({ type: () => [String], default: undefined })
+  selectedPartners?: string[];
+
   @prop({ default: false })
   isDeleted?: boolean;
 
