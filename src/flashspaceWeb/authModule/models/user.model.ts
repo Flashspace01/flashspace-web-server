@@ -226,7 +226,6 @@ export class User extends TimeStamps {
     default: {
       email: true,
       push: true,
-      promotional: false,
       reminders: true,
       loginAlerts: true,
     },
@@ -234,7 +233,6 @@ export class User extends TimeStamps {
   public notifications!: {
     email: boolean;
     push: boolean;
-    promotional: boolean;
     reminders: boolean;
     loginAlerts: boolean;
   };

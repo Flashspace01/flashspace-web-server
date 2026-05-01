@@ -16,7 +16,6 @@ interface SendNotificationPayload {
 export type NotificationPreferenceKey =
   | "email"
   | "push"
-  | "promotional"
   | "reminders"
   | "loginAlerts";
 
@@ -28,7 +27,6 @@ export class NotificationService {
     private static readonly defaultPreferences: Record<NotificationPreferenceKey, boolean> = {
         email: true,
         push: true,
-        promotional: false,
         reminders: true,
         loginAlerts: true,
     };
@@ -39,10 +37,6 @@ export class NotificationService {
         return {
             email: typeof raw?.email === "boolean" ? raw.email : this.defaultPreferences.email,
             push: typeof raw?.push === "boolean" ? raw.push : this.defaultPreferences.push,
-            promotional:
-                typeof raw?.promotional === "boolean"
-                    ? raw.promotional
-                    : this.defaultPreferences.promotional,
             reminders:
                 typeof raw?.reminders === "boolean"
                     ? raw.reminders
@@ -79,7 +73,6 @@ export class NotificationService {
         if (
             explicitPreference === "email" ||
             explicitPreference === "push" ||
-            explicitPreference === "promotional" ||
             explicitPreference === "reminders" ||
             explicitPreference === "loginAlerts"
         ) {
@@ -115,13 +108,6 @@ export class NotificationService {
 
         if (isVisitLike) return "loginAlerts";
 
-        const isPromotionalLike =
-            combinedText.includes("marketing") ||
-            combinedText.includes("offer") ||
-            combinedText.includes("announcement") ||
-            combinedText.includes("promo");
-
-        if (isPromotionalLike) return "promotional";
 
         return null;
     }
