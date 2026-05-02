@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer';
 import { DateTime } from 'luxon';
 import { EmailUtil } from '../authModule/utils/email.util';
 
@@ -11,71 +10,8 @@ export interface MeetingEmailOptions {
 }
 
 export class MeetingEmailUtil {
-  private static transporter: nodemailer.Transporter | null = null;
-  private static isInitialized = false;
-
-  static initialize() {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
-
-    if (service === 'gmail') {
-      this.transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD,
-        },
-      });
-      console.log('✅ Meeting email service initialized (Gmail)');
-      this.isInitialized = true;
-    } else if (service === 'sendgrid') {
-      this.transporter = nodemailer.createTransport({
-        service: 'SendGrid',
-        auth: {
-          user: 'apikey',
-          pass: process.env.SENDGRID_API_KEY,
-        },
-      });
-      console.log('✅ Meeting email service initialized (SendGrid)');
-      this.isInitialized = true;
-    } else {
-      console.log('📧 Meeting email service disabled - emails will be logged only');
-      this.isInitialized = true;
-    }
-  }
-
   private static async sendEmail(options: { to: string; subject: string; html: string; text?: string }): Promise<void> {
     return EmailUtil.sendEmail(options);
-
-    const service = process.env.EMAIL_SERVICE?.toLowerCase();
-
-    try {
-      if (!this.isInitialized) {
-        this.initialize();
-      }
-
-      if (service === 'gmail' || service === 'sendgrid') {
-        const transporter = this.transporter!;
-        if (!transporter) {
-          throw new Error('Email transporter not initialized');
-        }
-
-        await transporter.sendMail({
-          from: `"FlashSpace" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
-          to: options.to,
-          subject: options.subject,
-          text: options.text,
-          html: options.html,
-        });
-        console.log(`✅ Meeting email sent successfully via ${service}`);
-      } else {
-        console.log('📧 Meeting email logged (sending disabled):');
-        console.log('   To:', options.to);
-        console.log('   Subject:', options.subject);
-      }
-    } catch (error: any) {
-      console.error('❌ Error sending meeting email:', error);
-      console.log('⚠️ Email sending failed but continuing...');
-    }
   }
 
   static async sendMeetingConfirmation(options: MeetingEmailOptions): Promise<void> {

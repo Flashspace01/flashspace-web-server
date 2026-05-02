@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 
 export interface EmailOptions {
@@ -21,10 +20,6 @@ export class EmailUtil {
 
     if (configuredService) {
       return configuredService;
-    }
-
-    if (process.env.SENDGRID_API_KEY) {
-      return "sendgrid";
     }
 
     if (process.env.SMTP_HOST) {
@@ -84,18 +79,7 @@ export class EmailUtil {
     this.transporter = null;
     this.initializationError = null;
 
-    if (service === 'sendgrid') {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      if (!apiKey) {
-        this.failInitialization("SENDGRID_API_KEY is required when EMAIL_SERVICE=sendgrid");
-        return;
-        console.warn('⚠️ SENDGRID_API_KEY not configured');
-        return;
-      }
-      sgMail.setApiKey(apiKey);
-      console.log('✅ SendGrid email service initialized');
-      this.isInitialized = true;
-    } else if (service === 'gmail') {
+    if (service === 'gmail') {
       if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
         this.failInitialization("EMAIL_USER and EMAIL_PASSWORD are required when EMAIL_SERVICE=gmail");
         return;
@@ -116,14 +100,8 @@ export class EmailUtil {
         return;
       }
 
-      const smtpUser =
-        process.env.SMTP_USER ||
-        (process.env.SMTP_HOST.includes("sendgrid") ? "apikey" : undefined);
-      const smtpPass =
-        process.env.SMTP_PASS ||
-        (process.env.SMTP_HOST.includes("sendgrid")
-          ? process.env.SENDGRID_API_KEY
-          : undefined);
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
 
       if (!smtpUser || !smtpPass) {
         this.failInitialization("SMTP_USER and SMTP_PASS are required when EMAIL_SERVICE=smtp");
@@ -141,6 +119,9 @@ export class EmailUtil {
       });
       console.log('✅ SMTP email service initialized');
       this.isInitialized = true;
+    } else if (service === 'sendgrid') {
+      this.failInitialization("Direct SendGrid email is disabled. Use EMAIL_SERVICE=gmail or EMAIL_SERVICE=smtp with Nodemailer.");
+      return;
     } else {
       console.log('📧 Email service disabled - emails will be logged only');
       this.isInitialized = true;
@@ -177,19 +158,7 @@ export class EmailUtil {
         throw this.initializationError || new Error("Email service is not initialized");
       }
 
-      if (service === 'sendgrid') {
-        const msg = {
-          to: options.to,
-          from: this.getFromAddress(),
-          subject: options.subject,
-          text: options.text || options.html.replace(/<[^>]*>/g, ''),
-          html: options.html,
-        };
-
-        const result = await sgMail.send(msg);
-        console.log('✅ Email sent successfully via SendGrid to:', options.to);
-        return;
-      } else if (service === 'gmail' || service === 'smtp') {
+      if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
           throw new Error(`${service} transporter not initialized`);
         }
@@ -211,20 +180,7 @@ export class EmailUtil {
     } catch (error: any) {
       console.error('Error sending email:', error?.message || error);
 
-      if (service === 'sendgrid' && error.response?.body) {
-        console.error('SendGrid error details:', JSON.stringify(error.response.body, null, 2));
-      }
-
       throw error;
-      console.error('❌ Error sending email:', error);
-
-      // COMMENTED OUT - SendGrid error logging
-      // if (service === 'sendgrid' && error.response?.body) {
-      //   console.error('📝 SendGrid Error Details:', JSON.stringify(error.response.body, null, 2));
-      // }
-
-      // Don't throw error - just log it so app continues working
-      console.log('⚠️ Email sending failed but continuing...');
     }
   }
 
@@ -773,11 +729,7 @@ export class EmailUtil {
         throw this.initializationError || new Error("Email service is not initialized");
       }
 
-      if (service === 'sendgrid') {
-        // SendGrid doesn't have a verify method, we'll try to send a test
-        console.log('✅ SendGrid connection configured');
-        return true;
-      } else if (service === 'gmail' || service === 'smtp') {
+      if (service === 'gmail' || service === 'smtp') {
         if (!this.transporter) {
           throw new Error(`${service} transporter not initialized`);
         }

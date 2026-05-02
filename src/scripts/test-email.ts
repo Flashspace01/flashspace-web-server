@@ -4,12 +4,6 @@ import { EmailUtil } from "../flashspaceWeb/authModule/utils/email.util";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
-const mask = (value?: string) => {
-  if (!value) return "<missing>";
-  if (value.length <= 8) return "***";
-  return `${value.slice(0, 4)}...${value.slice(-4)}`;
-};
-
 const run = async () => {
   const recipient =
     process.argv[2] ||
@@ -27,7 +21,6 @@ const run = async () => {
   console.log("Service:", process.env.EMAIL_SERVICE || (process.env.SMTP_HOST ? "smtp" : "disabled"));
   console.log("SMTP host:", process.env.SMTP_HOST || "<not set>");
   console.log("From:", process.env.EMAIL_FROM || process.env.EMAIL_USER || "<not set>");
-  console.log("SendGrid key:", mask(process.env.SENDGRID_API_KEY));
   console.log("Recipient:", recipient);
 
   EmailUtil.initialize();
