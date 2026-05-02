@@ -1,23 +1,49 @@
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const service = (process.env.EMAIL_SERVICE || 'gmail').toLowerCase();
+const recipient = process.env.TEST_EMAIL_TO || process.env.EMAIL_USER;
 
-const msg = {
-  to: 'yogeshbisht12122005@gmail.com', // Change to your recipient
-  from: process.env.EMAIL_FROM || 'team@flashspace.co', // Change to your verified sender
-  subject: 'Test Email via Sendgrid',
-  text: 'Just testing if Sendgrid is working or dead.',
-};
+if (!recipient) {
+  throw new Error('Set TEST_EMAIL_TO or EMAIL_USER before running this test.');
+}
 
-sgMail
-  .send(msg)
-  .then(() => {
-    console.log('Email sent successfully!');
+const transporter =
+  service === 'smtp'
+    ? nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      })
+    : nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      });
+
+const from =
+  process.env.EMAIL_FROM ||
+  (service === 'smtp'
+    ? `"FlashSpace Test" <${process.env.SMTP_USER}>`
+    : `"FlashSpace Test" <${process.env.EMAIL_USER}>`);
+
+transporter
+  .sendMail({
+    from,
+    to: recipient,
+    subject: 'Test Email via Nodemailer',
+    text: 'If you receive this, Nodemailer email delivery is working.',
+  })
+  .then((info) => {
+    console.log('Email sent successfully:', info.response);
   })
   .catch((error) => {
-    console.error('Error sending email. SendGrid might be blocked or inactive.');
-    if (error.response) {
-      console.error(error.response.body);
-    }
+    console.error('Error sending email via Nodemailer:', error.message);
+    process.exitCode = 1;
   });

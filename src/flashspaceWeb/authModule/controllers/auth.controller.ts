@@ -274,7 +274,6 @@ export class AuthController {
           SMTP_PORT: process.env.SMTP_PORT || "<not set>",
           SMTP_USER: maskValue(process.env.SMTP_USER),
           EMAIL_USER: maskValue(process.env.EMAIL_USER),
-          SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? "<present>" : "<not set>",
         },
       });
 
