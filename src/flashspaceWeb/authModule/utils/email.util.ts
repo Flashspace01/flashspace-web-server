@@ -23,8 +23,16 @@ export class EmailUtil {
       return configuredService;
     }
 
+    if (process.env.SENDGRID_API_KEY) {
+      return "sendgrid";
+    }
+
     if (process.env.SMTP_HOST) {
       return "smtp";
+    }
+
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      return "gmail";
     }
 
     return "disabled";
