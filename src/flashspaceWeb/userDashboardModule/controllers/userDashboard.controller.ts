@@ -58,6 +58,93 @@ const formatBookingDocUrl = (req: Request, url?: string) => {
   return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
 };
 
+const resetRejectedPartnerReviewDocs = (profile: any): boolean => {
+  if (!profile || !Array.isArray(profile.documents)) return false;
+
+  let changed = false;
+  profile.documents.forEach((doc: any) => {
+    if (String(doc?.partnerReviewStatus || "").toLowerCase() !== "rejected") {
+      return;
+    }
+
+    doc.partnerReviewStatus = "pending";
+    doc.partnerRejectionReason = undefined;
+    doc.partnerReviewedAt = undefined;
+    doc.partnerReviewedBy = undefined;
+    changed = true;
+  });
+
+  if (changed) {
+    profile.markModified("documents");
+    profile.updatedAt = new Date();
+  }
+
+  return changed;
+};
+
+async function resetRejectedPartnerReviewsForBooking(
+  userId: string,
+  booking: any,
+): Promise<number> {
+  const linkedProfileId = booking.kycProfile
+    ? String((booking.kycProfile as any)?._id || booking.kycProfile)
+    : "";
+
+  const partnerProfileFilter = (() => {
+    const selectedPartners = Array.isArray(booking.selectedPartners)
+      ? booking.selectedPartners.filter(Boolean)
+      : [];
+
+    if (selectedPartners.length > 0) {
+      return {
+        _id: {
+          $in: selectedPartners
+            .filter((id: any) => mongoose.Types.ObjectId.isValid(String(id)))
+            .map((id: any) => new mongoose.Types.ObjectId(String(id))),
+        },
+      };
+    }
+
+    const profileIds = [linkedProfileId].filter(Boolean);
+    return profileIds.length
+      ? { kycProfile: { $in: profileIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+      : {};
+  })();
+
+  const [personalProfile, linkedKycProfile, linkedBusinessInfo, partnerProfiles] =
+    await Promise.all([
+      KYCDocumentModel.findOne({ user: userId, kycType: "individual", isDeleted: { $ne: true } }),
+      linkedProfileId
+        ? KYCDocumentModel.findOne({ _id: linkedProfileId, user: userId, isDeleted: { $ne: true } })
+        : Promise.resolve(null),
+      linkedProfileId
+        ? BusinessInfoModel.findOne({
+            user: userId,
+            isDeleted: { $ne: true },
+            $or: [{ _id: linkedProfileId }, { kycProfile: linkedProfileId }],
+          })
+        : Promise.resolve(null),
+      PartnerKYCModel.find({
+        user: userId,
+        isDeleted: { $ne: true },
+        ...partnerProfileFilter,
+      }),
+    ]);
+
+  const uniqueProfiles = Array.from(
+    new Map(
+      [personalProfile, linkedKycProfile, linkedBusinessInfo, ...partnerProfiles]
+        .filter(Boolean)
+        .map((profile: any) => [String(profile._id), profile]),
+    ).values(),
+  );
+
+  const changedProfiles = uniqueProfiles.filter(resetRejectedPartnerReviewDocs);
+  await Promise.all(changedProfiles.map((profile: any) => profile.save()));
+
+  return changedProfiles.length;
+}
+
 async function getPartnerScopeIds(partnerId: string) {
   const partnerObjectId = new mongoose.Types.ObjectId(partnerId);
   const user = await UserModel.findById(partnerObjectId).select("parentPartnerId isTeamMember");
@@ -2022,7 +2109,20 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
     }
     
     booking.partnerRequestStatus = "submitted";
+    if (String(booking.kycStatus || "").toLowerCase() === "rejected") {
+      booking.kycStatus = "pending";
+    }
+    if (String(booking.status || "").toLowerCase() !== "active") {
+      booking.status = "pending_kyc";
+    }
     booking.updatedAt = new Date();
+
+    const resetCount = await resetRejectedPartnerReviewsForBooking(userId, booking);
+    if (resetCount > 0) {
+      console.log(
+        `[submitUserBookingRequest] Reset partner-rejected KYC docs to pending in ${resetCount} profile(s) for booking ${booking.bookingNumber}`,
+      );
+    }
     
     // Only add to timeline if not already submitted or if it's been a while
     const lastSubmitted = booking.timeline?.filter((t: any) => t.status === "submitted_to_space_partner").pop();
