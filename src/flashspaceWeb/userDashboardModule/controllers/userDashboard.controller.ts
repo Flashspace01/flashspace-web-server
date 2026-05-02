@@ -903,16 +903,11 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     ];
 
     const bookings = await BookingModel.find(filter)
-      .populate("user", "fullName email phone")
+      .populate("user", "fullName email phoneNumber phone")
+      .populate("kycProfile", "user businessInfo profileName kycType")
       .sort({ startDate: -1 });
 
-    const mappedBookings = bookings.map((b: any) => {
-      const bObj = b.toObject();
-      return {
-        ...bObj,
-        totalAmount: bObj.plan?.finalPrice || bObj.plan?.price || 0,
-      };
-    });
+    const mappedBookings = await mapPartnerBookingRows(bookings);
 
     res.status(200).json({ success: true, data: mappedBookings });
   } catch (error) {
@@ -977,16 +972,11 @@ export const getPartnerPropertyBookings = async (
       isDeleted: false,
       spaceId: { $in: spaceIds },
     })
-      .populate("user", "fullName email phone")
+      .populate("user", "fullName email phoneNumber phone")
+      .populate("kycProfile", "user businessInfo profileName kycType")
       .sort({ createdAt: -1 });
 
-    const mappedBookings = bookings.map((b: any) => {
-      const bObj = b.toObject();
-      return {
-        ...bObj,
-        totalAmount: bObj.plan?.finalPrice || bObj.plan?.price || 0,
-      };
-    });
+    const mappedBookings = await mapPartnerBookingRows(bookings);
 
     res.status(200).json({ success: true, data: mappedBookings });
   } catch (error) {
@@ -996,6 +986,80 @@ export const getPartnerPropertyBookings = async (
       .json({ success: false, message: "Failed to fetch property bookings" });
   }
 };
+
+async function mapPartnerBookingRows(bookings: any[]) {
+  const rawRows = bookings.map((booking: any) =>
+    typeof booking.toObject === "function" ? booking.toObject() : booking,
+  );
+
+  const userIds = [
+    ...new Set(
+      rawRows
+        .map((booking: any) => {
+          const user = booking.user;
+          const kycProfile = booking.kycProfile;
+          return (
+            user?._id ||
+            user ||
+            kycProfile?.user?._id ||
+            kycProfile?.user ||
+            ""
+          );
+        })
+        .map((id: any) => String(id || ""))
+        .filter(
+          (id: string) =>
+            id && id !== "null" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id),
+        ),
+    ),
+  ];
+
+  const [fallbackUsers, businessInfos] = await Promise.all([
+    userIds.length
+      ? UserModel.find({ _id: { $in: userIds } }).select("fullName email phoneNumber phone")
+      : Promise.resolve([]),
+    userIds.length
+      ? BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: false })
+      : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map(
+    fallbackUsers.map((user: any) => [user._id.toString(), user.toObject ? user.toObject() : user]),
+  );
+  const businessMap = new Map(
+    businessInfos.map((info: any) => [info.user.toString(), info]),
+  );
+
+  return rawRows.map((booking: any) => {
+    const kycProfile = booking.kycProfile;
+    const userId = String(
+      booking.user?._id ||
+        booking.user ||
+        kycProfile?.user?._id ||
+        kycProfile?.user ||
+        "",
+    );
+    const fallbackUser = userMap.get(userId);
+    const business = businessMap.get(userId);
+    const user =
+      booking.user && typeof booking.user === "object"
+        ? booking.user
+        : fallbackUser || booking.user;
+
+    return {
+      ...booking,
+      user,
+      clientUserId: userId,
+      clientCompanyName:
+        kycProfile?.businessInfo?.companyName || business?.companyName || "",
+      totalAmount:
+        booking.plan?.finalPrice ||
+        booking.plan?.partnerPrice ||
+        booking.plan?.price ||
+        0,
+    };
+  });
+}
 
 export const getPartnerClients = async (req: Request, res: Response) => {
   try {
@@ -1486,6 +1550,57 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       const allPartners = [...partnersFromLinked, ...partnersFromIndividual];
       const uniquePartners = Array.from(new Map(allPartners.map(p => [String(p._id), p])).values());
 
+      const personalDocuments = safeNormalizeDocs(
+        kycProfile?.kycType === "individual"
+          ? kycProfile?.documents
+          : individualProfile?.documents || [],
+      );
+      const businessDocuments = safeNormalizeDocs(allBizDocs);
+      const partnerDocuments = uniquePartners
+        .filter((partner: any) => {
+          const selected = booking.selectedPartners;
+          const hasSubmittedAt = !!booking.partnerRequestSubmittedAt;
+
+          if (selected !== undefined && selected !== null) {
+            if (selected.length === 0) return false;
+            return selected.some((id: any) => String(id) === String(partner._id));
+          }
+
+          if (hasSubmittedAt) return false;
+          return true;
+        })
+        .map((partner: any) => ({
+          id: String(partner._id),
+          name: partner.fullName || "",
+          email: partner.email || "",
+          status: partner.status || "pending",
+          documents: safeNormalizeDocs(partner.documents),
+        }));
+
+      const partnerReviewDocs = [
+        ...personalDocuments,
+        ...businessDocuments,
+        ...partnerDocuments.flatMap((partner: any) => partner.documents || []),
+      ];
+
+      const derivedPartnerKycStatus = (() => {
+        if (!partnerReviewDocs.length) return "pending";
+
+        const partnerStatuses = partnerReviewDocs.map((doc: any) =>
+          String(doc.partnerReviewStatus || "pending").toLowerCase(),
+        );
+
+        if (partnerStatuses.some((status: string) => status === "rejected")) {
+          return "rejected";
+        }
+
+        if (partnerStatuses.every((status: string) => status === "approved")) {
+          return "approved";
+        }
+
+        return "pending";
+      })();
+
       // ========== DEBUG: Log resolved profiles for this booking ==========
       console.log(`\n${"=".repeat(80)}`);
       console.log(`[getPartnerBookingRequests] Booking: ${booking.bookingNumber} | User: ${user?.fullName || clientUserId}`);
@@ -1579,7 +1694,8 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           price: booking.plan?.finalPrice || booking.plan?.price || 0,
         },
         status: booking.status,
-        kycStatus: booking.kycStatus || "not_started",
+        kycStatus: derivedPartnerKycStatus,
+        adminKycStatus: booking.kycStatus || "not_started",
         startDate: booking.startDate,
         endDate: booking.endDate,
         createdAt: booking.createdAt,
@@ -1589,37 +1705,9 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           profileName: kycProfile?.profileName || linkedBusiness?.companyName || kycProfile?.businessInfo?.companyName || "KYC Profile",
           kycType: kycProfile?.kycType || (linkedBusiness || businessInfo) ? "business" : "individual",
           overallStatus: kycProfile?.overallStatus || "pending",
-          personalDocuments: safeNormalizeDocs(
-            kycProfile?.kycType === "individual" ? kycProfile?.documents : (individualProfile?.documents || [])
-          ),
-          businessDocuments: safeNormalizeDocs(allBizDocs),
-          partnerDocuments: uniquePartners
-            .filter((partner: any) => {
-              const selected = booking.selectedPartners;
-              const hasSubmittedAt = !!booking.partnerRequestSubmittedAt;
-
-              // 1. If selection exists, follow it strictly (even if empty)
-              if (selected !== undefined && selected !== null) {
-                if (selected.length === 0) return false;
-                return selected.some((id: any) => String(id) === String(partner._id));
-              }
-
-              // 2. If selection is missing (undefined/null):
-              // - If it has a submission date, it's a "new" submission flow.
-              //   If they didn't select, we show nothing (scoped).
-              if (hasSubmittedAt) return false;
-
-              // - If no submission date and no selection field, it's a legacy booking.
-              //   Show all partners to avoid breaking old workflow visibility.
-              return true;
-            })
-            .map((partner: any) => ({
-            id: String(partner._id),
-            name: partner.fullName || "",
-            email: partner.email || "",
-            status: partner.status || "pending",
-            documents: safeNormalizeDocs(partner.documents),
-          })),
+          personalDocuments,
+          businessDocuments,
+          partnerDocuments,
         },
         agreement: {
           draftAgreement: draftAgreement || null,

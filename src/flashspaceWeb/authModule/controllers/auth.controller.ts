@@ -99,6 +99,7 @@ export class AuthController {
           data: {
             requiresTwoFactor: true,
             email: loginData.email,
+            devOtp: result.devOtp,
           },
           error: {},
         });
@@ -250,6 +251,11 @@ export class AuthController {
   forgotPassword = async (req: Request, res: Response): Promise<void> => {
     try {
       const forgotPasswordData: ForgotPasswordRequest = req.body;
+      const frontendUrl =
+        req.get("origin") ||
+        req.get("referer")?.replace(/\/forgot-password\/?$/, "") ||
+        req.get("x-forwarded-origin") ||
+        undefined;
 
       if (!forgotPasswordData.email) {
         res.status(400).json({
@@ -261,7 +267,10 @@ export class AuthController {
         return;
       }
 
-      const result = await this.authService.forgotPassword(forgotPasswordData);
+      const result = await this.authService.forgotPassword(
+        forgotPasswordData,
+        frontendUrl,
+      );
 
       res.status(result.success ? 200 : 500).json({
         success: result.success,
@@ -773,6 +782,7 @@ export class AuthController {
           data: {
             requiresTwoFactor: true,
             email: result.user?.email,
+            devOtp: result.devOtp,
           },
           error: {},
         });
@@ -841,6 +851,7 @@ export class AuthController {
           data: {
             requiresTwoFactor: true,
             email: result.user?.email,
+            devOtp: result.devOtp,
           },
           error: {},
         });

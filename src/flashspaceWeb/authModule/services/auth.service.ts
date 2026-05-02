@@ -36,6 +36,26 @@ export class AuthService {
     return crypto.randomBytes(32).toString("hex");
   }
 
+  private logOTPForDevelopment(email: string, otp: string, context: string) {
+    if (process.env.NODE_ENV === "production") return;
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "medium",
+    });
+
+    console.log("\n================ FLASHSPACE DEV OTP ================");
+    console.log(`Context : ${context}`);
+    console.log(`Email   : ${email}`);
+    console.log(`OTP     : ${otp}`);
+    console.log(`Expires : ${expiresAt}`);
+    console.log("====================================================\n");
+  }
+
+  private getDevOtp(otp: string): string | undefined {
+    return process.env.NODE_ENV === "production" ? undefined : otp;
+  }
+
   private buildUserResponse(user: any) {
     return {
       id: user._id.toString(),
@@ -226,6 +246,7 @@ export class AuthService {
           otpData.otp,
           otpData.expiresAt,
         );
+        this.logOTPForDevelopment(user.email, otpData.otp, "Login two-factor authentication");
 
         // Send OTP (non-blocking)
         EmailUtil.sendLoginOTP(user.email, otpData.otp, user.fullName).catch(
@@ -236,6 +257,7 @@ export class AuthService {
           success: true,
           message: "Two-factor authentication required. OTP sent to your email.",
           requiresTwoFactor: true,
+          devOtp: this.getDevOtp(otpData.otp),
           user: this.buildUserResponse(user),
         };
       }
@@ -485,6 +507,7 @@ export class AuthService {
           otpData.otp,
           otpData.expiresAt,
         );
+        this.logOTPForDevelopment(authUser.email, otpData.otp, "Google login two-factor authentication");
 
         // Send OTP (non-blocking)
         EmailUtil.sendLoginOTP(authUser.email, otpData.otp, authUser.fullName).catch(
@@ -496,6 +519,7 @@ export class AuthService {
           success: true,
           message: "Two-factor authentication required. OTP sent to your email.",
           requiresTwoFactor: true,
+          devOtp: this.getDevOtp(otpData.otp),
           user: this.buildUserResponse(authUser),
         };
       }
@@ -578,6 +602,7 @@ export class AuthService {
 
   async forgotPassword(
     forgotPasswordData: ForgotPasswordRequest,
+    frontendUrl?: string,
   ): Promise<AuthResponse> {
     try {
       const { email } = forgotPasswordData;
@@ -605,8 +630,13 @@ export class AuthService {
       });
 
       // Send reset email (non-blocking)
-      EmailUtil.sendPasswordResetEmail(email, resetToken, user.fullName).catch(
-        (emailError) => console.error("Error sending reset email:", emailError),
+      EmailUtil.sendPasswordResetEmail(
+        email,
+        resetToken,
+        user.fullName,
+        frontendUrl,
+      ).catch((emailError) =>
+        console.error("Error sending reset email:", emailError),
       );
 
       return {
@@ -1030,6 +1060,7 @@ export class AuthService {
         otpData.otp,
         otpData.expiresAt,
       );
+      this.logOTPForDevelopment(email, otpData.otp, "Email verification resend");
 
       // Send OTP email (non-blocking)
       EmailUtil.sendEmailVerificationOTP(

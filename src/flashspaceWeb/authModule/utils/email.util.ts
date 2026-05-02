@@ -41,6 +41,29 @@ export class EmailUtil {
     );
   }
 
+  private static resolveFrontendUrl(preferredUrl?: string): string {
+    const candidates = [
+      preferredUrl,
+      process.env.FRONTEND_URL,
+      process.env.PUBLIC_APP_URL,
+      process.env.APP_URL,
+      process.env.WEBSITE_URL,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+    ];
+
+    const resolved = candidates
+      .map((value) => value?.trim())
+      .find((value) => Boolean(value));
+
+    if (resolved) {
+      return resolved.replace(/\/$/, "");
+    }
+
+    return process.env.NODE_ENV === "production"
+      ? "https://www.flashspace.ai"
+      : "http://localhost:5173";
+  }
+
   private static failInitialization(message: string): void {
     this.transporter = null;
     this.isInitialized = false;
@@ -201,8 +224,13 @@ export class EmailUtil {
     return crypto.randomBytes(32).toString('hex');
   }
 
-  static async sendVerificationEmail(email: string, token: string, fullName: string): Promise<void> {
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
+  static async sendVerificationEmail(
+    email: string,
+    token: string,
+    fullName: string,
+    frontendUrl?: string,
+  ): Promise<void> {
+    const verificationUrl = `${this.resolveFrontendUrl(frontendUrl)}/verify-email?token=${token}`;
 
     const html = `
       <!DOCTYPE html>
@@ -268,8 +296,13 @@ export class EmailUtil {
     });
   }
 
-  static async sendPasswordResetEmail(email: string, token: string, fullName: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+  static async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    fullName: string,
+    frontendUrl?: string,
+  ): Promise<void> {
+    const resetUrl = `${this.resolveFrontendUrl(frontendUrl)}/reset-password?token=${token}`;
 
     const html = `
       <!DOCTYPE html>
@@ -279,35 +312,67 @@ export class EmailUtil {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Reset Your Password - FlashSpace</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; background: #f5576c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-          .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          body { margin: 0; padding: 0; background: #f4f7f4; font-family: Arial, sans-serif; line-height: 1.6; color: #17312a; }
+          .shell { padding: 32px 16px; }
+          .container { max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #dbe7df; border-radius: 24px; overflow: hidden; box-shadow: 0 18px 60px rgba(53, 80, 63, 0.08); }
+          .header { padding: 28px 32px; background: linear-gradient(180deg, #f8fcf9 0%, #eef5f0 100%); border-bottom: 1px solid #dbe7df; }
+          .brand { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: #13282b; }
+          .brand-accent { color: #35503F; font-style: italic; }
+          .eyebrow { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 999px; background: #e9f3ec; color: #35503F; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+          .content { padding: 36px 32px 32px; background: #ffffff; }
+          h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.15; color: #13282b; }
+          p { margin: 0 0 16px; font-size: 15px; color: #496065; }
+          .summary { background: #f7faf8; border: 1px solid #dbe7df; border-radius: 18px; padding: 18px 20px; margin: 24px 0; }
+          .summary-title { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #13282b; }
+          .button-wrap { text-align: center; margin: 28px 0 22px; }
+          .button { display: inline-block; background: #35503F; color: #fef8c3 !important; padding: 14px 28px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 15px; }
+          .link-box { background: #fcfefd; border: 1px dashed #c8d7cd; border-radius: 16px; padding: 16px; margin: 20px 0 24px; }
+          .link-label { margin: 0 0 8px; font-size: 12px; font-weight: 700; color: #6b7f74; text-transform: uppercase; letter-spacing: 0.08em; }
+          .link-value { margin: 0; font-size: 14px; word-break: break-all; color: #35503F; }
+          .warning { background: #fff8e8; border: 1px solid #f3df9d; border-radius: 18px; padding: 18px 20px; margin: 24px 0; }
+          .warning strong { color: #6b5200; }
+          .note { font-size: 14px; color: #5f7478; }
+          .footer { padding: 22px 32px 30px; background: #fbfcfb; border-top: 1px solid #edf2ee; text-align: center; }
+          .footer p { margin: 0; font-size: 12px; color: #7a8d82; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>Password Reset Request</h1>
-          </div>
-          <div class="content">
-            <h2>Hello ${fullName},</h2>
-            <p>We received a request to reset your password for your FlashSpace account. If you made this request, click the button below to reset your password:</p>
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Reset Password</a>
+        <div class="shell">
+          <div class="container">
+            <div class="header">
+              <div class="brand">FLASH<span class="brand-accent">space</span></div>
+              <div class="eyebrow">Password Reset</div>
             </div>
-            <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #f5576c;">${resetUrl}</p>
-            <div class="warning">
-              <strong>Important:</strong> This password reset link will expire in 1 hour for security reasons.
+            <div class="content">
+              <h1>Reset your password</h1>
+              <p>Hello ${fullName},</p>
+              <p>We received a request to reset the password for your FlashSpace account. Use the secure button below to choose a new password.</p>
+
+              <div class="summary">
+                <p class="summary-title">What happens next?</p>
+                <p class="note">Open the reset link, set a new password, and sign in again with your updated credentials.</p>
+              </div>
+
+              <div class="button-wrap">
+                <a href="${resetUrl}" class="button">Reset Password</a>
+              </div>
+
+              <div class="link-box">
+                <p class="link-label">Reset link</p>
+                <p class="link-value">${resetUrl}</p>
+              </div>
+
+              <div class="warning">
+                <strong>Security note:</strong>
+                <p class="note" style="margin-top: 8px;">This reset link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email.</p>
+              </div>
+
+              <p class="note">For your account safety, this link works only for a limited time and should not be shared with anyone.</p>
             </div>
-            <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
-          </div>
-          <div class="footer">
-            <p>&copy; 2024 FlashSpace. All rights reserved.</p>
+            <div class="footer">
+              <p>FlashSpace account security email</p>
+              <p style="margin-top: 6px;">&copy; 2024 FlashSpace. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </body>
@@ -315,17 +380,18 @@ export class EmailUtil {
     `;
 
     const text = `
-      Password Reset Request - FlashSpace
+      FlashSpace Password Reset
       
       Hello ${fullName},
       
-      We received a request to reset your password for your FlashSpace account. If you made this request, visit this link to reset your password:
+      We received a request to reset the password for your FlashSpace account.
+      Use the link below to choose a new password:
       
       ${resetUrl}
       
-      Important: This password reset link will expire in 1 hour for security reasons.
+      This reset link will expire in 1 hour for security reasons.
       
-      If you didn't request a password reset, please ignore this email. Your password will remain unchanged.
+      If you did not request a password reset, you can safely ignore this email.
       
       © 2024 FlashSpace. All rights reserved.
     `;

@@ -34,6 +34,7 @@ export interface AuthResponse {
   };
   requiresTwoFactor?: boolean;
   twoFactorToken?: string;
+  devOtp?: string;
 }
 
 export interface JwtPayload {
