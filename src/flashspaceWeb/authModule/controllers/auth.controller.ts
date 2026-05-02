@@ -256,6 +256,27 @@ export class AuthController {
         req.get("referer")?.replace(/\/forgot-password\/?$/, "") ||
         req.get("x-forwarded-origin") ||
         undefined;
+      const maskValue = (value?: string) => {
+        if (!value) return "<not set>";
+        if (value.length <= 8) return `${value.slice(0, 2)}***`;
+        return `${value.slice(0, 4)}***${value.slice(-4)}`;
+      };
+
+      console.log("[ForgotPassword] Incoming request debug:", {
+        email: forgotPasswordData.email,
+        frontendUrl: frontendUrl || "<not detected>",
+        env: {
+          NODE_ENV: process.env.NODE_ENV || "<not set>",
+          FRONTEND_URL: process.env.FRONTEND_URL || "<not set>",
+          EMAIL_SERVICE: process.env.EMAIL_SERVICE || "<auto>",
+          EMAIL_FROM: process.env.EMAIL_FROM || "<not set>",
+          SMTP_HOST: process.env.SMTP_HOST || "<not set>",
+          SMTP_PORT: process.env.SMTP_PORT || "<not set>",
+          SMTP_USER: maskValue(process.env.SMTP_USER),
+          EMAIL_USER: maskValue(process.env.EMAIL_USER),
+          SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? "<present>" : "<not set>",
+        },
+      });
 
       if (!forgotPasswordData.email) {
         res.status(400).json({
