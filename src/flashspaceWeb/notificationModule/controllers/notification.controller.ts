@@ -4,7 +4,17 @@ import { NotificationType } from "../models/Notification";
 
 export const getAdminNotifications = async (req: Request, res: Response) => {
   try {
-    const notifications = await NotificationService.getAdminNotifications();
+    const archivedQuery = String(req.query.archived || "").toLowerCase();
+    const archiveFilter =
+      archivedQuery === "only" || archivedQuery === "true"
+        ? "archived"
+        : archivedQuery === "all"
+          ? "all"
+          : "active";
+    const notifications = await NotificationService.getAdminNotifications(
+      10000,
+      archiveFilter,
+    );
     res.status(200).json({
       success: true,
       data: notifications,

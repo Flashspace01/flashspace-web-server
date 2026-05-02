@@ -252,11 +252,21 @@ export class NotificationService {
             .limit(limit);
     }
 
-    static async getAdminNotifications(limit = 10000) {
-        return await NotificationModel.find({
+    static async getAdminNotifications(
+        limit = 10000,
+        archiveFilter: "active" | "archived" | "all" = "active",
+    ) {
+        const query: any = {
             recipientType: NotificationRecipientType.ADMIN,
-            archived: { $ne: true },
-        })
+        };
+
+        if (archiveFilter === "active") {
+            query.archived = { $ne: true };
+        } else if (archiveFilter === "archived") {
+            query.archived = true;
+        }
+
+        return await NotificationModel.find(query)
             .sort({ createdAt: -1 })
             .limit(limit);
     }
