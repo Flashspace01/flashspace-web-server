@@ -337,6 +337,118 @@ const LEGACY_PARTNERS = [
     "email": "prabhji@namdharigroup.co.in",
     "mobile_number": "8651140092",
     "address": "D9, CCC, VIP Rd, Zirakpur, Punjab 140603"
+  },
+  {
+    "space_name": "Task Alley Rentals LLP",
+    "partner_name": "IYENGAR PK",
+    "email": "TASKALLEY@GMAIL.COM",
+    "mobile_number": "+91 94270 68542",
+    "address": "2HV6+3MX, Maganbhai Barot Marg, Amrutbagh Colony, Sadhna Colony, Hindu Colony, Navrangpura, Ahmedabad, Gujarat 380009, India"
+  },
+  {
+    "space_name": "Getset Spaces",
+    "partner_name": "Getset Spaces",
+    "email": "accounts@getsetoffice.com",
+    "mobile_number": "+91 9220140038",
+    "address": "3rd Floor, LMR House, S-16, Block C, Green Park Extension, Green Park, New Delhi, Delhi 110016, India"
+  },
+  {
+    "space_name": "Sanogic Coworking Space (Delhi)",
+    "partner_name": "Vishwajeet Sharma",
+    "email": "vishwajeetsharma@gmail.com",
+    "mobile_number": "9873715670, 8810245259",
+    "address": "Unit No. - 111, Aggarwal City Square, Plot No. 10, District Centre Manglam Place, Sector-3, Rohini, New Delhi - 110085"
+  },
+  {
+    "space_name": "CS Coworking - Raidurg",
+    "partner_name": "Gopaldas Agarwal, Nisha, Manasa",
+    "email": "coworkingspaces.hyd@gmail.com",
+    "mobile_number": "+91 9849019209, 9963005341, 8309665334",
+    "address": "Cluster_malkajgiri 82, 19, Dargah Rd, LIG Chitrapuri Colony, Muppas Panchavati Colony, Radhe Nagar, Hyderabad, Rai Durg, Telangana 500104"
+  },
+  {
+    "space_name": "CS Coworking - Hitex Road",
+    "partner_name": "Gopaldas Agarwal, Nisha, Manasa",
+    "email": "coworkingspaces.hyd@gmail.com",
+    "mobile_number": "+91 9849019209, 9963005341, 8309665334",
+    "address": "5th Floor, Melkiors Pride, Hitex Road, Vinayaka Nagar, Izzathnagar, HITEC City, Khanammet, Hyderabad, Telangana 500084"
+  },
+  {
+    "space_name": "CS Coworking.- Shaikpet I",
+    "partner_name": "Gopaldas Agarwal, Nisha, Manasa",
+    "email": "coworkingspaces.hyd@gmail.com",
+    "mobile_number": "+91 9849019209, 9963005341, 8309665334",
+    "address": "4th Floor, Aparna Astute Jubilee Hills, Shaikpet, Hyderabad, Telangana 500096"
+  },
+  {
+    "space_name": "MSB Cospazes (Delhi)",
+    "partner_name": "MSB Cospazes (Delhi)",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "No.26-27-A, H- Block, Third Floor, (Office No.401 & 404) Vikas Marg, Laxmi Nagar, Delhi-110092,"
+  },
+  {
+    "space_name": "MSB COspaze (Gurgaon)",
+    "partner_name": "Deeksha",
+    "email": "NA",
+    "mobile_number": "8178121604",
+    "address": "2nd Floor, Sona Marble Building, Sneh Vihar, Bhondsi, Gurgaon - 122102"
+  },
+  {
+    "space_name": "Sector 3 - MyWorX",
+    "partner_name": "Sector 3 - MyWorX",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "B-7, 1st floor, metro station, B-7, next to sector-15, B Block, Sector 2, Noida, Uttar Pradesh 201301, India"
+  },
+  {
+    "space_name": "Sector 16 - Registerkaro",
+    "partner_name": "Sector 16 - Registerkaro",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "OFFICE NO \u2013 101, FIRST FLOOR, AT, SEVEN WONDER BUSINESS CENTER, PLOT NO. A-61, A Block, Sector 16, Noida, Uttar Pradesh 201301"
+  },
+  {
+    "space_name": "Sector 62 - Alt F",
+    "partner_name": "Sector 62 - Alt F",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "C-20, 1/1A, Coast Guard Golf Ground Rd, C Block, Phase 2, Industrial Area, Sector 62, Noida, Uttar Pradesh 201309"
+  },
+  {
+    "space_name": "Sec 142 - Alt F",
+    "partner_name": "Sec 142 - Alt F",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "Ground Floor, Plot No. 21 \u0026 21A, Sector 142, Noida, Uttar Pradesh 201304"
+  },
+  {
+    "space_name": "Sec 58 - Alt F",
+    "partner_name": "Sec 58 - Alt F",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "A100, A Block, Sector 58, Noida, Uttar Pradesh 201309"
+  },
+  {
+    "space_name": "Sec 68 - Alt F",
+    "partner_name": "Sec 68 - Alt F",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "A-5, Grovy Optiva, Block A, Sector 68, Noida, Basi Bahuddin Nagar, Uttar Pradesh 201316"
+  },
+  {
+    "space_name": "Alt F - Gachibowli",
+    "partner_name": "Alt F - Gachibowli",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "Divyasree Orion, Raidurg Panmaktha, Gachibowli, Hyderabad, Telangana 500032"
+  },
+  {
+    "space_name": "Spacehive",
+    "partner_name": "Spacehive",
+    "email": "NA",
+    "mobile_number": "NA",
+    "address": "4263, Anjikathu Rd, CSEZ, Chittethukara, Kakkanad, Kochi, Kerala 682037, India"
   }
 ];
 
@@ -360,7 +472,11 @@ async function seed() {
         console.log(`Total partners to process: ${allPartners.length}`);
 
         for (const p of allPartners) {
-            const cleanEmail = p.email.toLowerCase().trim();
+            let cleanEmail = p.email.toLowerCase().trim();
+            // Handle missing emails by generating a unique one based on space name
+            if (cleanEmail === 'na') {
+                cleanEmail = `${p.space_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@flashspace.co`;
+            }
             console.log(`\nProcessing: ${p.space_name} (${cleanEmail})`);
             
             const emailPasswordHash = await bcrypt.hash(cleanEmail, 12);
