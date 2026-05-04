@@ -629,15 +629,21 @@ export class AuthService {
         },
       });
 
-      // Send reset email (non-blocking)
-      EmailUtil.sendPasswordResetEmail(
-        email,
-        resetToken,
-        user.fullName,
-        frontendUrl,
-      ).catch((emailError) =>
-        console.error("Error sending reset email:", emailError),
-      );
+      try {
+        await EmailUtil.sendPasswordResetEmail(
+          email,
+          resetToken,
+          user.fullName,
+          frontendUrl,
+        );
+      } catch (emailError) {
+        console.error("Error sending reset email:", emailError);
+        return {
+          success: false,
+          message:
+            "Password reset email could not be sent. Please try again later.",
+        };
+      }
 
       return {
         success: true,

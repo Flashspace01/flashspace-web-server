@@ -22,6 +22,10 @@ export class EmailUtil {
       return configuredService;
     }
 
+    if (process.env.SENDGRID_API_KEY) {
+      return "sendgrid";
+    }
+
     if (process.env.SMTP_HOST) {
       return "smtp";
     }
@@ -45,6 +49,10 @@ export class EmailUtil {
   }
 
   private static resolveFrontendUrl(preferredUrl?: string): string {
+    const isProduction = process.env.NODE_ENV === "production";
+    const isLocalUrl = (value: string) =>
+      /(^https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?/i.test(value);
+
     const candidates = [
       preferredUrl,
       process.env.FRONTEND_URL,
@@ -56,7 +64,9 @@ export class EmailUtil {
 
     const resolved = candidates
       .map((value) => value?.trim())
-      .find((value) => Boolean(value));
+      .find((value): value is string =>
+        Boolean(value) && !(isProduction && isLocalUrl(value as string)),
+      );
 
     if (resolved) {
       return resolved.replace(/\/$/, "");
@@ -94,24 +104,37 @@ export class EmailUtil {
       });
       console.log('✅ Gmail email service initialized');
       this.isInitialized = true;
-    } else if (service === 'smtp') {
-      if (!process.env.SMTP_HOST) {
+    } else if (service === 'smtp' || service === 'sendgrid') {
+      const smtpHost =
+        process.env.SMTP_HOST ||
+        (service === "sendgrid" || process.env.SENDGRID_API_KEY
+          ? "smtp.sendgrid.net"
+          : undefined);
+      const smtpPort =
+        process.env.SMTP_PORT ||
+        (service === "sendgrid" || process.env.SENDGRID_API_KEY ? "587" : "587");
+      const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === "465";
+      const smtpUser =
+        process.env.SMTP_USER ||
+        (service === "sendgrid" || process.env.SENDGRID_API_KEY
+          ? "apikey"
+          : undefined);
+      const smtpPass = process.env.SMTP_PASS || process.env.SENDGRID_API_KEY;
+
+      if (!smtpHost) {
         this.failInitialization("SMTP_HOST is required when EMAIL_SERVICE=smtp");
         return;
       }
 
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
-
       if (!smtpUser || !smtpPass) {
-        this.failInitialization("SMTP_USER and SMTP_PASS are required when EMAIL_SERVICE=smtp");
+        this.failInitialization("SMTP_USER and SMTP_PASS are required when EMAIL_SERVICE=smtp. For SendGrid, set SENDGRID_API_KEY or SMTP_PASS.");
         return;
       }
 
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+        host: smtpHost,
+        port: parseInt(smtpPort, 10),
+        secure: smtpSecure, // true for 465, false for other ports
         auth: {
           user: smtpUser,
           pass: smtpPass,
@@ -119,9 +142,6 @@ export class EmailUtil {
       });
       console.log('✅ SMTP email service initialized');
       this.isInitialized = true;
-    } else if (service === 'sendgrid') {
-      this.failInitialization("Direct SendGrid email is disabled. Use EMAIL_SERVICE=gmail or EMAIL_SERVICE=smtp with Nodemailer.");
-      return;
     } else {
       console.log('📧 Email service disabled - emails will be logged only');
       this.isInitialized = true;
@@ -158,7 +178,7 @@ export class EmailUtil {
         throw this.initializationError || new Error("Email service is not initialized");
       }
 
-      if (service === 'gmail' || service === 'smtp') {
+      if (service === 'gmail' || service === 'smtp' || service === 'sendgrid') {
         if (!this.transporter) {
           throw new Error(`${service} transporter not initialized`);
         }
@@ -729,7 +749,7 @@ export class EmailUtil {
         throw this.initializationError || new Error("Email service is not initialized");
       }
 
-      if (service === 'gmail' || service === 'smtp') {
+      if (service === 'gmail' || service === 'smtp' || service === 'sendgrid') {
         if (!this.transporter) {
           throw new Error(`${service} transporter not initialized`);
         }
