@@ -85,6 +85,35 @@ class BookingDocument {
   generatedAt?: Date;
 }
 
+class BookingKycDocumentReview {
+  @prop()
+  profileModel?: string;
+
+  @prop()
+  profileId?: string;
+
+  @prop()
+  documentId?: string;
+
+  @prop()
+  documentType?: string;
+
+  @prop({
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
+  })
+  status?: string;
+
+  @prop()
+  rejectionReason?: string;
+
+  @prop()
+  reviewedAt?: Date;
+
+  @prop()
+  reviewedBy?: string;
+}
+
 class SpaceSnapshot {
   @prop()
   _id?: string;
@@ -168,6 +197,9 @@ export class Booking {
 
   @prop({ type: () => [BookingDocument], default: [] })
   documents?: BookingDocument[];
+
+  @prop({ type: () => [BookingKycDocumentReview], default: [] })
+  kycDocumentReviews?: BookingKycDocumentReview[];
 
   @prop({
     enum: ["draft", "submitted", "in_review", "completed"],
