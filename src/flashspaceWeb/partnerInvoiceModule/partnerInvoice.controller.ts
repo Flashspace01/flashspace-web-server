@@ -391,7 +391,12 @@ export const markInvoicePaid = async (req: Request, res: Response): Promise<any>
         title: "Invoice Paid",
         message: `Your invoice #${invoice.invoiceNumber} has been marked as paid!`,
         type: "SUCCESS",
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: {
+          invoiceId: invoice._id,
+          invoiceNumber: invoice.invoiceNumber,
+          type: "invoice_paid"
+        }
       });
     } catch (socketErr) {
       console.log("Socket emit failed, continuing...", socketErr);

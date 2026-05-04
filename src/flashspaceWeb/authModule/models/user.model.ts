@@ -94,6 +94,24 @@ export class User extends TimeStamps {
   @prop({ trim: true })
   public phoneNumber?: string;
 
+  @prop({ trim: true })
+  public alternatePhone?: string;
+
+  @prop({ trim: true })
+  public address?: string;
+
+  @prop({ trim: true })
+  public city?: string;
+
+  @prop({ trim: true })
+  public state?: string;
+
+  @prop({ trim: true })
+  public country?: string;
+
+  @prop({ trim: true })
+  public pincode?: string;
+
   // If present, this account belongs to a partner's internal team
   @prop({ ref: () => User, type: () => Types.ObjectId })
   public parentPartnerId?: Types.ObjectId;
