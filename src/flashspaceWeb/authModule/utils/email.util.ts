@@ -14,6 +14,9 @@ export class EmailUtil {
   private static isInitialized = false;
   private static isContactInitialized = false;
   private static initializationError: Error | null = null;
+  private static readonly mailTimeoutMs = Number(
+    process.env.EMAIL_TIMEOUT_MS || 10000,
+  );
 
   private static getService(): string {
     const configuredService = process.env.EMAIL_SERVICE?.trim().toLowerCase();
@@ -97,6 +100,9 @@ export class EmailUtil {
 
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
+        connectionTimeout: this.mailTimeoutMs,
+        greetingTimeout: this.mailTimeoutMs,
+        socketTimeout: this.mailTimeoutMs,
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASSWORD,
@@ -135,6 +141,9 @@ export class EmailUtil {
         host: smtpHost,
         port: parseInt(smtpPort, 10),
         secure: smtpSecure, // true for 465, false for other ports
+        connectionTimeout: this.mailTimeoutMs,
+        greetingTimeout: this.mailTimeoutMs,
+        socketTimeout: this.mailTimeoutMs,
         auth: {
           user: smtpUser,
           pass: smtpPass,

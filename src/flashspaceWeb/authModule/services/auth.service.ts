@@ -629,25 +629,21 @@ export class AuthService {
         },
       });
 
-      try {
-        await EmailUtil.sendPasswordResetEmail(
-          email,
-          resetToken,
-          user.fullName,
-          frontendUrl,
+      EmailUtil.sendPasswordResetEmail(
+        email,
+        resetToken,
+        user.fullName,
+        frontendUrl,
+      )
+        .then(() => console.log("Password reset email sent to:", email))
+        .catch((emailError) =>
+          console.error("Error sending reset email:", emailError),
         );
-      } catch (emailError) {
-        console.error("Error sending reset email:", emailError);
-        return {
-          success: false,
-          message:
-            "Password reset email could not be sent. Please try again later.",
-        };
-      }
 
       return {
         success: true,
-        message: "Password reset link has been sent to your email.",
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
       };
     } catch (error) {
       console.error("Forgot password error:", error);
