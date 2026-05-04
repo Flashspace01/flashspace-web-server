@@ -100,6 +100,16 @@ export class TicketService {
       { ticketId: ticket._id },
     );
 
+    if (partnerId) {
+      NotificationService.notifyUser(
+        partnerId.toString(),
+        `New Support Request: ${ticketNumber}`,
+        `A customer has raised a query regarding their booking: "${data.subject}"`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+    }
+
     return populatedTicket;
   }
 
@@ -174,6 +184,16 @@ export class TicketService {
         NotificationType.TICKET_UPDATE,
         { ticketId: ticket._id },
       );
+
+      if (ticket.partnerId) {
+        NotificationService.notifyUser(
+          ticket.partnerId.toString(),
+          `User Reply on Ticket: ${ticket.ticketNumber}`,
+          `The customer has replied to their query.`,
+          NotificationType.TICKET_UPDATE,
+          { ticketId: ticket._id },
+        );
+      }
     }
 
     return await TicketModel.findById(ticket._id)
@@ -308,6 +328,16 @@ export class TicketService {
       NotificationType.TICKET_UPDATE,
       { ticketId: ticket._id },
     );
+
+    if (ticket.partnerId) {
+      NotificationService.notifyUser(
+        ticket.partnerId.toString(),
+        `Admin Update on Ticket: ${ticket.ticketNumber}`,
+        `An admin has replied to a query regarding your space.`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+    }
 
     return await TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
@@ -594,6 +624,16 @@ export class TicketService {
       NotificationType.TICKET_UPDATE,
       { ticketId: ticket._id },
     );
+
+    if (ticket.partnerId) {
+      NotificationService.notifyUser(
+        ticket.partnerId.toString(),
+        `Affiliate Update on Ticket: ${ticket.ticketNumber}`,
+        `An affiliate has replied to a query regarding your space.`,
+        NotificationType.TICKET_UPDATE,
+        { ticketId: ticket._id },
+      );
+    }
 
     return TicketModel.findById(ticket._id)
       .populate("user", "fullName email phoneNumber")
