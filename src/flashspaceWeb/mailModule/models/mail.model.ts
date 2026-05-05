@@ -10,6 +10,7 @@ export interface IMail extends Document {
     space: string;
     received: Date;
     status: 'Pending Action' | 'Forwarded' | 'Collected';
+    photo?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -28,6 +29,7 @@ const MailSchema: Schema = new Schema({
         enum: ['Pending Action', 'Forwarded', 'Collected'],
         default: 'Pending Action'
     },
+    photo: { type: String },
 }, { timestamps: true });
 
 export default mongoose.model<IMail>('Mail', MailSchema);

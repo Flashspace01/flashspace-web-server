@@ -182,6 +182,12 @@ router.post(
   authController.uploadProfilePicture,
 );
 
+router.post(
+  "/upload-cover",
+  uploadProfilePic.single("coverImage"),
+  authController.uploadCoverImage,
+);
+
 // ============ PARTNER KYC ============
 import {
   addPartner,

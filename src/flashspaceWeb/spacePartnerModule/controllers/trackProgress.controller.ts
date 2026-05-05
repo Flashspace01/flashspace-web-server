@@ -30,7 +30,7 @@ export const getPartnerTrackProgressData = async (req: Request, res: Response) =
       partner: partnerObjectId,
       isDeleted: { $ne: true }
     })
-      .populate("user", "fullName kycVerified")
+      .populate("user", "fullName kycVerified profilePicture")
       .populate("kycProfile", "overallStatus")
       .sort({ createdAt: -1 })
       .lean();
@@ -74,6 +74,7 @@ export const getPartnerTrackProgressData = async (req: Request, res: Response) =
         id: booking._id,
         bookingId: booking.bookingNumber,
         userName: booking.user?.fullName || "N/A",
+        profilePicture: booking.user?.profilePicture,
         spaceBooked: booking.spaceSnapshot?.name || "N/A",
         userKycApprovedByAdmin: booking.user?.kycVerified || false,
         userKycApprovedBySpace: partnerKycApproved,

@@ -64,6 +64,7 @@ export class AuthService {
       fullName: user.fullName,
       phoneNumber: user.phoneNumber,
       profilePicture: user.profilePicture,
+      coverImage: user.coverImage,
       role: user.role,
       authProvider: user.authProvider,
       isEmailVerified: user.isEmailVerified,

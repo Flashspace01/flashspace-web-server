@@ -135,6 +135,9 @@ export class User extends TimeStamps {
   @prop()
   public profilePicture?: string;
 
+  @prop()
+  public coverImage?: string;
+
   // Password (only for local auth)
   @prop({ select: false }) // Don't select by default for security
   public password?: string;

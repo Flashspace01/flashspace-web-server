@@ -25,6 +25,8 @@ export const createMail = async (req: Request, res: Response) => {
 
     const mailId = `MAIL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    const photo = req.file ? `/uploads/profile-pictures/${req.file.filename}` : undefined;
+
     const newMail = new Mail({
       mailId,
       partnerId,
@@ -35,6 +37,7 @@ export const createMail = async (req: Request, res: Response) => {
       space,
       received: new Date(),
       status: "Pending Action",
+      photo,
     });
 
     await newMail.save();
@@ -62,6 +65,7 @@ export const createMail = async (req: Request, res: Response) => {
               type: "mail_record",
               sender,
               space,
+              photo: newMail.photo,
               actionUrl: "/dashboard/mail-records",
             },
             { preferenceKey: "push" },
@@ -71,7 +75,7 @@ export const createMail = async (req: Request, res: Response) => {
           EmailUtil.sendMailRecordEmail(
             normalizedEmail,
             (clientUser as any).fullName || client,
-            { sender, type, office: space }
+            { sender, type, office: space, photo: newMail.photo }
           ).catch(emailErr => console.error("[createMail] Email failed:", emailErr));
         }
       } catch (notifError) {
