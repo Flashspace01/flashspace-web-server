@@ -921,7 +921,7 @@ export const getPartnerDashboardOverview = async (
     const partnerBookings = await BookingModel.find({
       partner: userObjectId,
       isDeleted: false,
-    }).populate("user", "fullName email phoneNumber company");
+    }).populate("user", "fullName email phoneNumber company profilePicture");
     console.log("Partner Bookings:", partnerBookings);
     // Map bookings to the frontend Client structure
     const clients = partnerBookings.map((b: any) => {
@@ -960,6 +960,7 @@ export const getPartnerDashboardOverview = async (
           : "N/A",
         status: status,
         kycStatus: b.kycStatus === "approved" ? "VERIFIED" : "PENDING",
+        profilePicture: b.user?.profilePicture,
       };
     });
 
@@ -1020,7 +1021,7 @@ export const getPartnerSpaceBookings = async (req: Request, res: Response) => {
     ];
 
     const bookings = await BookingModel.find(filter)
-      .populate("user", "fullName email phoneNumber phone")
+      .populate("user", "fullName email phoneNumber phone profilePicture")
       .populate("kycProfile", "user businessInfo profileName kycType")
       .sort({ startDate: -1 });
 
@@ -1089,7 +1090,7 @@ export const getPartnerPropertyBookings = async (
       isDeleted: false,
       spaceId: { $in: spaceIds },
     })
-      .populate("user", "fullName email phoneNumber phone")
+      .populate("user", "fullName email phoneNumber phone profilePicture")
       .populate("kycProfile", "user businessInfo profileName kycType")
       .sort({ createdAt: -1 });
 
@@ -1133,7 +1134,7 @@ async function mapPartnerBookingRows(bookings: any[]) {
 
   const [fallbackUsers, businessInfos] = await Promise.all([
     userIds.length
-      ? UserModel.find({ _id: { $in: userIds } }).select("fullName email phoneNumber phone")
+      ? UserModel.find({ _id: { $in: userIds } }).select("fullName email phoneNumber phone profilePicture")
       : Promise.resolve([]),
     userIds.length
       ? BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: false })
@@ -1188,7 +1189,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     const bookings = await BookingModel.find({
       partner: userId,
       isDeleted: false,
-    }).populate("user", "fullName email phoneNumber");
+    }).populate("user", "fullName email phoneNumber profilePicture");
 
     // 2. Fetch business info for all users in these bookings to get company names
     const userIds = [
@@ -1245,6 +1246,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
         dealValue: booking.plan?.finalPrice || booking.plan?.price || 0,
         category: booking.type === "VirtualOffice" ? "Virtual Office" : booking.type === "CoworkingSpace" ? "Coworking" : booking.type === "MeetingRoom" ? "Meeting Room" : booking.type || "Booking",
         createdAt: booking.createdAt,
+        profilePicture: user?.profilePicture,
       };
 
       // Use composite key to allow same user with different categories (e.g. Booking and Ticket)
@@ -1354,7 +1356,7 @@ export const getPartnerClientBookings = async (req: Request, res: Response) => {
       $or: [{ partner: partnerObjectId }, { spaceId: { $in: ownedSpaceIds } }],
       isDeleted: false,
     })
-      .populate("user", "fullName email phoneNumber phone")
+      .populate("user", "fullName email phoneNumber phone profilePicture")
       .populate("kycProfile", "profileName kycType businessInfo overallStatus")
       .sort({ createdAt: -1 });
 
@@ -1478,6 +1480,7 @@ export const getPartnerClientBookings = async (req: Request, res: Response) => {
           booking.plan?.price ||
           0,
         createdAt: booking.createdAt,
+        profilePicture: user?.profilePicture,
       };
     });
 
@@ -1505,7 +1508,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       partnerRequestStatus: { $in: ["submitted", "in_review", "completed"] },
       $or: [{ partner: { $in: partnerIds } }, { spaceId: { $in: ownedSpaceIds } }],
     })
-      .populate("user", "fullName email phoneNumber phone")
+      .populate("user", "fullName email phoneNumber phone profilePicture")
       .populate("kycProfile")
       .sort({ createdAt: -1 });
 
@@ -1904,6 +1907,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           registeredAddress: linkedBusiness?.registeredAddress || kycProfile?.businessInfo?.registeredAddress || businessInfo?.registeredAddress || businessInfo?.address || "N/A",
           industry: linkedBusiness?.industry || kycProfile?.businessInfo?.industry || businessInfo?.industry || "N/A",
           businessNature: linkedBusiness?.businessNature || kycProfile?.businessInfo?.businessNature || businessInfo?.businessNature || "N/A",
+          profilePicture: user?.profilePicture,
         },
         space: {
           id: String(booking.spaceId || ""),

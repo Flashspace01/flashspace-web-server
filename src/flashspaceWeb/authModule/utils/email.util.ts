@@ -774,7 +774,10 @@ export class EmailUtil {
       return false;
     }
   }
-  static async sendMailRecordEmail(email: string, fullName: string, mailData: { sender: string; type: string; office: string }): Promise<void> {
+  static async sendMailRecordEmail(email: string, fullName: string, mailData: { sender: string; type: string; office: string; photo?: string }): Promise<void> {
+    const apiBaseUrl = process.env.API_URL || 'http://localhost:5000';
+    const photoUrl = mailData.photo ? (mailData.photo.startsWith('http') ? mailData.photo : `${apiBaseUrl}${mailData.photo}`) : null;
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
         <div style="background: #35503F; color: #FEF8C3; padding: 25px; text-align: center;">
@@ -788,6 +791,12 @@ export class EmailUtil {
             <p style="margin: 5px 0;"><strong>Type:</strong> ${mailData.type}</p>
             <p style="margin: 5px 0;"><strong>Office:</strong> ${mailData.office}</p>
           </div>
+          ${photoUrl ? `
+          <div style="margin: 20px 0; text-align: center;">
+            <p style="text-align: left; font-weight: bold; margin-bottom: 10px;">Item Preview:</p>
+            <img src="${photoUrl}" alt="Mail Item" style="max-width: 100%; border-radius: 8px; border: 1px solid #eee;" />
+          </div>
+          ` : ''}
           <p>You can view more details and request forwarding from your dashboard.</p>
           <div style="text-align: center; margin-top: 30px;">
             <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/mail-records" style="background: #35503F; color: #FEF8C3; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Mail Records</a>

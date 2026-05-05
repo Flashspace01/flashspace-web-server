@@ -571,6 +571,7 @@ export class AuthController {
             country: user.country,
             pincode: user.pincode,
             profilePicture: user.profilePicture,
+            coverImage: user.coverImage,
             role: user.role,
             authProvider: user.authProvider,
             isEmailVerified: user.isEmailVerified,
@@ -629,6 +630,7 @@ export class AuthController {
                 country: user.country,
                 pincode: user.pincode,
                 profilePicture: user.profilePicture,
+                coverImage: user.coverImage,
                 role: user.role,
                 authProvider: user.authProvider,
                 isEmailVerified: user.isEmailVerified,
@@ -988,6 +990,7 @@ export class AuthController {
           country: updatedUser.country,
           pincode: updatedUser.pincode,
           profilePicture: updatedUser.profilePicture,
+          coverImage: updatedUser.coverImage,
           role: updatedUser.role,
           authProvider: updatedUser.authProvider,
           isEmailVerified: updatedUser.isEmailVerified,
@@ -1062,6 +1065,67 @@ export class AuthController {
       });
     } catch (error) {
       console.error("Upload profile picture controller error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        data: {},
+        error: "Internal server error",
+      });
+    }
+  };
+
+  // Upload cover image
+  uploadCoverImage = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({
+          success: false,
+          message: "Authentication required",
+          data: {},
+          error: "Not authenticated",
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+          data: {},
+          error: "Missing file",
+        });
+        return;
+      }
+
+      const { UserModel } = await import("../models/user.model");
+      const imageUrl = `/uploads/profile-pictures/${req.file.filename}`; // Using same directory for simplicity
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        req.user.id,
+        { $set: { coverImage: imageUrl } },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+          data: {},
+          error: "User not found",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Cover image uploaded successfully",
+        data: {
+          coverImage: updatedUser.coverImage,
+        },
+        error: {},
+      });
+    } catch (error) {
+      console.error("Upload cover image controller error:", error);
       res.status(500).json({
         success: false,
         message: "Internal server error",

@@ -90,7 +90,7 @@ export class TicketService {
     });
 
     const populatedTicket = await TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .lean();
 
     NotificationService.notifyAdmin(
@@ -143,7 +143,7 @@ export class TicketService {
       if (userId) query.user = new Types.ObjectId(userId);
 
       return await TicketModel.findOne(query)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .populate("assignee", "fullName email role")
         .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean();
@@ -197,7 +197,7 @@ export class TicketService {
     }
 
     return await TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email")
       .lean();
   }
@@ -240,7 +240,7 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .populate("assignee", "fullName email role")
         .populate("bookingId", "bookingNumber spaceSnapshot type status")
         .lean(),
@@ -298,7 +298,7 @@ export class TicketService {
       updateObj,
       { new: true },
     )
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
@@ -340,7 +340,7 @@ export class TicketService {
     }
 
     return await TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email role")
       .lean();
   }
@@ -351,7 +351,7 @@ export class TicketService {
       { assignee: new Types.ObjectId(assigneeId), status: TicketStatus.IN_PROGRESS },
       { new: true },
     )
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
@@ -389,7 +389,7 @@ export class TicketService {
       { status: TicketStatus.ESCALATED },
       { new: true },
     )
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
@@ -402,7 +402,7 @@ export class TicketService {
       { status: TicketStatus.RESOLVED, resolvedAt: new Date() },
       { new: true },
     )
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("assignee", "fullName email role");
 
     if (!ticket) throw new Error("Ticket not found");
@@ -474,7 +474,7 @@ export class TicketService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .populate("assignee", "fullName email role")
         .populate("bookingId", "bookingNumber spaceSnapshot type")
         .lean(),
@@ -516,7 +516,7 @@ export class TicketService {
     );
 
     return TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
@@ -538,7 +538,7 @@ export class TicketService {
     );
 
     return TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
@@ -561,7 +561,7 @@ export class TicketService {
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .populate("bookingId", "bookingNumber spaceSnapshot type")
         .lean(),
       TicketModel.countDocuments(query),
@@ -596,7 +596,7 @@ export class TicketService {
     await ticket.save();
 
     return TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
@@ -636,7 +636,7 @@ export class TicketService {
     }
 
     return TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }
@@ -736,7 +736,7 @@ export class TicketService {
     }
 
     return await TicketModel.findById(ticket._id)
-      .populate("user", "fullName email phoneNumber")
+      .populate("user", "fullName email phoneNumber profilePicture")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
   }

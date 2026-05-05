@@ -112,7 +112,7 @@ export class BookingService {
     }
 
     return await BookingModel.find(filter)
-      .populate("user")
+      .populate("user", "fullName email profilePicture")
       .sort({ createdAt: -1 });
   }
 
@@ -236,7 +236,7 @@ export class BookingService {
     ];
 
     return await BookingModel.find(filter)
-      .populate("user", "fullName email phone")
+      .populate("user", "fullName email phone profilePicture")
       .sort({ startDate: -1 });
   }
 
@@ -244,7 +244,7 @@ export class BookingService {
     const partnerBookings = await BookingModel.find({
       partner: partnerId,
       isDeleted: false,
-    }).populate("user", "fullName email phone company");
+    }).populate("user", "fullName email phone company profilePicture");
 
     return partnerBookings.map((b: any) => {
       let status = "INACTIVE";

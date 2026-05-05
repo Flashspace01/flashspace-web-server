@@ -147,7 +147,7 @@ export const getAllSpacePartnerKyc = async (req: any, res: any) => {
     // Only show pending KYC requests to admin
     const kycs = await SpaceUserKycModel.find({
       overallStatus: { $ne: "not_started" },
-    }).populate("userId", "fullName email phoneNumber");
+    }).populate("userId", "fullName email phoneNumber profilePicture");
     res.json({ success: true, data: kycs });
   } catch (err: any) {
     res.status(500).json({
@@ -164,7 +164,7 @@ export const getSpacePartnerKycById = async (req: any, res: any) => {
     const { id } = req.params;
     const kyc = await SpaceUserKycModel.findById(id).populate(
       "userId",
-      "fullName email phoneNumber",
+      "fullName email phoneNumber profilePicture",
     );
     if (!kyc) {
       return res
@@ -215,6 +215,7 @@ export const getMySpaceUserKyc = async (req: Request, res: Response) => {
       fullName: partnerUser?.fullName || kycObject.fullName || "",
       email: partnerUser?.email || kycObject.email || "",
       phoneNumber: partnerUser?.phoneNumber || kycObject.phoneNumber || "",
+      profilePicture: partnerUser?.profilePicture || kycObject.profilePicture || "",
 
       // Ensure Property fields take precedence
       companyName: firstProperty?.companyName || firstProperty?.name || kycObject.companyName || "",

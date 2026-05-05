@@ -553,7 +553,7 @@ export class AdminService {
         .select(
           "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress partnerCount businessInfoCount createdAt updatedAt",
         )
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .sort({ updatedAt: -1 })
         .lean();
 
@@ -796,7 +796,7 @@ export class AdminService {
       }
 
       const bookings = await BookingModel.find(query)
-        .populate("user", "fullName email")
+        .populate("user", "fullName email profilePicture")
         .populate("partner", "fullName email")
         .populate("spaceSnapshot", "name city") // Helpful context
         .sort({ createdAt: -1 })
@@ -831,7 +831,7 @@ export class AdminService {
   async getTrackProgressData(): Promise<ApiResponse<any>> {
     try {
       const bookings = await BookingModel.find({ isDeleted: false })
-        .populate("user", "fullName kycVerified")
+        .populate("user", "fullName kycVerified profilePicture")
         .populate("kycProfile", "overallStatus")
         .sort({ createdAt: -1 })
         .lean();
@@ -867,6 +867,7 @@ export class AdminService {
           id: booking._id,
           bookingId: booking.bookingNumber,
           userName: booking.user?.fullName || "N/A",
+          profilePicture: booking.user?.profilePicture,
           spaceBooked: booking.spaceSnapshot?.name || "N/A",
           userKycApprovedByAdmin: booking.user?.kycVerified || false,
           userKycApprovedBySpace: partnerKycApproved,
@@ -1009,7 +1010,7 @@ export class AdminService {
       await booking.save();
 
       const updatedBooking = await BookingModel.findById(booking._id)
-        .populate("user", "fullName email")
+        .populate("user", "fullName email profilePicture")
         .populate("partner", "fullName email")
         .populate("spaceSnapshot", "name city");
 
@@ -1082,7 +1083,7 @@ export class AdminService {
       }
 
       const allBookings = await BookingModel.find(query)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .sort({ createdAt: -1 });
 
       const clientMap = new Map<string, any>();
@@ -1106,6 +1107,7 @@ export class AdminService {
             activeBookings: booking.status === "active" ? 1 : 0,
             firstBookingDate: bookingDate,
             lastBookingDate: bookingDate,
+            profilePicture: booking.user.profilePicture,
             bookings: [booking],
           });
           return;
@@ -1137,6 +1139,7 @@ export class AdminService {
           firstBookingDate: client.firstBookingDate?.toISOString?.() || null,
           lastBookingDate: client.lastBookingDate?.toISOString?.() || null,
           statusLabel,
+          profilePicture: client.profilePicture,
           initials: client.name
             .split(" ")
             .slice(0, 2)
@@ -1225,7 +1228,7 @@ export class AdminService {
       }
 
       const bookings = await BookingModel.find(query)
-        .populate("user", "fullName email phoneNumber")
+        .populate("user", "fullName email phoneNumber profilePicture")
         .sort({ createdAt: -1 });
 
       if (!bookings.length || !bookings[0].user) {
@@ -1455,7 +1458,7 @@ export class AdminService {
     try {
       const kyc = await KYCDocumentModel.findById(kycId).populate(
         "user",
-        "fullName email phoneNumber",
+        "fullName email phoneNumber profilePicture",
       );
 
       if (!kyc) {
@@ -1481,7 +1484,7 @@ export class AdminService {
     try {
       const partner = await PartnerKYCModel.findById(partnerId).populate(
         "user",
-        "fullName email phoneNumber",
+        "fullName email phoneNumber profilePicture",
       );
 
       if (!partner) {
@@ -2150,7 +2153,7 @@ export class AdminService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("user", "fullName email"); // Populate user details if needed
+        .populate("user", "fullName email phoneNumber profilePicture"); // Populate user details if needed
 
       const total = await PartnerKYCModel.countDocuments(query);
 
@@ -2959,7 +2962,7 @@ export class AdminService {
       if (!type || type === "user") {
         const userKycQuery: any = { isDeleted: false };
         const userKycDocs = await KYCDocumentModel.find(userKycQuery)
-          .populate("user", "fullName email phoneNumber")
+          .populate("user", "fullName email phoneNumber profilePicture")
           .lean();
 
         userKycDocs.forEach((kyc: any) => {
@@ -2986,6 +2989,7 @@ export class AdminService {
               status: doc.status || "pending",
               uploadedAt: doc.uploadedAt || kyc.createdAt,
               category: docCategory,
+              ownerProfilePicture: kyc.user?.profilePicture,
               originalKycId: kyc._id,
             });
           });
@@ -2996,7 +3000,7 @@ export class AdminService {
       if (!type || type === "partner") {
         const partnerKycQuery: any = { isDeleted: false };
         const partnerKycDocs = await PartnerKYCModel.find(partnerKycQuery)
-          .populate("user", "fullName email")
+          .populate("user", "fullName email profilePicture")
           .lean();
 
         partnerKycDocs.forEach((kyc: any) => {
@@ -3037,6 +3041,7 @@ export class AdminService {
               status: doc.status || "pending",
               uploadedAt: doc.uploadedAt || kyc.createdAt,
               category: "Partner",
+              ownerProfilePicture: mainUser?.profilePicture,
               originalKycId: kyc._id,
             });
           });
@@ -3047,7 +3052,7 @@ export class AdminService {
       if (!type || type === "business") {
         const businessQuery: any = { isDeleted: false };
         const businessDocs = await BusinessInfoModel.find(businessQuery)
-          .populate("user", "fullName email")
+          .populate("user", "fullName email profilePicture")
           .lean();
 
         businessDocs.forEach((biz: any) => {
@@ -3079,6 +3084,7 @@ export class AdminService {
               status: doc.status || "pending",
               uploadedAt: doc.uploadedAt || biz.createdAt,
               category: "Business",
+              ownerProfilePicture: mainUser?.profilePicture,
               originalKycId: biz._id,
             });
           });
