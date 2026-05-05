@@ -9,7 +9,7 @@ const listDatabases = async () => {
         const client = await mongoose.connect(ATLAS_URI);
         console.log('Connected!');
 
-        const adminDb = mongoose.connection.client.db().admin();
+        const adminDb = (mongoose.connection as any).client.db().admin();
         const dbs = await adminDb.listDatabases();
 
         console.log('\n--- Databases on Cluster ---');

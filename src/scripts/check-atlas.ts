@@ -10,6 +10,7 @@ const checkAtlasStorage = async () => {
         console.log('Connected!');
 
         const db = mongoose.connection.db;
+        if (!db) throw new Error("DB not connected");
         const collections = await db.listCollections().toArray();
 
         const stats = [];
@@ -35,6 +36,7 @@ const checkAtlasStorage = async () => {
             console.log(`${s.name.padEnd(30)} | ${s.count.toString().padEnd(10)} | ${s.dataSize.toFixed(2).padEnd(12)} | ${s.totalSize.toFixed(2).padEnd(10)}`);
         });
 
+        if (!db) throw new Error("DB not connected");
         const dbStats = await db.command({ dbStats: 1 });
         console.log('\n--- Overall DB Stats ---');
         console.log(`Storage Size (Quota): ${(dbStats.storageSize / (1024 * 1024)).toFixed(2)} MB`);

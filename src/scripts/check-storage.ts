@@ -12,6 +12,7 @@ const checkStorage = async () => {
         console.log('Connected!');
 
         const db = mongoose.connection.db;
+        if (!db) throw new Error("DB not connected");
         const collections = await db.listCollections().toArray();
 
         console.log('\n--- Database Storage Analysis ---');
