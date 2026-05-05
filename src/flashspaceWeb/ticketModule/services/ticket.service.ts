@@ -85,7 +85,7 @@ export class TicketService {
       chatType,
       affiliateId,
       tappedIn: [],
-      messages: [{ sender: "user", message: data.description, createdAt: new Date() }],
+      messages: [{ sender: "user", message: data.description, attachments: data.attachments || [], createdAt: new Date() }],
       expiresAt,
     });
 
@@ -309,7 +309,7 @@ export class TicketService {
     ticketId: string,
     adminId: string,
     message: string,
-    attachments?: string[],
+    attachments: string[] = [],
   ) {
     const ticket = await TicketModel.findById(ticketId);
     if (!ticket) throw new Error("Ticket not found");
@@ -500,7 +500,12 @@ export class TicketService {
     const ticket = await this.validatePartnerOwnership(ticketId, partnerId);
     if (!ticket) throw new Error("Ticket not found or access denied");
 
-    ticket.messages.push({ sender: "partner", message, attachments, createdAt: new Date() });
+    ticket.messages.push({ 
+      sender: "partner", 
+      message, 
+      attachments: attachments || [], 
+      createdAt: new Date() 
+    });
 
     if (ticket.status === TicketStatus.OPEN) ticket.status = TicketStatus.IN_PROGRESS;
 
@@ -605,6 +610,7 @@ export class TicketService {
     ticketId: string,
     affiliateId: string,
     message: string,
+    attachments?: string[],
   ): Promise<any> {
     const ticket = await TicketModel.findById(ticketId);
     if (!ticket) throw new Error("Ticket not found");
@@ -613,7 +619,12 @@ export class TicketService {
       throw new Error("You must tap in before you can send messages");
     }
 
-    ticket.messages.push({ sender: "affiliate", message, createdAt: new Date() });
+    ticket.messages.push({ 
+      sender: "affiliate", 
+      message, 
+      attachments: attachments || [], 
+      createdAt: new Date() 
+    });
     ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await ticket.save();
 
@@ -643,7 +654,7 @@ export class TicketService {
 
   static async partnerMessageClient(
     partnerId: string,
-    data: { clientUserId: string; bookingId?: string; subject: string; message: string }
+    data: { clientUserId: string; bookingId?: string; subject: string; message: string; attachments?: string[] }
   ) {
     const partnerObjectId = new Types.ObjectId(partnerId);
 
@@ -712,6 +723,7 @@ export class TicketService {
       ticket.messages.push({
         sender: "partner",
         message: data.message,
+        attachments: data.attachments || [],
         createdAt: new Date()
       });
       ticket.status = TicketStatus.IN_PROGRESS;
@@ -730,7 +742,7 @@ export class TicketService {
         priority: TicketPriority.MEDIUM,
         status: TicketStatus.OPEN,
         chatType: "user_partner",
-        messages: [{ sender: "partner", message: data.message, createdAt: new Date() }],
+        messages: [{ sender: "partner", message: data.message, attachments: data.attachments || [], createdAt: new Date() }],
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
     }

@@ -48,8 +48,7 @@ export class TicketValidation {
    */
   static validateReply(req: Request, res: Response, next: NextFunction) {
     const schema = Joi.object({
-      message: Joi.string().required().min(1).max(2000).messages({
-        'string.empty': 'Message is required',
+      message: Joi.string().allow('').max(2000).optional().messages({
         'string.max': 'Message cannot exceed 2000 characters'
       }),
       attachments: Joi.array().items(Joi.string()).optional()

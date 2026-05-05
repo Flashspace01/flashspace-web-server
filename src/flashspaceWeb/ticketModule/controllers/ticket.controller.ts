@@ -12,6 +12,7 @@ interface AuthenticatedRequest extends Request {
     email: string;
     role: string;
   };
+  files?: any;
 }
 
 // User Controllers
@@ -30,7 +31,14 @@ export const createTicket = async (
       });
     }
 
-    const { subject, description, category, priority, attachments, bookingId } = req.body;
+    let { subject, description, category, priority, attachments, bookingId } = req.body;
+    
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
 
     if (!description || description.trim().length < 10) {
       return res.status(400).json({
@@ -178,7 +186,14 @@ export const replyToTicket = async (
     const userId = req.user?._id || req.user?.id;
     const userRole = req.user?.role;
     const ticketId = req.params.ticketId as string;
-    const { message, attachments } = req.body;
+    let { message, attachments } = req.body;
+    
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
 
     if (!userId) {
       return res.status(401).json({
@@ -400,7 +415,14 @@ export const addAdminReply = async (
   try {
     const adminId = req.user?._id;
     const ticketId = req.params.ticketId as string;
-    const { message, attachments } = req.body;
+    let { message, attachments } = req.body;
+    
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
 
     if (!adminId) {
       return res.status(401).json({
@@ -565,18 +587,29 @@ export const addPartnerReply = async (
     }
 
     const { ticketId } = req.params as { ticketId: string };
-    const { message } = req.body;
+    let { message, attachments } = req.body;
+    
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
 
-    if (!message || !message.trim()) {
+    if ((!message || !message.trim()) && (!attachments || attachments.length === 0)) {
       return res
         .status(400)
-        .json({ success: false, message: "Message is required" });
+        .json({ success: false, message: "Message or attachment is required" });
     }
+
+    // Default to empty string if only attachments are sent
+    if (!message) message = "";
 
     const ticket = await TicketService.addPartnerReply(
       ticketId,
       partnerId,
       message,
+      attachments
     );
 
     // Emit socket event - emit the new message to the ticket room
@@ -647,9 +680,16 @@ export const partnerMessageClient = async (
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
 
-    const { clientUserId, bookingId, subject, message } = req.body;
+    let { clientUserId, bookingId, subject, message, attachments } = req.body;
 
-    if (!clientUserId || !subject || !message) {
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
+
+    if (!clientUserId || !subject || (!message && (!attachments || attachments.length === 0))) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
@@ -658,6 +698,7 @@ export const partnerMessageClient = async (
       bookingId,
       subject,
       message,
+      attachments,
     });
 
     // Emit socket event
@@ -747,13 +788,20 @@ export const addAffiliateReply = async (
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
     const { ticketId } = req.params as { ticketId: string };
-    const { message } = req.body;
+    let { message, attachments } = req.body;
+    
+    // Handle file uploads
+    const uploadedFiles = req.files as Express.Multer.File[];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const fileUrls = uploadedFiles.map(file => `/uploads/ticket-attachments/${file.filename}`);
+      attachments = Array.isArray(attachments) ? [...attachments, ...fileUrls] : fileUrls;
+    }
 
     if (!message?.trim()) {
       return res.status(400).json({ success: false, message: "Message is required" });
     }
 
-    const ticket = await TicketService.addAffiliateReply(ticketId, affiliateId, message);
+    const ticket = await TicketService.addAffiliateReply(ticketId, affiliateId, message, attachments);
 
     if (ticket?.messages?.length) {
       getIO().to(ticketId).emit("new_message", {
