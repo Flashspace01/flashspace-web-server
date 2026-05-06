@@ -1961,6 +1961,23 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
   }
 };
 
+const buildBookingReviewLookup = (booking: any) => {
+  const map = new Map<string, any>();
+  const reviews = booking.kycDocumentReviews || [];
+  reviews.forEach((review: any) => {
+    // Use a composite key of profileModel, profileId, and documentType (or documentId)
+    const key = `${review.profileModel || "kyc"}_${String(review.profileId)}_${review.documentType || review.documentId}`;
+    map.set(key, review);
+  });
+  return map;
+};
+
+const findBookingReview = (lookup: Map<string, any>, model: string, profileId: any, doc: any) => {
+  const docKey = doc.type || String(doc._id || "");
+  const key = `${model}_${String(profileId)}_${docKey}`;
+  return lookup.get(key);
+};
+
 export const reviewPartnerBookingKycDocument = async (req: Request, res: Response) => {
   try {
     const partnerId = req.user?.id;
