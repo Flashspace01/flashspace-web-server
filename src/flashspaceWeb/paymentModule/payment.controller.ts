@@ -233,7 +233,7 @@ async function createBookingAndInvoice(payment: any) {
         razorpayPaymentId: payment.razorpayPaymentId,
         kycProfile: approvedBookingProfile?._id,
         status: isUserVerified ? "active" : "pending_kyc",
-        kycStatus: approvedBookingProfile ? "approved" : isUserVerified ? "approved" : "not_started",
+        kycStatus: approvedBookingProfile || isUserVerified ? "pending" : "not_started",
         timeline: [
           {
             status: "payment_received",

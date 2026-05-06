@@ -94,28 +94,75 @@ export const createMail = async (req: Request, res: Response) => {
 
 export const getMails = async (req: Request, res: Response) => {
   try {
-    const { email } = req.query;
+    const { email, search, status } = req.query;
     let filter: any = {};
 
-    // If a specific email is requested (e.g. from the client dashboard)
+    if (req.user && req.user.role === "partner") {
+      filter.partnerId = req.user.id;
+    }
+
     if (email) {
       const emailRegex = new RegExp("^" + email.toString().trim() + "$", "i");
       filter.$or = [
         { email: { $regex: emailRegex } },
         { clientEmail: { $regex: emailRegex } },
       ];
-    } else if (req.user && req.user.role === "partner") {
-      // If it's the partner dashboard requesting all records, only show THEIR records
-      filter.partnerId = req.user.id;
     }
 
-    const mails = await Mail.find(filter).lean().sort({ createdAt: -1 });
-    const mappedMails = mails.map((m: any) => ({
-      ...m,
-      mailId: m.mailId || m._id?.toString(),
-    }));
+    if (search) {
+      const searchRegex = new RegExp(search.toString().trim(), "i");
+      filter.$or = [
+        ...(filter.$or || []),
+        { client: { $regex: searchRegex } },
+        { sender: { $regex: searchRegex } },
+        { email: { $regex: searchRegex } },
+      ];
+    }
 
-    res.status(200).json({ success: true, data: mappedMails });
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Mail.countDocuments(filter);
+    const pendingCount = await Mail.countDocuments({ ...filter, status: "Pending Action" });
+    const collectedCount = await Mail.countDocuments({ ...filter, status: "Collected" });
+    const mails = await Mail.find(filter)
+      .lean()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Fetch real names from UserModel based on emails
+    const uniqueEmails = [...new Set(mails.map((m: any) => m.email?.toLowerCase().trim()).filter(Boolean))];
+    const users = await UserModel.find({ email: { $in: uniqueEmails } }).select("email fullName").lean();
+    const emailToName = Object.fromEntries(users.map((u: any) => [u.email.toLowerCase(), u.fullName]));
+
+    const mappedMails = mails.map((m: any) => {
+      const emailKey = m.email?.toLowerCase().trim();
+      return {
+        ...m,
+        client: emailToName[emailKey] || m.client,
+        mailId: m.mailId || m._id?.toString(),
+        documentUrl: m.photo, // Map photo to documentUrl for frontend consistency
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: mappedMails,
+      pagination: {
+        total: totalCount,
+        pending: pendingCount,
+        collected: collectedCount,
+        page,
+        limit,
+        pages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("[getMails] Error:", error);
     res
@@ -127,19 +174,30 @@ export const getMails = async (req: Request, res: Response) => {
 export const updateMailStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, clientDecision, userCollectedStatus } = req.body;
 
-    const validStatuses = ["Pending Action", "Forwarded", "Collected"];
-    if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or missing status provided.",
-      });
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (clientDecision) updateData.clientDecision = clientDecision;
+    if (userCollectedStatus) updateData.userCollectedStatus = userCollectedStatus;
+
+    // Special logic for client requests from User Dashboard
+    if (req.user?.role === 'user' || !req.user?.role) {
+      if (status === 'Forwarded') {
+        // User requested forward, but status should remain 'Pending Action' until partner acts
+        delete updateData.status;
+        updateData.clientDecision = 'Forward Requested';
+      }
+      if (status === 'Collected') {
+        // User marked as collected (received), but status should remain 'Forwarded' or 'Pending' until partner acts
+        delete updateData.status;
+        updateData.userCollectedStatus = 'Collected';
+      }
     }
 
     const updatedMail = await Mail.findByIdAndUpdate(
       id,
-      { status },
+      updateData,
       { new: true },
     );
 

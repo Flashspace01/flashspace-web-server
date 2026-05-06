@@ -173,13 +173,13 @@ export const removePartner = async (req: Request, res: Response) => {
       });
     }
 
-    // Soft delete
-    partner.isDeleted = true;
-    await partner.save();
-
+    // Hard delete from database
+    const kycProfileId = partner.kycProfile;
+    await partner.deleteOne();
+    
     // Recalculate partnerCount
     const kycProfile = await KYCDocumentModel.findOne({
-      _id: partner.kycProfile,
+      _id: kycProfileId,
     });
 
     if (kycProfile && partner.user) {

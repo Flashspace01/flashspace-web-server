@@ -37,38 +37,21 @@ export const getPartnerTrackProgressData = async (req: Request, res: Response) =
 
     console.log(`[TrackProgress] Found ${bookings.length} bookings for partner ${partnerId}`);
 
-    const userIds = bookings.map((b: any) => b.user?._id?.toString()).filter(Boolean);
-
-    // Fetch all approved partner KYCs for these users AND this partner in one go
-    const approvedPartnerKycs = await PartnerKYCModel.find({
-      user: { $in: userIds },
-      linkedUser: partnerId, // Explicitly filter by this partner
-      status: "approved",
-      isDeleted: { $ne: true }
-    }).lean();
-
-    console.log(`[TrackProgress] Found ${approvedPartnerKycs.length} approved partner KYC records`);
-
     const data = bookings.map((booking: any) => {
       const docs = booking.documents || [];
       
-      const draftSubmitted = docs.some((doc: any) => doc.type === 'draft_agreement');
+      const draftSubmitted = docs.some((doc: any) => doc.type === 'draft_agreement' && !!doc.fileUrl);
       const draftVerified = docs.some((doc: any) => 
         (doc.type === 'signed_agreement' || doc.type === 'agreement') && 
         doc.status === 'approved'
       );
       const supportingDocReceived = docs.some((doc: any) => 
-        ['noc', 'utility_bill', 'electricity_bill', 'other_support', 'gst_certificate', 'pan_card'].includes(doc.type)
+        ['noc', 'utility_bill', 'electricity_bill', 'other_support', 'gst_certificate', 'pan_card'].includes(doc.type) && !!doc.fileUrl
       );
 
-      const agreementReceived = docs.some((doc: any) => doc.type === 'signed_agreement' || doc.type === 'agreement');
+      const agreementReceived = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement' || doc.type === 'final_agreement') && !!doc.fileUrl);
 
-      // Partner KYC is approved if there's an approved PartnerKYC record linking this user and this partner
-      const partnerKycApproved = approvedPartnerKycs.some(
-        (pk: any) =>
-          pk.user.toString() === booking.user?._id?.toString() &&
-          pk.linkedUser?.toString() === partnerId
-      );
+      const partnerKycApproved = (booking.kycStatus === 'approved');
 
       return {
         id: booking._id,
