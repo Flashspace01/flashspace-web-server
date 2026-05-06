@@ -7,28 +7,69 @@ import { EmailUtil } from "../../authModule/utils/email.util";
 
 export const getVisits = async (req: Request, res: Response) => {
   try {
-    const { email } = req.query;
+    const { email, search } = req.query;
     let filter: any = {};
 
-    // If a specific email is requested (e.g. from the client dashboard)
+    if (req.user && req.user.role === "partner") {
+      filter.partnerId = req.user.id;
+    }
+
     if (email) {
       const emailRegex = new RegExp("^" + email.toString().trim() + "$", "i");
       filter.$or = [
         { email: { $regex: emailRegex } },
         { clientEmail: { $regex: emailRegex } },
       ];
-    } else if (req.user && req.user.role === "partner") {
-      // If it's the partner dashboard requesting all records, only show THEIR records
-      filter.partnerId = req.user.id;
     }
 
-    const visits = await Visit.find(filter).lean().sort({ createdAt: -1 });
-    const mappedVisits = visits.map((v: any) => ({
-      ...v,
-      visitId: v.visitId || v._id?.toString(),
-    }));
+    if (search) {
+      const searchRegex = new RegExp(search.toString().trim(), "i");
+      filter.$or = [
+        ...(filter.$or || []),
+        { client: { $regex: searchRegex } },
+        { visitor: { $regex: searchRegex } },
+        { purpose: { $regex: searchRegex } },
+        { email: { $regex: searchRegex } },
+      ];
+    }
 
-    res.status(200).json({ success: true, data: mappedVisits });
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const totalCount = await Visit.countDocuments(filter);
+    const pendingCount = await Visit.countDocuments({ ...filter, status: "Pending" });
+    const visits = await Visit.find(filter)
+      .lean()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // Fetch real names from UserModel based on emails
+    const uniqueEmails = [...new Set(visits.map((v: any) => v.email?.toLowerCase().trim()).filter(Boolean))];
+    const users = await UserModel.find({ email: { $in: uniqueEmails } }).select("email fullName").lean();
+    const emailToName = Object.fromEntries(users.map((u: any) => [u.email.toLowerCase(), u.fullName]));
+
+    const mappedVisits = visits.map((v: any) => {
+      const emailKey = v.email?.toLowerCase().trim();
+      return {
+        ...v,
+        client: emailToName[emailKey] || v.client,
+        visitId: v.visitId || v._id?.toString(),
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: mappedVisits,
+      pagination: {
+        total: totalCount,
+        pending: pendingCount,
+        page,
+        limit,
+        pages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error: any) {
     console.error("Error fetching visits:", error);
     res.status(500).json({

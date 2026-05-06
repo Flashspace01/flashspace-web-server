@@ -137,7 +137,7 @@ async function resetRejectedPartnerReviewsForBooking(
 
     const profileIds = [linkedProfileId].filter(Boolean);
     return profileIds.length
-      ? { kycProfile: { $in: profileIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+      ? { $or: [{ kycProfile: { $in: profileIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { _id: { $in: profileIds.map((id) => new mongoose.Types.ObjectId(id)) } }] }
       : {};
   })();
 
@@ -2057,63 +2057,18 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       generatedAt: reviewPayload.reviewedAt,
     };
 
-    await BookingModel.updateOne(
-      { _id: booking._id },
-      {
-        $pull: { kycDocumentReviews: reviewIdentity },
-        $set: { updatedAt: new Date() },
-      },
-    );
-    await BookingModel.updateOne(
-      { _id: booking._id },
-      {
-        $push: { kycDocumentReviews: reviewPayload },
-        $set: { updatedAt: new Date() },
-      },
-    );
-    await BookingModel.updateOne(
-      { _id: booking._id },
-      {
-        $pull: { documents: { type: reviewDocType } },
-        $set: { updatedAt: new Date() },
-      },
-    );
-    await BookingModel.updateOne(
-      { _id: booking._id },
-      {
-        $push: { documents: reviewDocEntry },
-        $set: { updatedAt: new Date() },
-      },
-    );
-
-    const persistedBooking = await BookingModel.findById(booking._id)
-      .select("kycDocumentReviews documents")
-      .lean();
-    const persistedInReviews = (persistedBooking?.kycDocumentReviews || []).some(
-      (review: any) =>
-        String(review.profileModel || "kyc") === targetProfileModel &&
-        String(review.profileId || "") === targetProfileId &&
-        String(review.documentId || "") === targetDocId &&
-        String(review.status || "") === reviewStatus,
-    );
-    const persistedInDocuments = (persistedBooking?.documents || []).some(
-      (doc: any) =>
-        String(doc.type || "") === reviewDocType &&
-        String(doc.status || "") === reviewStatus,
-    );
-
-    if (!persistedInReviews && !persistedInDocuments) {
-      console.error("[reviewPartnerBookingKycDocument] Review did not persist", {
-        bookingId: String(booking._id),
-        reviewPayload,
-        reviewDocType,
-      });
-      return res.status(500).json({
-        success: false,
-        message: "Review could not be saved. Please try again.",
-      });
+    // 4. Update the target profile's document status directly
+    if (targetProfile && targetDoc) {
+      targetDoc.partnerReviewStatus = reviewStatus;
+      targetDoc.partnerRejectionReason = reviewReason;
+      targetDoc.partnerReviewedAt = new Date();
+      targetDoc.partnerReviewedBy = partnerId;
+      targetProfile.markModified('documents');
+      await targetProfile.save();
+      console.log(`[reviewPartnerBookingKycDocument] Profile ${targetProfile._id} document updated.`);
     }
 
+    // 5. Update the booking object in memory for kycDocumentReviews
     booking.kycDocumentReviews = [
       ...(Array.isArray(booking.kycDocumentReviews) ? booking.kycDocumentReviews : []).filter((review: any) => {
         const sameProfile =
@@ -2127,6 +2082,17 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       }),
       reviewPayload,
     ];
+
+    // 6. Update the booking's documents array in memory (to avoid overwrite during save)
+    const existingDocIndex = (booking.documents || []).findIndex((doc: any) => String(doc.type || "") === reviewDocType);
+    if (existingDocIndex >= 0) {
+      booking.documents[existingDocIndex] = reviewDocEntry;
+    } else {
+      booking.documents = [...(booking.documents || []), reviewDocEntry];
+    }
+    booking.markModified('documents');
+    booking.markModified('kycDocumentReviews');
+
     console.log(`[reviewPartnerBookingKycDocument] Booking review saved. New Status: ${reviewStatus}`);
 
     // Notify User
@@ -2155,31 +2121,100 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       console.error("[reviewPartnerBookingKycDocument] Notification failed:", notifError);
     }
 
-    const reviewedProfileDocs = (targetProfile.documents || []).filter((item: any) =>
-      item?._id || item?.type,
+    // 7. Re-calculate overall KYC status for this booking
+    // We must check if ALL required documents for this specific booking have been approved.
+    // We cannot rely on the profile's document status alone because it might be 'approved' from a previous booking.
+    const reviewLookup = buildBookingReviewLookup(booking);
+    
+    const clientUserId = String(userId);
+    const rawProfileId = (booking.kycProfile as any)?._id || booking.kycProfile;
+    const linkedProfileId = rawProfileId ? String(rawProfileId) : "";
+    
+    const kycProfilesMap = new Map(kycProfiles.map((p: any) => [String(p._id), p]));
+    const businessMap = new Map(businessProfiles.map((p: any) => [String(p._id), p]));
+    const businessByKycProfile = new Map(
+      businessProfiles
+        .filter((p: any) => p.kycProfile)
+        .map((p: any) => [String(p.kycProfile), p])
     );
-    const bookingReviewsForProfile = (booking.kycDocumentReviews || []).filter(
-      (review: any) =>
-        String(review.profileModel || "kyc") === String(targetProfileModel) &&
-        String(review.profileId || "") === targetProfileId,
-    );
+    
+    const individualProfile = kycProfiles.find((p: any) => String(p.user) === clientUserId && p.kycType === "individual");
+    let linkedKycProfile = kycProfilesMap.get(linkedProfileId);
+    const linkedBusiness = businessMap.get(linkedProfileId) || businessByKycProfile.get(linkedProfileId);
+    
+    if (!linkedKycProfile && linkedBusiness?.kycProfile) {
+      linkedKycProfile = kycProfilesMap.get(String(linkedBusiness.kycProfile));
+    }
 
-    if (
-      reviewedProfileDocs.length &&
-      reviewedProfileDocs.every((item: any) =>
-        bookingReviewsForProfile.some((review: any) => {
-          const sameId =
-            item._id && String(review.documentId || "") === String(item._id);
-          const sameType =
-            !item._id && item.type && String(review.documentType || "") === String(item.type);
-          return (sameId || sameType) && review.status === "approved";
-        }),
-      )
-    ) {
+    // Collect all documents that need review for this booking
+    const allRequiredDocs: any[] = [];
+    
+    // 1. Individual Documents
+    if (individualProfile) {
+      (individualProfile.documents || []).forEach((d: any) => {
+        allRequiredDocs.push({ doc: d, profileId: String(individualProfile._id), model: "kyc" });
+      });
+    }
+    
+    // 2. Business Documents
+    if (linkedBusiness) {
+      (linkedBusiness.documents || []).forEach((d: any) => {
+        allRequiredDocs.push({ doc: d, profileId: String(linkedBusiness._id), model: "business" });
+      });
+    } else if (linkedKycProfile?.kycType === "business") {
+      (linkedKycProfile.documents || []).forEach((d: any) => {
+        allRequiredDocs.push({ doc: d, profileId: String(linkedKycProfile._id), model: "kyc" });
+      });
+    }
+
+    // 3. Partner Documents
+    const selectedPartnerIds = booking.selectedPartners || [];
+    partnerProfiles.forEach((p: any) => {
+      if (selectedPartnerIds.some((id: any) => String(id) === String(p._id))) {
+        (p.documents || []).forEach((d: any) => {
+          allRequiredDocs.push({ doc: d, profileId: String(p._id), model: "partner" });
+        });
+      }
+    });
+
+    // Evaluate overall status strictly based on booking reviews
+    const allApprovedInBooking = allRequiredDocs.length > 0 && allRequiredDocs.every(item => {
+      const review = findBookingReview(reviewLookup, item.model, item.profileId, item.doc);
+      return review?.status === "approved";
+    });
+
+    if (allApprovedInBooking) {
       booking.kycStatus = "approved";
       if (booking.status === "pending_kyc") booking.status = "active";
-      await booking.save();
+      
+      // Update the profile's overall status for global consistency if all documents are approved
+      if (targetProfile) {
+        const profileDocs = targetProfile.documents || [];
+        const profileAllApproved = profileDocs.length > 0 && profileDocs.every((d: any) => d.partnerReviewStatus === "approved");
+        
+        if (profileAllApproved) {
+          if ('status' in targetProfile) targetProfile.status = 'approved';
+          if ('overallStatus' in targetProfile) targetProfile.overallStatus = 'approved';
+          if ('kycStatus' in targetProfile) targetProfile.kycStatus = 'approved';
+          await targetProfile.save();
+        }
+      }
+    } else {
+      // If any document is rejected, the booking KYC is rejected
+      const anyRejected = allRequiredDocs.some(item => {
+        const review = findBookingReview(reviewLookup, item.model, item.profileId, item.doc);
+        return review?.status === "rejected";
+      });
+
+      if (anyRejected || action === "reject") {
+        booking.kycStatus = "rejected";
+      } else {
+        booking.kycStatus = "pending";
+      }
     }
+
+    await booking.save();
+    console.log(`[reviewPartnerBookingKycDocument] Booking ${booking._id} saved with kycStatus: ${booking.kycStatus}`);
 
     return res.status(200).json({ success: true, message: `Document ${action}d successfully` });
   } catch (error) {
@@ -2376,11 +2411,15 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
 
     booking.kycDocumentReviews = [];
     booking.markModified("kycDocumentReviews");
+
+    // Clear partner review records from documents array to allow fresh review
+    booking.documents = (booking.documents || []).filter(
+      (doc: any) => !doc.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX)
+    );
+    booking.markModified("documents");
     
     booking.partnerRequestStatus = "submitted";
-    if (String(booking.kycStatus || "").toLowerCase() === "rejected") {
-      booking.kycStatus = "pending";
-    }
+    booking.kycStatus = "pending";
     if (String(booking.status || "").toLowerCase() !== "active") {
       booking.status = "pending_kyc";
     }
@@ -2929,42 +2968,6 @@ export const getAllBookings = async (req: Request, res: Response) => {
     const limitNum = Number(limit) || 100;
     const skip = (Number(page) - 1) * limitNum;
 
-    // 0. AUTO-FIX: Transition pending_kyc to active if user is already verified
-    try {
-      const user = await UserModel.findById(userId);
-      if (user?.kycVerified) {
-        // Find bookings that need activation
-        const needsActivation = await BookingModel.find({
-          user: userId,
-          status: "pending_kyc",
-          isDeleted: { $ne: true }
-        });
-
-        if (needsActivation.length > 0) {
-          await BookingModel.updateMany(
-            { user: userId, status: "pending_kyc", isDeleted: { $ne: true } },
-            { 
-              $set: { 
-                status: "active", 
-                kycStatus: "approved",
-                updatedAt: new Date()
-              },
-              $push: {
-                timeline: {
-                  status: "activated_automatically",
-                  date: new Date(),
-                  note: "Booking activated automatically as user KYC is already verified.",
-                  by: "System"
-                }
-              }
-            }
-          );
-        }
-      }
-    } catch (err) {
-      console.error("[getAllBookings] Auto-activation error:", err);
-    }
-
     // Prepare seat filter if applicable
     let seatFilter: any = null;
     if (!normalizedType || normalizedType === "CoworkingSpace") {
@@ -3169,25 +3172,6 @@ export const getBookingById = async (req: Request, res: Response) => {
     );
 
     if (booking) {
-      // AUTO-FIX: Transition pending_kyc to active if user is already verified
-      const ownsBooking = String((booking as any).user) === String(userId);
-      const user = ownsBooking ? await UserModel.findById(userId) : null;
-      if (ownsBooking && user?.kycVerified && booking.status === "pending_kyc") {
-        booking.status = "active";
-        booking.kycStatus = "approved";
-        
-        // Add timeline entry for the automatic activation
-        booking.timeline = booking.timeline || [];
-        booking.timeline.push({
-          status: "activated_automatically",
-          date: new Date(),
-          note: "Booking activated automatically as user KYC is already verified.",
-          by: "System"
-        });
-
-        await booking.save();
-      }
-
       const bookingObj = booking.toObject() as any;
       bookingObj.sharedAccess = String(bookingObj.user) !== String(userId);
       if (bookingObj.endDate) {
@@ -4470,7 +4454,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
         });
       }
       // Business Profile Docs
-      requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
+      requiredDocs = ["pan_card", "gst_certificate"];
     } else {
       // KYCDocument Validation
       const isBusiness = kyc.kycType === "business";
@@ -4498,7 +4482,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
 
       const isPartnerProfile = kyc.isPartner === true;
       if (isBusiness) {
-        requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
+        requiredDocs = ["pan_card", "gst_certificate"];
       } else if (isPartnerProfile) {
         requiredDocs = ["pan_card", "aadhaar"];
       } else {
@@ -4848,7 +4832,7 @@ function calculateKYCProgress(kyc: any): number {
     if (kyc.companyName) progress += 25;
 
     // Check documents for Business Info
-    const requiredDocs = ["pan_card", "gst_certificate", "address_proof"];
+    const requiredDocs = ["pan_card", "gst_certificate"];
     const uploadedDocs = kyc.documents?.map((d: any) => d.type) || [];
     const hasRequiredCount = requiredDocs.filter((d) =>
       uploadedDocs.includes(d),
@@ -4867,7 +4851,6 @@ function calculateKYCProgress(kyc: any): number {
     const requiredDocs = [
       "pan_card",
       "gst_certificate",
-      "address_proof",
       // "video_kyc", // Video KYC might not be required for pure business profile if personal is separate?
       // But let's keep it consistent with previous logic or adjust.
       // If it's BusinessInfoModel, we might strictly check docs.
@@ -5365,10 +5348,20 @@ export const getUserMails = async (req: Request, res: Response) => {
       collected: allUserMails.filter(m => m.status?.toLowerCase() === 'collected').length
     };
 
-    const formattedMails = mails.map((m: any) => ({
-      ...m,
-      mailId: m.mailId || m._id?.toString(),
-    }));
+    // Fetch real names from UserModel based on emails
+    const uniqueEmails = [...new Set(mails.map((m: any) => m.email?.toLowerCase().trim()).filter(Boolean))];
+    const users = await UserModel.find({ email: { $in: uniqueEmails } }).select("email fullName").lean();
+    const emailToName = Object.fromEntries(users.map((u: any) => [u.email.toLowerCase(), u.fullName]));
+
+    const formattedMails = mails.map((m: any) => {
+      const emailKey = m.email?.toLowerCase().trim();
+      return {
+        ...m,
+        client: emailToName[emailKey] || m.client,
+        mailId: m.mailId || m._id?.toString(),
+        documentUrl: m.photo,
+      };
+    });
 
     const finalResponse = {
       success: true,
@@ -5422,10 +5415,19 @@ export const getUserVisits = async (req: Request, res: Response) => {
       .lean()
       .sort({ createdAt: -1 });
 
-    const formattedVisits = visits.map((v: any) => ({
-      ...v,
-      visitId: v.visitId || v._id?.toString(),
-    }));
+    // Fetch real names from UserModel based on emails
+    const uniqueEmails = [...new Set(visits.map((v: any) => v.email?.toLowerCase().trim()).filter(Boolean))];
+    const users = await UserModel.find({ email: { $in: uniqueEmails } }).select("email fullName").lean();
+    const emailToName = Object.fromEntries(users.map((u: any) => [u.email.toLowerCase(), u.fullName]));
+
+    const formattedVisits = visits.map((v: any) => {
+      const emailKey = v.email?.toLowerCase().trim();
+      return {
+        ...v,
+        client: emailToName[emailKey] || v.client,
+        visitId: v.visitId || v._id?.toString(),
+      };
+    });
 
     res.status(200).json({ success: true, data: formattedVisits });
   } catch (error) {

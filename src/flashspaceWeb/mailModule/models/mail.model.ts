@@ -10,6 +10,8 @@ export interface IMail extends Document {
     space: string;
     received: Date;
     status: 'Pending Action' | 'Forwarded' | 'Collected';
+    clientDecision: 'None' | 'Forward Requested';
+    userCollectedStatus: 'Pending' | 'Collected';
     photo?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -28,6 +30,16 @@ const MailSchema: Schema = new Schema({
         type: String,
         enum: ['Pending Action', 'Forwarded', 'Collected'],
         default: 'Pending Action'
+    },
+    clientDecision: {
+        type: String,
+        enum: ['None', 'Forward Requested'],
+        default: 'None'
+    },
+    userCollectedStatus: {
+        type: String,
+        enum: ['Pending', 'Collected'],
+        default: 'Pending'
     },
     photo: { type: String },
 }, { timestamps: true });
