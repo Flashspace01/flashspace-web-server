@@ -857,7 +857,7 @@ export class AdminService {
           ['noc', 'utility_bill', 'electricity_bill', 'other_support', 'gst_certificate', 'pan_card'].includes(doc.type) && !!doc.fileUrl
         );
 
-        const agreementReceived = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement' || doc.type === 'final_agreement') && !!doc.fileUrl);
+        const agreementReceived = docs.some((doc: any) => doc.type === 'final_agreement' && !!doc.fileUrl);
 
         // A booking is considered partner-approved if the kycStatus is approved 
         // OR if there are explicit partner reviews that are approved.
