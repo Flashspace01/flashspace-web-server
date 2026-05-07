@@ -591,6 +591,7 @@ export class TicketService {
     ticketId: string,
     affiliateId: string,
     message: string,
+    attachments?: string[],
   ): Promise<any> {
     const ticket = await TicketModel.findById(ticketId);
     if (!ticket) throw new Error("Ticket not found");
@@ -599,7 +600,7 @@ export class TicketService {
       throw new Error("You must tap in before you can send messages");
     }
 
-    ticket.messages.push({ sender: "affiliate", message, createdAt: new Date() });
+    ticket.messages.push({ sender: "affiliate", message, attachments, createdAt: new Date() });
     ticket.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await ticket.save();
 
@@ -619,7 +620,7 @@ export class TicketService {
 
   static async partnerMessageClient(
     partnerId: string,
-    data: { clientUserId: string; bookingId?: string; subject: string; message: string }
+    data: { clientUserId: string; bookingId?: string; subject: string; message: string; attachments?: string[] }
   ) {
     const partnerObjectId = new Types.ObjectId(partnerId);
 
@@ -688,6 +689,7 @@ export class TicketService {
       ticket.messages.push({
         sender: "partner",
         message: data.message,
+        attachments: data.attachments,
         createdAt: new Date()
       });
       ticket.status = TicketStatus.IN_PROGRESS;
@@ -706,7 +708,8 @@ export class TicketService {
         priority: TicketPriority.MEDIUM,
         status: TicketStatus.OPEN,
         chatType: "user_partner",
-        messages: [{ sender: "partner", message: data.message, createdAt: new Date() }],
+        messages: [{ sender: "partner", message: data.message, attachments: data.attachments, createdAt: new Date() }],
+        attachments: data.attachments || [],
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
     }
@@ -715,5 +718,22 @@ export class TicketService {
       .populate("user", "fullName email phoneNumber")
       .populate("bookingId", "bookingNumber spaceSnapshot type")
       .lean();
+  }
+
+  static async replyToTicket(data: ReplyDTO & { ticketId: string }) {
+    return await this.addReply(data.ticketId, data);
+  }
+
+  static async submitTicketFeedback(ticketId: string, feedback: { rating: number; remarks?: string }) {
+    const ticket = await TicketModel.findById(ticketId);
+    if (!ticket) throw new Error("Ticket not found");
+
+    ticket.rating = feedback.rating;
+    ticket.ratingRemarks = feedback.remarks;
+    ticket.feedbackSubmittedAt = new Date();
+    ticket.ratedAssignee = ticket.assignee;
+
+    await ticket.save();
+    return ticket;
   }
 }

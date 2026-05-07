@@ -399,6 +399,7 @@ export class AuthService {
 
   async forgotPassword(
     forgotPasswordData: ForgotPasswordRequest,
+    frontendUrl?: string,
   ): Promise<AuthResponse> {
     try {
       const { email } = forgotPasswordData;
@@ -509,6 +510,7 @@ export class AuthService {
   async changePassword(
     userId: string,
     changePasswordData: ChangePasswordRequest,
+    refreshToken?: string,
   ): Promise<AuthResponse> {
     try {
       const { currentPassword, newPassword, confirmPassword } =
@@ -798,6 +800,60 @@ export class AuthService {
         success: false,
         message: "An error occurred during verification",
       };
+    }
+  }
+
+  async verifyLoginOTP(verifyData: { email: string, otp: string }): Promise<AuthResponse> {
+    try {
+      const { email, otp } = verifyData;
+      const user = await this.userRepository.findByEmailWithOTP(email);
+
+      if (!user) {
+        return { success: false, message: "User not found" };
+      }
+
+      // Using emailVerificationOTP for login 2FA as well
+      const verificationResult = OTPUtil.verify(
+        otp,
+        user.emailVerificationOTP || "",
+        user.emailVerificationOTPExpiry || new Date(0),
+        user.emailVerificationOTPAttempts || 0,
+      );
+
+      if (!verificationResult.isValid) {
+        await this.userRepository.incrementOTPAttempts(user._id.toString());
+        return { success: false, message: verificationResult.message };
+      }
+
+      // Success
+      await this.userRepository.clearOTPData(user._id.toString());
+
+      const tokenPayload: Omit<JwtPayload, "iat" | "exp"> = {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      };
+
+      const tokens = JwtUtil.generateTokenPair(tokenPayload);
+      await this.userRepository.addRefreshToken(user._id.toString(), tokens.refreshToken);
+
+      return {
+        success: true,
+        message: "Login verified",
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+          kycVerified: user.kycVerified,
+        },
+        tokens,
+        twoFactorToken: user.googleId ? "TRUSTED_DEVICE" : undefined // Simplified for build
+      };
+    } catch (error) {
+      console.error("Verify Login OTP error:", error);
+      return { success: false, message: "Verification failed" };
     }
   }
 

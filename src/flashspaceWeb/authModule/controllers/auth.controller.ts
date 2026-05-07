@@ -389,7 +389,7 @@ export class AuthController {
       const result = await this.authService.changePassword(
         req.user.id,
         changePasswordData,
-        AuthMiddleware.extractRefreshToken(req),
+        AuthMiddleware.extractRefreshToken(req) || undefined,
       );
 
       if (result.success) {
@@ -806,7 +806,6 @@ export class AuthController {
       const result = await this.authService.googleAuthWithToken(
         idToken,
         role,
-        req.cookies?.twoFactorDevice,
       );
 
       if (result.success && result.requiresTwoFactor) {
@@ -875,7 +874,6 @@ export class AuthController {
       const result = await this.authService.googleAuthWithToken(
         idToken,
         role,
-        req.cookies?.twoFactorDevice,
       );
 
       if (result.success && result.requiresTwoFactor) {

@@ -1863,7 +1863,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       // TRACE LOG: Print status of personal docs for debugging undo issue
       if (booking.bookingNumber.includes("322") || booking.bookingNumber.includes("917")) {
         console.log(`[getPartnerBookingRequests] TRACE ${booking.bookingNumber}:`);
-        personalDocuments.forEach(d => console.log(`   - ${d.type}: ${d.partnerReviewStatus} (Source: ${d.partnerReviewSource})`));
+        personalDocuments.forEach(d => console.log(`   - ${d?.type}: ${d?.partnerReviewStatus} (Source: ${d?.partnerReviewSource})`));
       }
       const partnerDocuments = uniquePartners
         .filter((partner: any) => {
@@ -2063,7 +2063,7 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       return res.status(400).json({ success: false, message: "Invalid review request" });
     }
 
-    const booking: any = await findPartnerAccessibleBooking(partnerId, String(bookingId));
+    let booking: any = await findPartnerAccessibleBooking(partnerId, String(bookingId));
     if (!booking) {
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
