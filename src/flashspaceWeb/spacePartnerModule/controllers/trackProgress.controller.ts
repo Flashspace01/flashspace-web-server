@@ -49,7 +49,7 @@ export const getPartnerTrackProgressData = async (req: Request, res: Response) =
         ['noc', 'utility_bill', 'electricity_bill', 'other_support', 'gst_certificate', 'pan_card'].includes(doc.type) && !!doc.fileUrl
       );
 
-      const agreementReceived = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement' || doc.type === 'final_agreement') && !!doc.fileUrl);
+      const agreementReceived = docs.some((doc: any) => doc.type === 'final_agreement' && !!doc.fileUrl);
 
       const partnerKycApproved = (booking.kycStatus === 'approved');
 
