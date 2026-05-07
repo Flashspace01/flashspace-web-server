@@ -67,6 +67,9 @@ export class BusinessInfo {
   @prop({ default: 0, min: 0, max: 100 })
   progress?: number;
 
+  @prop()
+  submittedAt?: Date;
+
   @prop({ default: Date.now })
   updatedAt?: Date;
 }

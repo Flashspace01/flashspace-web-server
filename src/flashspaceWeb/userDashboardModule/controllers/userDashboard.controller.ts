@@ -3552,6 +3552,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
             documents: businessInfo.documents || [],
             overallStatus: businessInfo.status || "pending",
             rejectionReason: businessInfo.rejectionReason,
+            submittedAt: businessInfo.submittedAt,
             progress: calculateKYCProgress({
               kycType: "business",
               documents: businessInfo.documents || [],
@@ -3593,6 +3594,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
             documents: partner.documents || [],
             overallStatus: partner.status || "pending",
             rejectionReason: partner.rejectionReason,
+            submittedAt: partner.submittedAt,
             progress: 0,
             createdAt: partner.createdAt,
             updatedAt: partner.updatedAt,
@@ -3684,6 +3686,7 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       documents: b.documents || [],
       overallStatus: b.status || "pending",
       rejectionReason: b.rejectionReason,
+      submittedAt: b.submittedAt,
       progress: 0,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
@@ -3710,6 +3713,8 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       },
       documents: p.documents || [],
       overallStatus: p.status || "pending",
+      rejectionReason: p.rejectionReason,
+      submittedAt: p.submittedAt,
       progress: 0,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
@@ -4221,19 +4226,19 @@ export const uploadKYCDocument = async (req: Request, res: Response) => {
     // Explicitly mark documents as modified to ensure Mongoose saves the array update
     kyc.markModified("documents");
 
-    // Update progress
-    // Update progress and status
+    // Update progress, but keep the profile as a draft until the user explicitly submits it.
     kyc.progress = calculateKYCProgress(kyc);
     
     const currentStatus = typeof kyc.overallStatus !== "undefined" ? kyc.overallStatus : kyc.status;
-    const isFinalState = ["not_started", "approved", "rejected", "in_progress"].includes(currentStatus || "");
+    const shouldMoveToDraft = ["not_started", "rejected", "resubmit"].includes(currentStatus || "");
     
-    if (isFinalState || !currentStatus) {
+    if (shouldMoveToDraft || !currentStatus) {
       if (typeof kyc.overallStatus !== "undefined") {
-        kyc.overallStatus = "pending";
+        kyc.overallStatus = "in_progress";
       } else {
-        kyc.status = "pending";
+        kyc.status = "in_progress";
       }
+      kyc.submittedAt = undefined;
     }
     kyc.updatedAt = new Date();
 
@@ -4438,13 +4443,10 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
     // Check status based on model type
     const status =
       isPartner || isBusinessInfoDoc ? kyc.status : kyc.overallStatus;
-    if (status === "pending" || status === "approved") {
+    if (status === "approved") {
       return res.status(400).json({
         success: false,
-        message:
-          status === "approved"
-            ? "KYC is already approved"
-            : "KYC is already under review",
+        message: "KYC is already approved",
       });
     }
 
@@ -4525,6 +4527,7 @@ export const submitKYCForReview = async (req: Request, res: Response) => {
       kyc.progress = calculateKYCProgress(kyc);
     }
     kyc.updatedAt = new Date();
+    kyc.submittedAt = new Date();
 
     await kyc.save();
 
