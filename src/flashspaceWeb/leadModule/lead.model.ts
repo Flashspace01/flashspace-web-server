@@ -1,8 +1,11 @@
-import { prop, getModelForClass, modelOptions, index } from "@typegoose/typegoose";
+import { prop, getModelForClass, modelOptions, index, Severity } from "@typegoose/typegoose";
 
 @modelOptions({
   schemaOptions: {
     timestamps: true,
+  },
+  options: {
+    allowMixed: Severity.ALLOW,
   },
 })
 @index({ email: 1 })
