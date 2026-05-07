@@ -83,6 +83,18 @@ class BookingDocument {
 
   @prop()
   generatedAt?: Date;
+
+  @prop({ enum: ["pending", "approved", "rejected"], default: "pending" })
+  partnerReviewStatus?: string;
+
+  @prop()
+  partnerRejectionReason?: string;
+
+  @prop()
+  partnerReviewedAt?: Date;
+
+  @prop()
+  partnerReviewedBy?: string;
 }
 
 class BookingKycDocumentReview {
@@ -183,8 +195,8 @@ export class Booking {
   })
   status!: string;
 
-  @prop({ ref: () => KYCDocument })
-  kycProfile?: Ref<KYCDocument>; // Reference to the KYC profile used for this booking
+  @prop({ type: () => mongoose.Schema.Types.ObjectId })
+  kycProfile?: any; // Reference to the KYC profile used for this booking (KYCDocument or BusinessInfo ID)
 
   @prop({
     enum: ["not_started", "pending", "approved", "rejected"],

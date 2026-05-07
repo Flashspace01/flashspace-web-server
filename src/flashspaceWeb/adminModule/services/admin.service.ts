@@ -849,14 +849,20 @@ export class AdminService {
         const docs = booking.documents || [];
         
         const draftSubmitted = docs.some((doc: any) => doc.type === 'draft_agreement' && !!doc.fileUrl);
-        const draftVerified = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement') && doc.status === 'approved');
+        const draftVerified = docs.some((doc: any) => 
+          (doc.type === 'signed_agreement' || doc.type === 'agreement') && 
+          (doc.status === 'approved' || doc.partnerReviewStatus === 'approved')
+        );
         const supportingDocReceived = docs.some((doc: any) => 
           ['noc', 'utility_bill', 'electricity_bill', 'other_support', 'gst_certificate', 'pan_card'].includes(doc.type) && !!doc.fileUrl
         );
 
         const agreementReceived = docs.some((doc: any) => (doc.type === 'signed_agreement' || doc.type === 'agreement' || doc.type === 'final_agreement') && !!doc.fileUrl);
 
-        const partnerKycApproved = (booking.kycStatus === 'approved');
+        // A booking is considered partner-approved if the kycStatus is approved 
+        // OR if there are explicit partner reviews that are approved.
+        const hasApprovedPartnerReview = (booking.kycDocumentReviews || []).some((r: any) => r.status === 'approved');
+        const partnerKycApproved = (booking.kycStatus === 'approved' || hasApprovedPartnerReview);
 
         return {
           id: booking._id,

@@ -88,6 +88,148 @@ const parseBookingKycReviewDocumentType = (type?: string) => {
   };
 };
 
+export const getReviewKey = (model: string, profileId: string, docId: string, docType: string) => {
+  let normalizedModel = (model || "kyc").toLowerCase();
+  if (normalizedModel === "businessinfo") normalizedModel = "business";
+  if (normalizedModel === "partnerkyc") normalizedModel = "partner";
+  
+  return `${normalizedModel}:${profileId}:${docId || ""}:${docType || ""}`;
+};
+
+const buildBookingReviewLookup = (booking: any) => {
+  const lookup = new Map<string, any>();
+
+  (booking.kycDocumentReviews || []).forEach((review: any) => {
+    const profileId = String(review.profileId || "");
+    const docId = String(review.documentId || "");
+    const docType = String(review.documentType || "");
+    const model = review.profileModel || "kyc";
+
+    const permutations = [
+      getReviewKey(model, profileId, docId, docType),
+      getReviewKey(model, profileId, docId, ""),
+      getReviewKey(model, profileId, "", docType)
+    ];
+
+    permutations.forEach(key => {
+      if (key) {
+        const existing = lookup.get(key);
+        if (!existing || (review.status !== "pending" && existing.status === "pending")) {
+          lookup.set(key, review);
+        }
+      }
+    });
+  });
+
+  (booking.documents || []).forEach((doc: any) => {
+    if (doc.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX)) {
+      const parsed = parseBookingKycReviewDocumentType(doc.type);
+      if (!parsed || !parsed.profileId) return;
+
+      const reviewData = {
+        profileModel: parsed.profileModel,
+        profileId: parsed.profileId,
+        documentId: parsed.documentId,
+        documentType: parsed.documentType,
+        status: doc.status || "pending",
+        rejectionReason: doc.rejectionReason || "",
+        reviewedAt: doc.reviewedAt || doc.generatedAt,
+      };
+
+      const permutations = [
+        getReviewKey(parsed.profileModel, parsed.profileId, parsed.documentId, parsed.documentType),
+        getReviewKey(parsed.profileModel, parsed.profileId, parsed.documentId, ""),
+        getReviewKey(parsed.profileModel, parsed.profileId, "", parsed.documentType)
+      ];
+
+      permutations.forEach(key => {
+        if (key) {
+          const existing = lookup.get(key);
+          if (!existing || (reviewData.status !== "pending" && existing.status === "pending")) {
+            lookup.set(key, reviewData);
+          }
+        }
+      });
+    }
+  });
+
+  return lookup;
+};
+
+const findBookingReview = (
+  lookup: Map<string, any>,
+  profileModel: string,
+  profileId: string,
+  doc: any,
+) => {
+  const documentId = String(doc?._id || "");
+  const documentType = doc?.type || "";
+
+  const modelsToTry = [profileModel];
+  if (profileModel === "business") modelsToTry.push("kyc");
+  if (profileModel === "kyc") modelsToTry.push("business");
+
+  for (const m of modelsToTry) {
+    const keysToTry = [
+      getReviewKey(m, profileId, documentId, documentType),
+      getReviewKey(m, profileId, documentId, ""),
+      getReviewKey(m, profileId, "", documentType)
+    ];
+
+    for (const key of keysToTry) {
+      const review = lookup.get(key);
+      if (review) {
+        console.log(`[findBookingReview] Found review (Model: ${m}) for key: ${key} -> Status: ${review.status}`);
+        return review;
+      }
+    }
+  }
+
+  console.log(`[findBookingReview] NO review found for profile ${profileModel}:${profileId} (tried models: ${modelsToTry.join(", ")})`);
+  return null;
+};
+
+const normalizeDoc = (
+  req: Request,
+  doc: any,
+  reviewLookup?: Map<string, any>,
+  profileModel = "kyc",
+  profileId = "",
+) => {
+  if (!doc) return null;
+  const bookingReview = reviewLookup
+    ? findBookingReview(reviewLookup, profileModel, profileId, doc)
+    : null;
+  return {
+    id: String(doc._id || doc.type || doc.name || "unknown"),
+    type: doc.type || "document",
+    name: doc.name || doc.type || "Document",
+    profileModel,
+    profileId,
+    status: doc.status || "pending",
+    partnerReviewStatus: bookingReview?.status || doc.partnerReviewStatus || "pending",
+    partnerReviewSource: bookingReview ? "booking" : (doc.partnerReviewStatus ? "profile" : "none"),
+    fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
+    uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
+    rejectionReason: doc.rejectionReason || "",
+    partnerRejectionReason: bookingReview?.rejectionReason || "",
+    partnerReviewedAt: bookingReview?.reviewedAt,
+  };
+};
+
+const safeNormalizeDocs = (
+  req: Request,
+  docs: any,
+  reviewLookup?: Map<string, any>,
+  profileModel = "kyc",
+  profileId = "",
+) => {
+  if (!docs || !Array.isArray(docs)) return [];
+  return docs
+    .map((doc) => normalizeDoc(req, doc, reviewLookup, profileModel, profileId))
+    .filter(Boolean);
+};
+
 const resetRejectedPartnerReviewDocs = (profile: any): boolean => {
   if (!profile || !Array.isArray(profile.documents)) return false;
 
@@ -1538,12 +1680,26 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
     if (profileIds.length > 0) partnerKycOrConditions.push({ kycProfile: { $in: profileIds } });
     if (userIds.length > 0) partnerKycOrConditions.push({ user: { $in: userIds } });
 
+    const kycProfileIdsFromBookings = Array.from(new Set(bookings.map((b: any) => String(b.kycProfile?._id || b.kycProfile || "")).filter(Boolean)));
+
     const [kycProfiles, businessInfos, partnerKycs] = await Promise.all([
-      userIds.length > 0
-        ? KYCDocumentModel.find({ user: { $in: userIds }, isDeleted: { $ne: true } })
+      (userIds.length > 0 || kycProfileIdsFromBookings.length > 0)
+        ? KYCDocumentModel.find({ 
+            $or: [
+              { user: { $in: userIds } },
+              { _id: { $in: kycProfileIdsFromBookings } }
+            ],
+            isDeleted: { $ne: true } 
+          })
         : Promise.resolve([]),
-      userIds.length > 0
-        ? BusinessInfoModel.find({ user: { $in: userIds }, isDeleted: { $ne: true } })
+      (userIds.length > 0 || kycProfileIdsFromBookings.length > 0)
+        ? BusinessInfoModel.find({ 
+            $or: [
+              { user: { $in: userIds } },
+              { _id: { $in: kycProfileIdsFromBookings } }
+            ],
+            isDeleted: { $ne: true } 
+          })
         : Promise.resolve([]),
       partnerKycOrConditions.length > 0
         ? PartnerKYCModel.find({
@@ -1570,123 +1726,17 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       partnersByProfile.set(key, [...(partnersByProfile.get(key) || []), partner]);
     });
 
-    const getReviewKey = (
-      profileModel: string,
-      profileId: string,
-      documentId?: string,
-      documentType?: string,
-    ) =>
-      [
-        profileModel || "kyc",
-        profileId || "",
-        documentId || "",
-        documentType || "",
-      ].join(":");
-
-    const buildBookingReviewLookup = (booking: any) => {
-      const lookup = new Map<string, any>();
-      const reviews = Array.isArray(booking?.kycDocumentReviews)
-        ? booking.kycDocumentReviews
-        : [];
-
-      reviews.forEach((review: any) => {
-        const key = getReviewKey(
-          review.profileModel || "kyc",
-          String(review.profileId || ""),
-          review.documentId ? String(review.documentId) : "",
-          review.documentType || "",
-        );
-        lookup.set(key, review);
-      });
-
-      const bookingDocs = Array.isArray(booking?.documents) ? booking.documents : [];
-      bookingDocs.forEach((doc: any) => {
-        const parsed = parseBookingKycReviewDocumentType(doc?.type);
-        if (!parsed) return;
-
-        const key = getReviewKey(
-          parsed.profileModel,
-          parsed.profileId,
-          parsed.documentId,
-          parsed.documentType,
-        );
-        lookup.set(key, {
-          profileModel: parsed.profileModel,
-          profileId: parsed.profileId,
-          documentId: parsed.documentId,
-          documentType: parsed.documentType,
-          status: doc.status || "pending",
-          rejectionReason: doc.rejectionReason || "",
-          reviewedAt: doc.reviewedAt || doc.generatedAt,
-        });
-      });
-
-      return lookup;
-    };
-
-    const findBookingReview = (
-      lookup: Map<string, any>,
-      profileModel: string,
-      profileId: string,
-      doc: any,
-    ) => {
-      const documentId = String(doc?._id || "");
-      const documentType = doc?.type || "";
-
-      return (
-        lookup.get(getReviewKey(profileModel, profileId, documentId, documentType)) ||
-        lookup.get(getReviewKey(profileModel, profileId, documentId, "")) ||
-        lookup.get(getReviewKey(profileModel, profileId, "", documentType))
-      );
-    };
-
-    const normalizeDoc = (
-      doc: any,
-      reviewLookup?: Map<string, any>,
-      profileModel = "kyc",
-      profileId = "",
-    ) => {
-      if (!doc) return null;
-      const bookingReview = reviewLookup
-        ? findBookingReview(reviewLookup, profileModel, profileId, doc)
-        : null;
-      return {
-        id: String(doc._id || doc.type || doc.name || "unknown"),
-        type: doc.type || "document",
-        name: doc.name || doc.type || "Document",
-        profileModel,
-        profileId,
-        status: doc.status || "pending",
-        partnerReviewStatus: bookingReview?.status || "pending",
-        partnerReviewSource: bookingReview ? "booking" : "none",
-        fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
-        uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
-        rejectionReason: doc.rejectionReason || "",
-        partnerRejectionReason: bookingReview?.rejectionReason || "",
-        partnerReviewedAt: bookingReview?.reviewedAt,
-      };
-    };
-
-    const safeNormalizeDocs = (
-      docs: any,
-      reviewLookup?: Map<string, any>,
-      profileModel = "kyc",
-      profileId = "",
-    ) => {
-      if (!docs || !Array.isArray(docs)) return [];
-      return docs
-        .map((doc) => normalizeDoc(doc, reviewLookup, profileModel, profileId))
-        .filter(Boolean);
-    };
-
     // Create lookup maps
     const businessMap = new Map(businessInfos.map((info: any) => [String(info._id), info]));
-    // Map BusinessInfo by its kycProfile reference (KYCDocument._id) for correct booking→business lookup
-    const businessByKycProfile = new Map(
-      businessInfos
-        .filter((info: any) => info.kycProfile)
-        .map((info: any) => [String(info.kycProfile), info])
-    );
+    // Map BusinessInfo by its kycProfile reference (KYCDocument._id)
+    // We use a Map of arrays to handle multiple businesses pointing to the same profile
+    const businessByKycProfile = new Map<string, any[]>();
+    businessInfos.forEach((info: any) => {
+      if (info.kycProfile) {
+        const key = String(info.kycProfile);
+        businessByKycProfile.set(key, [...(businessByKycProfile.get(key) || []), info]);
+      }
+    });
     const kycProfilesMap = new Map(kycProfiles.map((profile: any) => [String(profile._id), profile]));
     // 1. Fetch individual profiles for all users involved to get personal documents
     const individualProfiles = await KYCDocumentModel.find({
@@ -1698,7 +1748,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
 
     const data = bookings.map((booking: any) => {
       const user = booking.user as any;
-      const clientUserId = String(user?._id || booking.user || "");
+      const clientUserId = String(user?._id || booking.user || "");      
       const bookingReviewLookup = buildBookingReviewLookup(booking);
       
       // 1. Resolve the specific profile linked to this booking
@@ -1706,12 +1756,37 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       const linkedProfileId = rawProfileId ? String(rawProfileId) : "";
       
       let kycProfile = kycProfilesMap.get(linkedProfileId);
-      // Look up BusinessInfo by its _id OR its kycProfile reference (KYCDocument._id)
-      const linkedBusiness = businessMap.get(linkedProfileId) || businessByKycProfile.get(linkedProfileId);
       
-      console.log(`[getPartnerBookingRequests]   Linked ID: ${linkedProfileId || "NONE"}`);
+      // Look up BusinessInfo by its _id OR its kycProfile reference (KYCDocument._id)
+      let linkedBusiness = businessMap.get(linkedProfileId);
+      let isFallbackResolution = false;
+      
+      if (!linkedBusiness && linkedProfileId) {
+        const businesses = businessByKycProfile.get(linkedProfileId) || [];
+        if (businesses.length === 1) {
+          linkedBusiness = businesses[0];
+          isFallbackResolution = true;
+        } else if (businesses.length > 1) {
+          // If ambiguous, prefer the one with matching profileName if possible
+          linkedBusiness = businesses.find(b => b.profileName === kycProfile?.profileName) || businesses[0];
+          isFallbackResolution = true;
+        }
+      }
+      
+      console.log(`[getPartnerBookingRequests]   Booking: ${booking.bookingNumber}, Linked ID: ${linkedProfileId || "NONE"}`);
+      if (isFallbackResolution) console.log(`[getPartnerBookingRequests]   ⚠️ RESOLVED VIA PARENT KYC FALLBACK`);
       if (kycProfile) console.log(`[getPartnerBookingRequests]   Found KYC Profile: ${kycProfile.profileName} (${kycProfile.kycType})`);
-      if (linkedBusiness) console.log(`[getPartnerBookingRequests]   Found Business Info: ${linkedBusiness.companyName} (Docs: ${linkedBusiness.documents?.length || 0})`);
+      if (linkedBusiness) console.log(`[getPartnerBookingRequests]   Found Business Info: ${linkedBusiness.companyName} (ID: ${linkedBusiness._id}, Docs: ${linkedBusiness.documents?.length || 0})`);
+
+      // 1b. If we have an individual profile but this is a business booking, try to auto-resolve the business
+      const userBusinesses = businessByUser.get(clientUserId) || [];
+      if (!linkedBusiness && kycProfile?.kycType === "individual" && userBusinesses.length > 0) {
+        const businesses = businessByKycProfile.get(String(kycProfile._id)) || [];
+        if (businesses.length > 0) {
+          linkedBusiness = businesses[0];
+          console.log(`[getPartnerBookingRequests]   Auto-resolved business from individual kycProfile: ${linkedBusiness.companyName}`);
+        }
+      }
 
       // If we found a business but not a KYC profile, and the business has a kycProfile ref, try to fetch that too
       if (!kycProfile && linkedBusiness?.kycProfile) {
@@ -1722,32 +1797,37 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       // 2. Resolve the individual profile for personal docs
       const individualProfile = individualProfilesMap.get(clientUserId);
       
-      // Use the linked business info if available, otherwise fallback to the user's first business
-      const userBusinesses = businessByUser.get(clientUserId) || [];
-      const userKycProfiles = kycByUser.get(clientUserId) || [];
-      const businessInfo = linkedBusiness || userBusinesses[0];
+      // Use the linked business info if available. 
+      const businessInfo = linkedBusiness || userBusinesses[0] || null;
       
       // Aggregate documents for the business KYC section - BE STRICT
       let allBizDocs: any[] = [];
+      let targetBusinessProfile: any = null;
+
       if (linkedBusiness) {
+        targetBusinessProfile = linkedBusiness;
         allBizDocs = [...(linkedBusiness.documents || [])];
       } else if (kycProfile?.kycType === "business") {
+        targetBusinessProfile = kycProfile;
         allBizDocs = [...(kycProfile.documents || [])];
       }
-      // NO FALLBACK TO ALL BUSINESSES - that was showing too many docs
-
-      if (!linkedBusiness && !kycProfile && userBusinesses.length > 0) {
-        console.log(`[getPartnerBookingRequests]   WARNING: Booking ${booking.bookingNumber} has no specific business linked.`);
-      }
-
-      if (!linkedBusiness && userBusinesses.length > 0) {
-        console.log(`[getPartnerBookingRequests]   No specific business linked for booking ${booking.bookingNumber}. 
-          Fallback used: ${businessInfo.companyName} (Found ${userBusinesses.length} total businesses for user)`);
-      } else if (!linkedBusiness && userBusinesses.length === 0) {
-        console.log(`[getPartnerBookingRequests]   WARNING: No business profiles found for user ${clientUserId}`);
-      }
       
-      const bookingDocs = safeNormalizeDocs(booking.documents);
+      // FALLBACK: If no docs found yet but we have a business record for this user, use its docs
+      if (allBizDocs.length === 0 && businessInfo) {
+        targetBusinessProfile = businessInfo;
+        allBizDocs = [...(businessInfo.documents || [])];
+        console.log(`[getPartnerBookingRequests]   Using docs from fallback businessInfo: ${businessInfo.companyName}`);
+      }
+
+      const businessProfileId = targetBusinessProfile 
+        ? String(targetBusinessProfile._id) 
+        : (linkedProfileId || String(kycProfile?._id || ""));
+      
+      const businessProfileModel = targetBusinessProfile ? ((targetBusinessProfile as any)?.constructor?.modelName === 'BusinessInfo' ? 'business' : 'kyc') : 'business';
+
+      console.log(`[getPartnerBookingRequests]   Business Profile Source: ${businessProfileModel} (${businessProfileId})`);
+
+      const bookingDocs = safeNormalizeDocs(req, booking.documents);
       const draftAgreement = bookingDocs.find((doc: any) => doc.type === "draft_agreement");
       const signedAgreement = bookingDocs.find((doc: any) => doc.type === "signed_agreement");
       const finalAgreement = bookingDocs.find((doc: any) => doc.type === "final_agreement");
@@ -1762,11 +1842,9 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
       const personalProfileId = kycProfile?.kycType === "individual"
         ? linkedProfileId || String(kycProfile?._id || "")
         : String(individualProfile?._id || "");
-      const businessProfileId = linkedBusiness
-        ? String(linkedBusiness._id)
-        : linkedProfileId || String(kycProfile?._id || "");
 
       const personalDocuments = safeNormalizeDocs(
+        req,
         kycProfile?.kycType === "individual"
           ? kycProfile?.documents
           : individualProfile?.documents || [],
@@ -1775,11 +1853,18 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
         personalProfileId,
       );
       const businessDocuments = safeNormalizeDocs(
+        req,
         allBizDocs,
         bookingReviewLookup,
-        "business",
+        businessProfileModel,
         businessProfileId,
       );
+
+      // TRACE LOG: Print status of personal docs for debugging undo issue
+      if (booking.bookingNumber.includes("322") || booking.bookingNumber.includes("917")) {
+        console.log(`[getPartnerBookingRequests] TRACE ${booking.bookingNumber}:`);
+        personalDocuments.forEach(d => console.log(`   - ${d.type}: ${d.partnerReviewStatus} (Source: ${d.partnerReviewSource})`));
+      }
       const partnerDocuments = uniquePartners
         .filter((partner: any) => {
           const selected = booking.selectedPartners;
@@ -1799,6 +1884,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           email: partner.email || "",
           status: partner.status || "pending",
           documents: safeNormalizeDocs(
+            req,
             partner.documents,
             bookingReviewLookup,
             "partner",
@@ -1899,7 +1985,11 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
           name: user?.fullName || "Client",
           email: user?.email || "",
           phone: user?.phoneNumber || user?.phone || "",
-          companyName: linkedBusiness?.companyName || kycProfile?.businessInfo?.companyName || businessInfo?.companyName || kycProfile?.profileName || user?.fullName || "N/A",
+          companyName: linkedBusiness?.companyName || 
+                       (kycProfile?.kycType === "business" ? kycProfile?.businessInfo?.companyName || kycProfile?.profileName : null) || 
+                       businessInfo?.companyName || 
+                       user?.fullName || 
+                       "N/A",
           companyType: linkedBusiness?.companyType || kycProfile?.businessInfo?.companyType || businessInfo?.companyType || "N/A",
           gstNumber: linkedBusiness?.gstNumber || kycProfile?.businessInfo?.gstNumber || businessInfo?.gstNumber || "N/A",
           panNumber: linkedBusiness?.panNumber || kycProfile?.businessInfo?.panNumber || businessInfo?.panNumber || "N/A",
@@ -1961,22 +2051,7 @@ export const getPartnerBookingRequests = async (req: Request, res: Response) => 
   }
 };
 
-const buildBookingReviewLookup = (booking: any) => {
-  const map = new Map<string, any>();
-  const reviews = booking.kycDocumentReviews || [];
-  reviews.forEach((review: any) => {
-    // Use a composite key of profileModel, profileId, and documentType (or documentId)
-    const key = `${review.profileModel || "kyc"}_${String(review.profileId)}_${review.documentType || review.documentId}`;
-    map.set(key, review);
-  });
-  return map;
-};
-
-const findBookingReview = (lookup: Map<string, any>, model: string, profileId: any, doc: any) => {
-  const docKey = doc.type || String(doc._id || "");
-  const key = `${model}_${String(profileId)}_${docKey}`;
-  return lookup.get(key);
-};
+// Review logic unified at top of file
 
 export const reviewPartnerBookingKycDocument = async (req: Request, res: Response) => {
   try {
@@ -1993,46 +2068,109 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    const userId = booking.user?._id || booking.user;
+    const userId = String(booking.user?._id || booking.user);
+    const linkedProfileId = booking.kycProfile ? String((booking.kycProfile as any)?._id || booking.kycProfile) : "";
 
-    // Search for the document across ALL profiles of this user to be 100% sure we find it
     const [kycProfiles, businessProfiles, partnerProfiles] = await Promise.all([
-      KYCDocumentModel.find({ user: userId, isDeleted: { $ne: true } }),
-      BusinessInfoModel.find({ user: userId, isDeleted: { $ne: true } }),
-      PartnerKYCModel.find({ user: userId, isDeleted: { $ne: true } }),
+      KYCDocumentModel.find({ 
+        $or: [
+          { user: userId },
+          ...(linkedProfileId ? [{ _id: linkedProfileId }] : [])
+        ],
+        isDeleted: { $ne: true } 
+      }),
+      BusinessInfoModel.find({ 
+        $or: [
+          { user: userId },
+          ...(linkedProfileId ? [{ _id: linkedProfileId }, { kycProfile: linkedProfileId }] : [])
+        ],
+        isDeleted: { $ne: true } 
+      }),
+      PartnerKYCModel.find({ 
+        $or: [
+          { user: userId },
+          ...(linkedProfileId ? [{ kycProfile: linkedProfileId }] : []),
+          { _id: { $in: (booking.selectedPartners || []).map((id: any) => id) } }
+        ],
+        isDeleted: { $ne: true } 
+      }),
     ]);
 
-    const allProfiles =
-      profileId && mongoose.Types.ObjectId.isValid(String(profileId))
-        ? [...kycProfiles, ...businessProfiles, ...partnerProfiles].filter(
-            (profile: any) => String(profile._id) === String(profileId),
-          )
-        : [...kycProfiles, ...businessProfiles, ...partnerProfiles];
+    // If a specific profile was requested but not found in the initial user-scoped fetch,
+    // fetch it directly to be sure (security is still handled by the booking accessibility check)
+    let requestedProfile: any = null;
+    if (profileId && mongoose.Types.ObjectId.isValid(String(profileId))) {
+      const isAlreadyFetched = [...kycProfiles, ...businessProfiles, ...partnerProfiles].some(p => String(p._id) === String(profileId));
+      if (!isAlreadyFetched) {
+        if (profileModel === "kyc") requestedProfile = await KYCDocumentModel.findById(profileId);
+        else if (profileModel === "business") requestedProfile = await BusinessInfoModel.findById(profileId);
+        else if (profileModel === "partner") requestedProfile = await PartnerKYCModel.findById(profileId);
+      }
+    }
+
+    const allProfiles = [
+      ...kycProfiles, 
+      ...businessProfiles, 
+      ...partnerProfiles,
+      ...(requestedProfile ? [requestedProfile] : []),
+      booking
+    ];
+    
+    // 1. First attempt: Filter by profileId if provided
+    let candidateProfiles = profileId && mongoose.Types.ObjectId.isValid(String(profileId))
+        ? allProfiles.filter((profile: any) => String(profile._id) === String(profileId))
+        : allProfiles;
     
     let targetProfile: any = null;
     let targetDoc: any = null;
     let profileType = "";
 
-    console.log(`[reviewPartnerBookingKycDocument] Looking for doc: ID=${documentId}, Type=${documentType}`);
-
-    for (const p of allProfiles) {
-      const docs = p.documents || [];
-      const found = docs.find((d: any) => 
-        (documentId && String(d._id) === String(documentId)) ||
-        (documentType && d.type === documentType)
-      );
-      if (found) {
-        targetProfile = p;
-        targetDoc = found;
-        if ((p.constructor as any).modelName) profileType = (p.constructor as any).modelName;
-        break;
+    const findDocInProfiles = (profiles: any[]) => {
+      for (const p of profiles) {
+        const docs = p.documents || [];
+        const found = docs.find((d: any) => 
+          (documentId && String(d._id) === String(documentId)) ||
+          (documentType && d.type === documentType)
+        );
+        if (found) {
+          const modelName = (p.constructor as any).modelName;
+          let pType = "kyc";
+          if (modelName === "KYCDocument") pType = "kyc";
+          else if (modelName === "BusinessInfo") pType = "business";
+          else if (modelName === "PartnerKYC") pType = "partner";
+          else if (modelName === "Booking") pType = "booking";
+          else pType = modelName?.toLowerCase() || "kyc";
+          
+          return { profile: p, doc: found, type: pType };
+        }
       }
+      return null;
+    };
+
+    // Try primary search (respecting profileId)
+    console.log(`[reviewPartnerBookingKycDocument] Primary search for doc: ID=${documentId}, Type=${documentType} in ${candidateProfiles.length} profiles`);
+    let searchResult = findDocInProfiles(candidateProfiles);
+    
+    // 2. Global fallback: If not found in candidate profiles, search EVERYTHING
+    if (!searchResult) {
+      console.log(`[reviewPartnerBookingKycDocument] Global fallback search in ${allProfiles.length} profiles`);
+      searchResult = findDocInProfiles(allProfiles);
     }
 
-    if (!targetProfile || !targetDoc) {
-      console.log(`[reviewPartnerBookingKycDocument] Document NOT found in ${allProfiles.length} profiles`);
-      return res.status(404).json({ success: false, message: "Document not found in any of user's profiles" });
+    if (!searchResult) {
+      console.error(`[reviewPartnerBookingKycDocument] Doc NOT found. ID: ${documentId}, Type: ${documentType}. Searched ${allProfiles.length} profiles.`);
+      return res.status(404).json({
+        success: false,
+        message: "Document not found in any of user's profiles",
+      });
     }
+
+    targetProfile = searchResult.profile;
+    targetDoc = searchResult.doc;
+    profileType = searchResult.type;
+
+    console.log(`[reviewPartnerBookingKycDocument] Resolved doc to profile ${profileType}:${targetProfile._id}`);
+
 
     console.log(`[reviewPartnerBookingKycDocument] Found doc in profile: ${targetProfile._id} (Type: ${profileType})`);
 
@@ -2076,41 +2214,63 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
 
     // 4. Update the target profile's document status directly
     if (targetProfile && targetDoc) {
-      targetDoc.partnerReviewStatus = reviewStatus;
-      targetDoc.partnerRejectionReason = reviewReason;
-      targetDoc.partnerReviewedAt = new Date();
-      targetDoc.partnerReviewedBy = partnerId;
-      targetProfile.markModified('documents');
-      await targetProfile.save();
-      console.log(`[reviewPartnerBookingKycDocument] Profile ${targetProfile._id} document updated.`);
+      let ProfileModel: mongoose.Model<any> | null = null;
+      if (profileType === "kyc") ProfileModel = KYCDocumentModel as any;
+      else if (profileType === "business") ProfileModel = BusinessInfoModel as any;
+      else if (profileType === "partner") ProfileModel = PartnerKYCModel as any;
+      else if (profileType === "booking") ProfileModel = BookingModel as any;
+
+      if (ProfileModel) {
+        const docId = targetDoc._id;
+        const filter = docId ? { _id: targetProfile._id, "documents._id": docId } : { _id: targetProfile._id, "documents.type": targetDoc.type };
+        
+        await ProfileModel.updateOne(filter, {
+          $set: {
+            "documents.$.partnerReviewStatus": reviewStatus,
+            "documents.$.partnerRejectionReason": reviewReason,
+            "documents.$.partnerReviewedAt": new Date(),
+            "documents.$.partnerReviewedBy": partnerId,
+          }
+        });
+        console.log(`[reviewPartnerBookingKycDocument] Profile ${targetProfile._id} document updated.`);
+      }
     }
 
-    // 5. Update the booking object in memory for kycDocumentReviews
-    booking.kycDocumentReviews = [
-      ...(Array.isArray(booking.kycDocumentReviews) ? booking.kycDocumentReviews : []).filter((review: any) => {
-        const sameProfile =
-          String(review.profileModel || "kyc") === String(targetProfileModel) &&
-          String(review.profileId || "") === targetProfileId;
-        const sameDocById =
-          targetDocId && String(review.documentId || "") === targetDocId;
-        const sameDocByType =
-          !targetDocId && targetDocType && String(review.documentType || "") === targetDocType;
-        return !(sameProfile && (sameDocById || sameDocByType));
-      }),
-      reviewPayload,
-    ];
+    // 5. Update the booking's reviews and mirrored documents
+    // Use atomic update to prevent race conditions
+    await BookingModel.updateOne(
+      { _id: booking._id },
+      { 
+        $pull: { 
+          kycDocumentReviews: {
+            profileId: targetProfileId,
+            $or: [
+              { documentId: targetDocId },
+              { documentType: targetDocType }
+            ]
+          },
+          documents: { type: reviewDocType }
+        } 
+      }
+    );
 
-    // 6. Update the booking's documents array in memory (to avoid overwrite during save)
-    const existingDocIndex = (booking.documents || []).findIndex((doc: any) => String(doc.type || "") === reviewDocType);
-    if (existingDocIndex >= 0) {
-      booking.documents[existingDocIndex] = reviewDocEntry;
-    } else {
-      booking.documents = [...(booking.documents || []), reviewDocEntry];
+    await BookingModel.updateOne(
+      { _id: booking._id },
+      { 
+        $push: { 
+          kycDocumentReviews: reviewPayload,
+          documents: reviewDocEntry
+        } 
+      }
+    );
+
+    // 6. RE-FETCH for status calculation (non-lean this time if needed, but updateOne is better)
+    const freshBooking = await BookingModel.findById(booking._id).lean();
+    if (freshBooking) {
+      booking = freshBooking;
     }
-    booking.markModified('documents');
-    booking.markModified('kycDocumentReviews');
 
-    console.log(`[reviewPartnerBookingKycDocument] Booking review saved. New Status: ${reviewStatus}`);
+    console.log(`[reviewPartnerBookingKycDocument] Booking review updated.`);
 
     // Notify User
     try {
@@ -2144,9 +2304,6 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
     const reviewLookup = buildBookingReviewLookup(booking);
     
     const clientUserId = String(userId);
-    const rawProfileId = (booking.kycProfile as any)?._id || booking.kycProfile;
-    const linkedProfileId = rawProfileId ? String(rawProfileId) : "";
-    
     const kycProfilesMap = new Map(kycProfiles.map((p: any) => [String(p._id), p]));
     const businessMap = new Map(businessProfiles.map((p: any) => [String(p._id), p]));
     const businessByKycProfile = new Map(
@@ -2174,13 +2331,26 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
     }
     
     // 2. Business Documents
-    if (linkedBusiness) {
-      (linkedBusiness.documents || []).forEach((d: any) => {
-        allRequiredDocs.push({ doc: d, profileId: String(linkedBusiness._id), model: "business" });
-      });
-    } else if (linkedKycProfile?.kycType === "business") {
-      (linkedKycProfile.documents || []).forEach((d: any) => {
-        allRequiredDocs.push({ doc: d, profileId: String(linkedKycProfile._id), model: "kyc" });
+    let targetBizProfile: any = linkedBusiness;
+    let bizModel = "business";
+
+    if (!targetBizProfile && linkedKycProfile?.kycType === "business") {
+      targetBizProfile = linkedKycProfile;
+      bizModel = "kyc";
+    }
+
+    // Include fallback if nothing else was linked
+    if (!targetBizProfile) {
+      const userBusinesses = businessProfiles.filter((p: any) => String(p.user) === clientUserId);
+      if (userBusinesses.length > 0) {
+        targetBizProfile = userBusinesses[0];
+        bizModel = "business";
+      }
+    }
+
+    if (targetBizProfile) {
+      (targetBizProfile.documents || []).forEach((d: any) => {
+        allRequiredDocs.push({ doc: d, profileId: String(targetBizProfile._id), model: bizModel });
       });
     }
 
@@ -2194,10 +2364,23 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       }
     });
 
+    // 4. Booking Documents (e.g. Agreement)
+    // ONLY include documents that are actually reviewable by the partner
+    const reviewableBookingDocTypes = ['signed_agreement', 'agreement', 'final_agreement', 'noc', 'utility_bill', 'electricity_bill', 'gst_certificate', 'pan_card', 'other_support'];
+    (booking.documents || []).forEach((d: any) => {
+      if (reviewableBookingDocTypes.includes(d.type)) {
+        allRequiredDocs.push({ doc: d, profileId: String(booking._id), model: "booking" });
+      }
+    });
+
+    console.log(`[reviewPartnerBookingKycDocument] Re-calculating status for ${allRequiredDocs.length} required docs.`);
+
     // Evaluate overall status strictly based on booking reviews
     const allApprovedInBooking = allRequiredDocs.length > 0 && allRequiredDocs.every(item => {
       const review = findBookingReview(reviewLookup, item.model, item.profileId, item.doc);
-      return review?.status === "approved";
+      const isApproved = review?.status === "approved";
+      console.log(`[reviewPartnerBookingKycDocument]   Doc: ${item.doc.type} (${item.model}:${item.profileId}) -> Approved: ${isApproved}`);
+      return isApproved;
     });
 
     if (allApprovedInBooking) {
@@ -2206,14 +2389,36 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       
       // Update the profile's overall status for global consistency if all documents are approved
       if (targetProfile) {
-        const profileDocs = targetProfile.documents || [];
-        const profileAllApproved = profileDocs.length > 0 && profileDocs.every((d: any) => d.partnerReviewStatus === "approved");
-        
-        if (profileAllApproved) {
-          if ('status' in targetProfile) targetProfile.status = 'approved';
-          if ('overallStatus' in targetProfile) targetProfile.overallStatus = 'approved';
-          if ('kycStatus' in targetProfile) targetProfile.kycStatus = 'approved';
-          await targetProfile.save();
+        // Re-fetch the profile one last time for the final status update
+        let freshFinalProfile: any = null;
+        if (profileType === "kyc") freshFinalProfile = await KYCDocumentModel.findById(targetProfile._id);
+        else if (profileType === "business") freshFinalProfile = await BusinessInfoModel.findById(targetProfile._id);
+        else if (profileType === "partner") freshFinalProfile = await PartnerKYCModel.findById(targetProfile._id);
+        else if (profileType === "booking") freshFinalProfile = await BookingModel.findById(targetProfile._id);
+
+        if (freshFinalProfile) {
+          const profileDocs = freshFinalProfile.documents || [];
+          const profileAllApproved = profileDocs.length > 0 && profileDocs.every((d: any) => d.partnerReviewStatus === "approved");
+          
+          if (profileAllApproved) {
+            const finalProfileUpdate: any = {};
+            if ('status' in freshFinalProfile) finalProfileUpdate.status = 'approved';
+            if ('overallStatus' in freshFinalProfile) finalProfileUpdate.overallStatus = 'approved';
+            if ('kycStatus' in freshFinalProfile) finalProfileUpdate.kycStatus = 'approved';
+
+            if (Object.keys(finalProfileUpdate).length > 0) {
+              let FinalProfileModel: mongoose.Model<any> | null = null;
+              if (profileType === "kyc") FinalProfileModel = KYCDocumentModel as any;
+              else if (profileType === "business") FinalProfileModel = BusinessInfoModel as any;
+              else if (profileType === "partner") FinalProfileModel = PartnerKYCModel as any;
+              else if (profileType === "booking") FinalProfileModel = BookingModel as any;
+
+              if (FinalProfileModel) {
+                await FinalProfileModel.updateOne({ _id: freshFinalProfile._id }, { $set: finalProfileUpdate });
+                console.log(`[reviewPartnerBookingKycDocument] Profile ${freshFinalProfile._id} marked as fully approved atomically.`);
+              }
+            }
+          }
         }
       }
     } else {
@@ -2230,8 +2435,18 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       }
     }
 
-    await booking.save();
-    console.log(`[reviewPartnerBookingKycDocument] Booking ${booking._id} saved with kycStatus: ${booking.kycStatus}`);
+    // FINAL ATOMIC UPDATE for booking status
+    await BookingModel.updateOne(
+      { _id: booking._id },
+      { 
+        $set: { 
+          kycStatus: booking.kycStatus, 
+          status: booking.status, 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+    console.log(`[reviewPartnerBookingKycDocument] Booking ${booking._id} finalized atomically. KYC Status: ${booking.kycStatus}`);
 
     return res.status(200).json({ success: true, message: `Document ${action}d successfully` });
   } catch (error) {
@@ -2426,14 +2641,75 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
       booking.partnerRequestSubmittedAt = new Date();
     }
 
-    booking.kycDocumentReviews = [];
-    booking.markModified("kycDocumentReviews");
-
-    // Clear partner review records from documents array to allow fresh review
+    // Clear partner review records from documents array to allow fresh sync
     booking.documents = (booking.documents || []).filter(
       (doc: any) => !doc.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX)
     );
+
+    // 1. Fetch relevant profiles to mirror documents
+    const finalKycProfileId = kycProfileId || booking.kycProfile;
+    const [individualKyc, selectedProfile] = await Promise.all([
+      KYCDocumentModel.findOne({ user: userId, kycType: "individual", isDeleted: false }).lean(),
+      finalKycProfileId ? (async () => {
+        const kyc = await KYCDocumentModel.findById(finalKycProfileId).lean();
+        if (kyc) return { profile: kyc, model: "kyc" };
+        const biz = await BusinessInfoModel.findById(finalKycProfileId).lean();
+        if (biz) return { profile: biz, model: "business" };
+        const part = await PartnerKYCModel.findById(finalKycProfileId).lean();
+        if (part) return { profile: part, model: "partner" };
+        return null;
+      })() : Promise.resolve(null)
+    ]);
+
+    const profilesToMirror = [
+      ...(individualKyc ? [{ profile: individualKyc, model: "kyc" }] : []),
+      ...(selectedProfile && String(selectedProfile.profile._id) !== String(individualKyc?._id) ? [selectedProfile] : [])
+    ];
+
+    // 2. Mirror documents into booking
+    profilesToMirror.forEach(({ profile, model }) => {
+      (profile.documents || []).forEach((doc: any) => {
+        const reviewDocType = makeBookingKycReviewDocumentType(
+          model,
+          String(profile._id),
+          String(doc._id || ""),
+          doc.type
+        );
+
+        // Check if already in documents (unlikely due to filter above, but safe)
+        const exists = booking.documents.some((d: any) => d.type === reviewDocType);
+        if (!exists) {
+          booking.documents.push({
+            name: `KYC - ${doc.type?.replace(/_/g, ' ').toUpperCase() || doc.name || doc.type}`,
+            type: reviewDocType,
+            status: doc.partnerReviewStatus || "pending",
+            rejectionReason: doc.partnerRejectionReason,
+            uploadedBy: "user",
+            fileUrl: doc.fileUrl,
+            reviewedAt: doc.partnerReviewedAt,
+            generatedAt: new Date()
+          });
+
+          // Also ensure kycDocumentReviews has an entry if it's already reviewed
+          if (doc.partnerReviewStatus) {
+            booking.kycDocumentReviews = booking.kycDocumentReviews || [];
+            booking.kycDocumentReviews.push({
+              profileModel: model,
+              profileId: String(profile._id),
+              documentId: String(doc._id || ""),
+              documentType: doc.type,
+              status: doc.partnerReviewStatus,
+              rejectionReason: doc.partnerRejectionReason,
+              reviewedAt: doc.partnerReviewedAt,
+              reviewedBy: doc.partnerReviewedBy
+            });
+          }
+        }
+      });
+    });
+
     booking.markModified("documents");
+    booking.markModified("kycDocumentReviews");
     
     booking.partnerRequestStatus = "submitted";
     booking.kycStatus = "pending";
@@ -2490,6 +2766,16 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
       console.log(`\n📌 SAVED TO DB:`);
       console.log(`   booking.kycProfile: ${savedKycProfileId}`);
       console.log(`   booking.selectedPartners: ${JSON.stringify(dbBooking?.selectedPartners || [])}`);
+
+      if (dbBooking?.kycProfile) {
+        console.log(`\n📄 LINKED KYC PROFILE DETAILS:`);
+        const kp = dbBooking.kycProfile as any;
+        console.log(`   ID: ${kp._id}`);
+        console.log(`   Name: ${kp.profileName}`);
+        console.log(`   Type: ${kp.kycType}`);
+        console.log(`   Business Info Embedded: ${!!kp.businessInfo}`);
+        if (kp.businessInfo) console.log(`   Company Name: ${kp.businessInfo.companyName}`);
+      }
 
       console.log(`\n👤 PERSONAL PROFILE (Individual KYC):`);
       if (individualProf) {
@@ -3611,14 +3897,17 @@ export const getKYCStatus = async (req: Request, res: Response) => {
 
     // Get all user's profiles (Combined)
 
-    // 1. Individual Profile
-    const individualProfiles = await KYCDocumentModel.find({
+    // 1. Individual and Business KYCDocuments (Main collection)
+    const kycDocuments = await KYCDocumentModel.find({
       user: userId,
       isDeleted: { $ne: true },
-      kycType: "individual",
     });
+    
+    const individualProfiles = kycDocuments.filter(p => p.kycType === "individual" || !p.kycType);
+    const legacyBusinessKycProfiles = kycDocuments.filter(p => p.kycType === "business");
+
     console.log(
-      `[getKYCStatus] Found ${individualProfiles.length} individual profiles`,
+      `[getKYCStatus] Found ${individualProfiles.length} individual and ${legacyBusinessKycProfiles.length} legacy business profiles`,
     );
 
     // 2. Business Profiles (from BusinessInfoModel)
@@ -3715,16 +4004,32 @@ export const getKYCStatus = async (req: Request, res: Response) => {
       updatedAt: p.updatedAt,
     }));
 
+    // 4. Map Legacy Business Profiles
+    const mappedLegacyBusinessProfiles = legacyBusinessKycProfiles.map(p => {
+      const obj = p.toObject ? p.toObject() : p;
+      return {
+        ...obj,
+        kycType: "business",
+        businessInfo: obj.businessInfo || { companyName: obj.profileName || "Business Profile" }
+      };
+    });
+
     // Combine
-    const allProfiles = [
+    const allProfilesRaw = [
       ...individualProfiles,
       ...mappedBusinessProfiles,
       ...mappedPartnerProfiles,
+      ...mappedLegacyBusinessProfiles,
       ...sharedProfiles.map((profile: any) => ({
         ...profile.toObject(),
         sharedAccess: true,
       })),
     ];
+
+    // Ensure uniqueness by ID
+    const allProfiles = Array.from(
+      new Map(allProfilesRaw.map((p: any) => [String(p._id), p])).values(),
+    );
 
     res.status(200).json({ success: true, data: allProfiles });
   } catch (error) {
