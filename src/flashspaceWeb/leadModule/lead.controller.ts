@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { google } from "googleapis";
 import { LeadModel } from "./lead.model";
+import { BookingLeadModel } from "./bookingLead.model";
 import { EmailUtil } from "../authModule/utils/email.util";
 
 export const createLead = async (req: Request, res: Response) => {
@@ -153,5 +154,52 @@ export const getLeads = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("CRITICAL - Failed to fetch leads:", error.message);
     return res.status(500).json({ ok: false, message: "Failed to fetch leads: " + error.message });
+  }
+};
+export const createBookingLead = async (req: Request, res: Response) => {
+  try {
+    const { userId, email, phone, spaceId, spaceName, utm } = req.body || {};
+
+    if (!email || !phone || !spaceId) {
+      return res.status(400).json({ ok: false, message: "Missing required fields (email, phone, spaceId)" });
+    }
+
+    const bookingLead = await BookingLeadModel.create({
+      userId,
+      email,
+      phone,
+      spaceId,
+      spaceName,
+      utm,
+    });
+
+    console.log("✅ Booking Lead saved:", bookingLead._id);
+
+    // Optional: Send email notification to admin
+    const adminEmail = process.env.ADMIN_EMAIL || "yogeshbisht12122005@gmail.com";
+    const subject = `📅 New Booking Lead for ${spaceName || "a Space"}`;
+    const html = `
+      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px;">
+        <h2 style="color: #2c3e50; border-bottom: 2px solid #EDB003; padding-bottom: 10px;">New Booking Lead</h2>
+        <p>A user has shown interest in booking a space.</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <tr><td style="padding: 8px; font-weight: bold; width: 120px;">Email:</td><td style="padding: 8px;"><a href="mailto:${email}">${email}</a></td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Phone:</td><td style="padding: 8px;"><a href="tel:${phone}">${phone}</a></td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">Space:</td><td style="padding: 8px;">${spaceName || spaceId}</td></tr>
+          <tr><td style="padding: 8px; font-weight: bold;">User ID:</td><td style="padding: 8px;">${userId || "Guest"}</td></tr>
+        </table>
+      </div>
+    `;
+
+    EmailUtil.sendEmail({ to: adminEmail, subject, html }).catch(err => console.error("⚠️ Failed to send booking lead email:", err.message));
+
+    return res.status(201).json({
+      ok: true,
+      message: "Booking lead captured",
+      id: bookingLead._id
+    });
+  } catch (error: any) {
+    console.error("❌ Failed to create booking lead:", error.message);
+    return res.status(500).json({ ok: false, message: error.message });
   }
 };
