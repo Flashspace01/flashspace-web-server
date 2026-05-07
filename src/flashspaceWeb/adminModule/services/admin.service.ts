@@ -551,7 +551,7 @@ export class AdminService {
 
       const kycDocs = await KYCDocumentModel.find(query)
         .select(
-          "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress partnerCount businessInfoCount createdAt updatedAt",
+          "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress submittedAt partnerCount businessInfoCount createdAt updatedAt",
         )
         .populate("user", "fullName email phoneNumber profilePicture")
         .sort({ updatedAt: -1 })

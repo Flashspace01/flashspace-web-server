@@ -173,6 +173,9 @@ export class KYCDocument {
   @prop({ default: 0, min: 0, max: 100 })
   progress?: number;
 
+  @prop()
+  submittedAt?: Date;
+
   @prop({ default: 0 })
   partnerCount?: number;
 
