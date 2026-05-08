@@ -51,7 +51,7 @@ export const getPartnerTrackProgressData = async (req: Request, res: Response) =
 
       const agreementReceived = docs.some((doc: any) => doc.type === 'final_agreement' && !!doc.fileUrl);
 
-      const partnerKycApproved = (booking.kycStatus === 'approved');
+      const partnerKycApproved = (booking.partnerKycStatus === 'approved');
 
       return {
         id: booking._id,

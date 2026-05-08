@@ -204,6 +204,12 @@ export class Booking {
   })
   kycStatus?: string;
 
+  @prop({
+    enum: ["not_started", "pending", "approved", "rejected"],
+    default: "not_started",
+  })
+  partnerKycStatus?: string;
+
   @prop({ type: () => [TimelineEntry], default: [] })
   timeline?: TimelineEntry[];
 

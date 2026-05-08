@@ -5,6 +5,9 @@ import { CoworkingSpaceModel } from "../coworkingSpaceModule/coworkingSpace.mode
 import { MeetingRoomModel } from "../meetingRoomModule/meetingRoom.model";
 import { SeatBookingModel } from "../seatingModule/seating.model";
 import { PaymentModel, PaymentStatus } from "../paymentModule/payment.model";
+import { BookingDocumentRecordModel } from "./bookingDocument.model";
+import { BusinessInfoModel } from "../userDashboardModule/models/businessInfo.model";
+import { PartnerKYCModel } from "../userDashboardModule/models/partnerKYC.model";
 import mongoose from "mongoose";
 
 export class BookingService {
@@ -543,5 +546,131 @@ export class BookingService {
       newClients: activeClientsSet.size,
       avgRating: ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "4.8" // Fallback to 4.8 as seen in static UI if no ratings
     };
+  }
+
+  private static normalizeReviewStatus(status?: string, fallback: "pending" | "approved" | "rejected" = "pending") {
+    const normalized = String(status || "").toLowerCase();
+    if (normalized === "approved" || normalized === "rejected" || normalized === "pending") return normalized;
+    if (normalized === "available" || normalized === "active" || normalized === "verified") return "approved";
+    return fallback;
+  }
+
+  static async syncBookingDocuments(bookingId: string) {
+    const booking: any = await BookingModel.findById(bookingId).populate("user");
+    if (!booking) return null;
+
+    const userId = booking.user?._id || booking.user || booking.clientId;
+    if (!userId) return null;
+
+    let record = await BookingDocumentRecordModel.findOne({ bookingId: booking._id });
+    if (!record) {
+      record = new BookingDocumentRecordModel({
+        bookingId: booking._id,
+        userId,
+        documents: [],
+      });
+    }
+
+    const existingByKey = new Map<string, any>();
+    const pushedKeys = new Set<string>();
+    (record.documents || []).forEach((doc: any) => {
+      const key = `${doc.category}:${doc.profileId || ""}:${doc.id || ""}:${doc.type}:${doc.url}`;
+      existingByKey.set(key, doc);
+    });
+
+    const nextDocs: any[] = [];
+    const pushDoc = (doc: any) => {
+      const key = `${doc.category}:${doc.profileId || ""}:${doc.id || ""}:${doc.type}:${doc.url}`;
+      if (pushedKeys.has(key)) return;
+      pushedKeys.add(key);
+      const existing = existingByKey.get(key);
+      nextDocs.push({
+        ...doc,
+        adminStatus: BookingService.normalizeReviewStatus(doc.adminStatus),
+        partnerStatus: BookingService.normalizeReviewStatus(existing?.partnerStatus || doc.partnerStatus),
+        partnerRejectionReason: existing?.partnerRejectionReason || doc.partnerRejectionReason,
+        partnerReviewedAt: existing?.partnerReviewedAt || doc.partnerReviewedAt,
+        partnerReviewedBy: existing?.partnerReviewedBy || doc.partnerReviewedBy,
+      });
+    };
+
+    (booking.documents || [])
+      .filter((doc: any) => doc.fileUrl || doc.url)
+      .filter((doc: any) => !String(doc.type || "").startsWith("__kyc_partner_review__"))
+      .forEach((doc: any) => {
+        pushDoc({
+          id: String(doc._id || ""),
+          name: doc.name || doc.type || "Booking Document",
+          type: doc.type || "document",
+          url: doc.fileUrl || doc.url,
+          category: "booking_specific",
+          profileId: String(booking._id),
+          adminStatus: doc.status,
+          partnerStatus: doc.partnerReviewStatus,
+          uploadedBy: doc.uploadedBy || "system",
+        });
+      });
+
+    const addProfileDocs = (profile: any, category: string) => {
+      if (!profile?.documents?.length) return;
+      profile.documents
+        .filter((doc: any) => doc.fileUrl || doc.url)
+        .forEach((doc: any) => {
+          pushDoc({
+            id: String(doc._id || ""),
+            name: doc.name || doc.type || "KYC Document",
+            type: doc.type || "document",
+            url: doc.fileUrl || doc.url,
+            category,
+            profileId: String(profile._id),
+            adminStatus: doc.status,
+            partnerStatus: "pending",
+            uploadedBy: "user",
+          });
+        });
+    };
+
+    const bookingUserId = String(booking.user?._id || booking.user || "");
+    if (bookingUserId) {
+      const individual = await KYCDocumentModel.findOne({
+        user: bookingUserId,
+        kycType: "individual",
+        isDeleted: { $ne: true },
+      }).lean();
+      addProfileDocs(individual, "user_kyc");
+    }
+
+    if (booking.kycProfile) {
+      const [businessById, businessByKyc, kycProfile] = await Promise.all([
+        BusinessInfoModel.findById(booking.kycProfile).lean(),
+        BusinessInfoModel.findOne({ kycProfile: booking.kycProfile, isDeleted: { $ne: true } }).lean(),
+        KYCDocumentModel.findById(booking.kycProfile).lean(),
+      ]);
+      addProfileDocs(businessById || businessByKyc || (kycProfile?.kycType === "business" ? kycProfile : null), "business_kyc");
+    }
+
+    if (booking.selectedPartners?.length) {
+      const partnerProfiles = await PartnerKYCModel.find({
+        _id: { $in: booking.selectedPartners },
+        isDeleted: { $ne: true },
+      }).lean();
+      partnerProfiles.forEach((partner) => addProfileDocs(partner, "partner_kyc"));
+    }
+
+    record.documents = nextDocs as any;
+    record.overallAdminStatus =
+      nextDocs.length > 0 && nextDocs.every((doc) => doc.adminStatus === "approved")
+        ? "approved"
+        : nextDocs.some((doc) => doc.adminStatus === "rejected")
+          ? "rejected"
+          : "pending";
+    record.overallPartnerStatus =
+      nextDocs.length > 0 && nextDocs.every((doc) => doc.partnerStatus === "approved")
+        ? "approved"
+        : nextDocs.some((doc) => doc.partnerStatus === "rejected")
+          ? "rejected"
+          : "pending";
+
+    return record.save();
   }
 }

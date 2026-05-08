@@ -28,6 +28,39 @@ import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancial
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 
 export class AdminService {
+  private getAdminVisibleKycStatus(status: any, user: any): string {
+    const normalized = String(status || "not_started").toLowerCase();
+    const adminVerified = Boolean(user?.kycVerified);
+
+    if (["approved", "verified", "active"].includes(normalized)) {
+      return adminVerified ? "approved" : "pending";
+    }
+
+    return normalized || "not_started";
+  }
+
+  private sanitizeUserKYCForAdmin(doc: any): any {
+    const raw = typeof doc?.toObject === "function" ? doc.toObject() : doc;
+    if (!raw) return raw;
+
+    const visibleStatus = this.getAdminVisibleKycStatus(
+      raw.overallStatus || raw.kycStatus,
+      raw.user,
+    );
+
+    return {
+      ...raw,
+      overallStatus: visibleStatus,
+      kycStatus: visibleStatus,
+      businessInfo: raw.businessInfo
+        ? {
+          ...raw.businessInfo,
+          verified: visibleStatus === "approved",
+        }
+        : raw.businessInfo,
+    };
+  }
+
   private mapPartnerKYC(partner: any): any {
     const raw =
       typeof partner.toObject === "function" ? partner.toObject() : partner;
@@ -541,7 +574,7 @@ export class AdminService {
         isDeleted: false,
         overallStatus: includeApproved
           ? { $nin: ["in_progress", "not_started"] }
-          : { $in: ["pending", "resubmit"] },
+          : { $in: ["pending", "resubmit", "approved", "verified"] },
       };
 
       // If partner, filter KYC docs by linkedBookings
@@ -553,7 +586,7 @@ export class AdminService {
         .select(
           "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress submittedAt partnerCount businessInfoCount createdAt updatedAt",
         )
-        .populate("user", "fullName email phoneNumber profilePicture")
+        .populate("user", "fullName email phoneNumber profilePicture kycVerified")
         .sort({ updatedAt: -1 })
         .lean();
 
@@ -647,12 +680,14 @@ export class AdminService {
           userId ? businessCountByUser.get(userId) || 0 : 0,
         );
 
-        return {
+        return this.sanitizeUserKYCForAdmin({
           ...doc,
           partnerCount,
           businessInfoCount,
-        };
-      });
+        });
+      }).filter((doc: any) =>
+        includeApproved || ["pending", "resubmit"].includes(doc.overallStatus),
+      );
 
       return {
         success: true,
@@ -859,10 +894,10 @@ export class AdminService {
 
         const agreementReceived = docs.some((doc: any) => doc.type === 'final_agreement' && !!doc.fileUrl);
 
-        // A booking is considered partner-approved if the kycStatus is approved 
-        // OR if there are explicit partner reviews that are approved.
+        // A booking is considered partner-approved only from booking-specific
+        // partner review state, never from admin/global KYC status.
         const hasApprovedPartnerReview = (booking.kycDocumentReviews || []).some((r: any) => r.status === 'approved');
-        const partnerKycApproved = (booking.kycStatus === 'approved' || hasApprovedPartnerReview);
+        const partnerKycApproved = (booking.partnerKycStatus === 'approved' || hasApprovedPartnerReview);
 
         return {
           id: booking._id,
@@ -1451,7 +1486,7 @@ export class AdminService {
     try {
       const kyc = await KYCDocumentModel.findById(kycId).populate(
         "user",
-        "fullName email phoneNumber profilePicture",
+        "fullName email phoneNumber profilePicture kycVerified",
       );
 
       if (!kyc) {
@@ -1461,7 +1496,7 @@ export class AdminService {
       return {
         success: true,
         message: "KYC details fetched successfully",
-        data: kyc,
+        data: this.sanitizeUserKYCForAdmin(kyc),
       };
     } catch (error: any) {
       return {
