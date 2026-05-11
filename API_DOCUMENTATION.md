@@ -4,7 +4,7 @@ This document provides details for the API endpoints in the `spacePartner`, `cow
 
 ## Base URL
 
-`http://localhost:5000/api` (Development)
+`http://localhost:5001/api` (Development)
 
 ## Authentication
 
