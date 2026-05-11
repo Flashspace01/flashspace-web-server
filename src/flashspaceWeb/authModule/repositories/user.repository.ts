@@ -13,7 +13,6 @@ export class UserRepository {
   ): Promise<User | null> {
     const query = UserModel.findOne({
       email: email.toLowerCase(),
-      isDeleted: false,
     });
 
     // Explicitly select password field if needed (for authentication)
@@ -28,9 +27,8 @@ export class UserRepository {
   async findByEmailForAuth(email: string): Promise<User | null> {
     return await UserModel.findOne({
       email: email.toLowerCase(),
-      isDeleted: false,
     })
-      .select("+password +trustedTwoFactorDevices")
+      .select("+password +trustedTwoFactorDevices +isDeleted")
       .exec();
   }
 

@@ -64,6 +64,7 @@ router.use(AuthMiddleware.authenticate); // Apply to all routes below
 router.post('/change-password', authController.changePassword);
 router.post('/logout', authController.logout);
 router.post('/logout-all', authController.logoutAll);
+router.delete('/delete-account', authController.deleteAccount);
 
 
 router.get(
