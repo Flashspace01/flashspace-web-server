@@ -150,7 +150,7 @@ export const createLead = async (req: Request, res: Response) => {
 export const getLeads = async (req: Request, res: Response) => {
   try {
     // 1. Fetch General Leads
-    const generalLeads = await LeadModel.find().sort({ createdAt: -1 });
+    const generalLeads = await LeadModel.find().sort({ createdAt: -1 }).lean();
 
     // 2. Fetch Booking Leads (Unpaid/Abandoned)
     // Only show booking leads that are older than 2.5 minutes (150s) and still pending
@@ -161,10 +161,10 @@ export const getLeads = async (req: Request, res: Response) => {
     const bookingLeads = await BookingLeadModel.find({ 
       status: "pending",
       createdAt: { $lt: gracePeriodThreshold }
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 }).lean();
 
     // 3. Normalize and Combine
-    const normalizedGeneral = generalLeads.map(l => ({
+    const normalizedGeneral = generalLeads.map((l: any) => ({
       _id: l._id,
       name: l.name,
       email: l.email,
@@ -177,7 +177,7 @@ export const getLeads = async (req: Request, res: Response) => {
       type: "general"
     }));
 
-    const normalizedBooking = bookingLeads.map(l => ({
+    const normalizedBooking = bookingLeads.map((l: any) => ({
       _id: l._id,
       name: l.name || "Booking Lead",
       email: l.email,
