@@ -386,7 +386,11 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
       MeetingRoomModel.distinct("_id", { property: { $in: propertyIds } }),
     ]);
 
-    const allSpaceIds = [...coworkingIds, ...virtualIds, ...meetingIds];
+    const allSpaceIds = [
+      ...coworkingIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
+      ...virtualIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
+      ...meetingIds.map((id) => new mongoose.Types.ObjectId((id as any).toString())),
+    ];
 
     // 2. Fetch all reviews and tickets with ratings
     const partnerBookingIds = await BookingModel.find({
@@ -397,7 +401,7 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
     const bookingIdList = partnerBookingIds.map((b: any) => b._id);
 
     const ticketFeedbackQuery: any = {
-      rating: { $ne: null },
+      rating: { $exists: true, $ne: null },
       $or: [
         { partnerId: new mongoose.Types.ObjectId(partnerId) },
         { assignee: new mongoose.Types.ObjectId(partnerId) }
@@ -415,15 +419,17 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
       TicketModel.find(ticketFeedbackQuery).lean()
     ]);
 
-    const totalResponses = reviews.filter(r => r.npsScore !== undefined).length + ticketFeedback.length;
+    // Only count reviews that actually have an npsScore
+    const reviewsWithNps = reviews.filter(r => typeof r.npsScore === 'number');
+    const totalResponses = reviewsWithNps.length + ticketFeedback.length;
     
     // Promoters (9-10 for reviews, 5 for tickets)
-    const reviewPromoters = reviews.filter(r => (r.npsScore || 0) >= 9).length;
+    const reviewPromoters = reviewsWithNps.filter(r => (r.npsScore ?? 0) >= 9).length;
     const ticketPromoters = ticketFeedback.filter(t => (t.rating || 0) >= 5).length;
     const promoters = reviewPromoters + ticketPromoters;
 
     // Detractors (0-6 for reviews, 1-3 for tickets)
-    const reviewDetractors = reviews.filter(r => r.npsScore !== undefined && (r.npsScore || 0) <= 6).length;
+    const reviewDetractors = reviewsWithNps.filter(r => (r.npsScore ?? 0) <= 6).length;
     const ticketDetractors = ticketFeedback.filter(t => (t.rating || 0) <= 3).length;
     const detractors = reviewDetractors + ticketDetractors;
 
@@ -435,8 +441,8 @@ export const getPartnerNpsStats = async (req: Request, res: Response) => {
 
     // Average rating calculation (combine all reviews and tickets)
     const allRatings = [
-      ...reviews.map(r => r.rating),
-      ...ticketFeedback.map(t => t.rating || 0)
+      ...reviews.map(r => Number(r.rating)).filter(n => !isNaN(n)),
+      ...ticketFeedback.map(t => Number(t.rating)).filter(n => !isNaN(n))
     ];
 
     const totalReviewsCount = allRatings.length;

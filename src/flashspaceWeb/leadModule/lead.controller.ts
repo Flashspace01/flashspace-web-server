@@ -149,8 +149,56 @@ export const createLead = async (req: Request, res: Response) => {
 
 export const getLeads = async (req: Request, res: Response) => {
   try {
-    const leads = await LeadModel.find().sort({ createdAt: -1 });
-    return res.status(200).json({ ok: true, data: leads });
+    // 1. Fetch General Leads
+    const generalLeads = await LeadModel.find().sort({ createdAt: -1 }).lean();
+
+    // 2. Fetch Booking Leads (Unpaid/Abandoned)
+    // Only show booking leads that are older than 2.5 minutes (150s) and still pending
+    // This provides a buffer for the user to complete their payment.
+    const delayMs = 150 * 1000; // 2.5 minutes
+    const gracePeriodThreshold = new Date(Date.now() - delayMs);
+    
+    const bookingLeads = await BookingLeadModel.find({ 
+      status: "pending",
+      createdAt: { $lt: gracePeriodThreshold }
+    }).sort({ createdAt: -1 }).lean();
+
+    // 3. Normalize and Combine
+    const normalizedGeneral = generalLeads.map((l: any) => ({
+      _id: l._id,
+      name: l.name,
+      email: l.email,
+      phone: l.phone,
+      city: l.city,
+      businessType: l.businessType,
+      message: l.message,
+      source: l.source || "Website Form",
+      createdAt: l.createdAt,
+      type: "general"
+    }));
+
+    const normalizedBooking = bookingLeads.map((l: any) => ({
+      _id: l._id,
+      name: l.name || "Booking Lead",
+      email: l.email,
+      phone: l.phone,
+      city: "N/A",
+      businessType: l.spaceName || "Space Booking",
+      message: `Abandoned booking for space: ${l.spaceName || l.spaceId}`,
+      source: "Booking Abandoned",
+      createdAt: l.createdAt,
+      type: "booking"
+    }));
+
+    const allLeads = [...normalizedGeneral, ...normalizedBooking].sort(
+      (a: any, b: any) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      }
+    );
+
+    return res.status(200).json({ ok: true, data: allLeads });
   } catch (error: any) {
     console.error("CRITICAL - Failed to fetch leads:", error.message);
     return res.status(500).json({ ok: false, message: "Failed to fetch leads: " + error.message });
@@ -158,7 +206,7 @@ export const getLeads = async (req: Request, res: Response) => {
 };
 export const createBookingLead = async (req: Request, res: Response) => {
   try {
-    const { userId, email, phone, spaceId, spaceName, utm } = req.body || {};
+    const { userId, name, email, phone, spaceId, spaceName, utm } = req.body || {};
 
     if (!email || !phone || !spaceId) {
       return res.status(400).json({ ok: false, message: "Missing required fields (email, phone, spaceId)" });
@@ -166,6 +214,7 @@ export const createBookingLead = async (req: Request, res: Response) => {
 
     const bookingLead = await BookingLeadModel.create({
       userId,
+      name,
       email,
       phone,
       spaceId,

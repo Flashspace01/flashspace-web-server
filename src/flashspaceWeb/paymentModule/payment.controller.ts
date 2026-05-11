@@ -23,6 +23,7 @@ import { NotificationService } from "../notificationModule/services/notification
 import { CouponModel, CouponStatus } from "../couponModule/coupon.model";
 import { getIO } from "../../socket";
 import { BookingService } from "../seatingModule/seating.service";
+import { BookingLeadModel } from "../leadModule/bookingLead.model";
 import {
   createOrderSchema,
   verifyPaymentSchema,
@@ -384,6 +385,25 @@ async function createBookingAndInvoice(payment: any) {
         console.error("Ledger deduction failed:", ledgerError);
       }
     }
+
+    // --- MARK BOOKING LEAD AS CONVERTED ---
+    try {
+      const lead = await BookingLeadModel.findOneAndUpdate(
+        { 
+          email: payment.userEmail, 
+          spaceId: payment.space.toString(),
+          status: "pending" 
+        },
+        { status: "converted" },
+        { new: true }
+      );
+      if (lead) {
+        console.log("✅ Booking Lead marked as converted:", lead._id);
+      }
+    } catch (leadError) {
+      console.error("⚠️ Failed to update booking lead status:", leadError);
+    }
+    // -------------------------------------
 
     return { booking, invoiceNumber: createdInvoiceNumber };
   } catch (error) {
