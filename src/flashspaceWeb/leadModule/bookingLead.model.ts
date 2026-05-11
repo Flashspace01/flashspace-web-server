@@ -17,6 +17,9 @@ export class BookingLead {
   @prop({ ref: () => User })
   public userId?: Ref<User>;
 
+  @prop({ trim: true })
+  public name?: string;
+
   @prop({ required: true, trim: true })
   public email!: string;
 

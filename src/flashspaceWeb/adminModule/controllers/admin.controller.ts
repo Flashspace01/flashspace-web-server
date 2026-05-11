@@ -539,4 +539,27 @@ export class AdminController {
     );
     res.status(result.success ? 200 : 500).json(result);
   }
+  // POST /api/admin/invoices/upload
+  static async uploadAdminInvoice(req: Request, res: Response) {
+    const { userId, invoiceNumber, amount, description, dueDate } = req.body;
+    const file = req.file;
+
+    if (!userId || !invoiceNumber || !amount || !description || !file) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields or invoice file",
+      });
+    }
+
+    const result = await adminService.uploadAdminInvoice(req.user, {
+      userId,
+      invoiceNumber,
+      amount: parseFloat(amount),
+      description,
+      dueDate,
+      pdfUrl: file.path, // Multer stores the path
+    });
+
+    res.status(result.success ? 201 : 500).json(result);
+  }
 }

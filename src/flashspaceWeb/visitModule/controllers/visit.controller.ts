@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import fs from "fs";
+import path from "path";
 import Visit from "../models/visit.model";
 import { UserModel } from "../../authModule/models/user.model";
 import { NotificationType } from "../../notificationModule/models/Notification";
@@ -54,6 +56,8 @@ export const getVisits = async (req: Request, res: Response) => {
       const emailKey = v.email?.toLowerCase().trim();
       return {
         ...v,
+        visitorEmail: v.visitorEmail,
+        visitorNumber: v.visitorNumber,
         client: emailToName[emailKey] || v.client,
         visitId: v.visitId || v._id?.toString(),
       };
@@ -82,7 +86,8 @@ export const getVisits = async (req: Request, res: Response) => {
 
 export const createVisit = async (req: Request, res: Response) => {
   try {
-    const { client, visitor, email, purpose, space, date } = req.body;
+    fs.appendFileSync("c:\\Users\\Aayush\\OneDrive\\Desktop\\flashspace\\flashspace-web-server\\debug_visit.log", JSON.stringify(req.body, null, 2) + "\n---\n");
+    const { client, visitor, visitorEmail, visitorNumber, email, purpose, space, date } = req.body;
 
     if (!client || !visitor || !email || !purpose || !space) {
       return res
@@ -98,17 +103,22 @@ export const createVisit = async (req: Request, res: Response) => {
         .json({ success: false, message: "Unauthorized. Partner ID missing." });
     }
 
+    console.log("Extracted fields:", { visitorEmail, visitorNumber });
     const newVisit = new Visit({
       partnerId,
       client,
       visitor,
-      email: email.trim(), // Sanitize email
+      visitorEmail: (visitorEmail || "").trim(),
+      visitorNumber: (visitorNumber || "").trim(),
+      email: email.trim(),
       purpose,
       space,
       date: date ? new Date(date) : undefined,
     });
 
+    console.log("Saving new visit object:", newVisit.toObject());
     await newVisit.save();
+    console.log("Visit saved successfully with ID:", newVisit._id);
 
     // Notify client user (if account exists for the provided email)
     (async () => {

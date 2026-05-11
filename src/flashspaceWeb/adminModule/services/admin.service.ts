@@ -26,6 +26,8 @@ import { checkAndAdvanceSpaceStatus } from "../../shared/utils/spaceOnboarding.u
 import { PropertyModel, KYCStatus, PropertyStatus } from "../../propertyModule/property.model";
 import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancials.model";
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
+import { LeadModel } from "../../leadModule/lead.model";
+import { BookingLeadModel } from "../../leadModule/bookingLead.model";
 
 export class AdminService {
   private getAdminVisibleKycStatus(status: any, user: any): string {
@@ -268,35 +270,72 @@ export class AdminService {
 
       const openTicketsCount = await TicketModel.countDocuments(ticketQuery);
 
-      // 5. Recent Activity
-      let recentActivity: any[] = [];
+      // 5. Recent Activity & Data
+      let recentLeads: any[] = [];
+      let recentBookings: any[] = [];
 
       if (isAdminOrStaff) {
-        const recentUsers = await UserModel.find({ isDeleted: false })
+        // Fetch recent leads
+        const [generalLeads, bookingLeads] = await Promise.all([
+          LeadModel.find().sort({ createdAt: -1 }).limit(10).lean(),
+          BookingLeadModel.find({ status: { $ne: "converted" } }).sort({ createdAt: -1 }).limit(10).lean()
+        ]);
+
+        recentLeads = [
+          ...generalLeads.map((l: any) => ({ 
+            id: l._id.toString(), 
+            name: l.name || "Unknown", 
+            email: l.email || "N/A", 
+            type: "general", 
+            time: l.createdAt 
+          })),
+          ...bookingLeads.map((l: any) => ({ 
+            id: l._id.toString(), 
+            name: l.name || "Booking Lead", 
+            email: l.email || "N/A", 
+            type: "booking", 
+            time: l.createdAt 
+          }))
+        ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5);
+
+        // Fetch recent bookings
+        const bookings = await BookingModel.find({ isDeleted: false })
           .sort({ createdAt: -1 })
           .limit(5)
-          .select("fullName email createdAt");
+          .populate("user", "fullName email")
+          .populate({ path: "spaceId" })
+          .lean();
 
-        recentActivity = recentUsers.map((u) => ({
-          id: u._id,
-          type: "user_joined",
-          message: `New user joined: ${u.fullName}`,
-          time: u.createdAt,
+        recentBookings = bookings.map((b: any) => ({
+          id: b._id.toString(),
+          userName: b.user?.fullName || "User",
+          userEmail: b.user?.email || "N/A",
+          spaceName: b.spaceSnapshot?.name || b.spaceId?.name || "Space",
+          planName: b.plan?.name || "N/A",
+          amount: b.plan?.price || 0,
+          status: b.status,
+          time: b.createdAt
         }));
       } else {
-        // Partners see recent bookings
-        const recentBookings = await BookingModel.find({
+        // Partners see recent bookings for their spaces
+        const bookings = await BookingModel.find({
           spaceId: { $in: spaceIds },
           isDeleted: false,
         })
           .sort({ createdAt: -1 })
           .limit(5)
-          .populate("user", "fullName");
+          .populate("user", "fullName email")
+          .populate({ path: "spaceId" })
+          .lean();
 
-        recentActivity = recentBookings.map((b) => ({
-          id: b._id,
-          type: "new_booking",
-          message: `New booking link for ${(b.user as any)?.fullName || "User"}`,
+        recentBookings = bookings.map((b: any) => ({
+          id: b._id.toString(),
+          userName: b.user?.fullName || "User",
+          userEmail: b.user?.email || "N/A",
+          spaceName: b.spaceSnapshot?.name || b.spaceId?.name || "Space",
+          planName: b.plan?.name || "N/A",
+          amount: b.plan?.price || 0,
+          status: b.status,
           time: b.createdAt,
         }));
       }
@@ -310,7 +349,8 @@ export class AdminService {
           activeListings,
           totalRevenue,
           openTickets: openTicketsCount,
-          recentActivity,
+          recentLeads,
+          recentBookings,
         },
       };
     } catch (error: any) {
@@ -3132,6 +3172,57 @@ export class AdminService {
       return {
         success: false,
         message: "Failed to fetch documents",
+        error: error.message
+      };
+    }
+  }
+
+  // Upload manual invoice for a user
+  async uploadAdminInvoice(
+    adminUser: any,
+    data: {
+      userId: string;
+      invoiceNumber: string;
+      amount: number;
+      description: string;
+      dueDate?: string;
+      pdfUrl: string;
+    }
+  ): Promise<ApiResponse<any>> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(data.userId)) {
+        return { success: false, message: "Invalid user ID" };
+      }
+
+      const user = await UserModel.findById(data.userId);
+      if (!user) {
+        return { success: false, message: "User not found" };
+      }
+
+      // Create new invoice
+      const invoice = await InvoiceModel.create({
+        invoiceNumber: data.invoiceNumber,
+        user: data.userId,
+        partner: adminUser.id, // Admin who uploaded it acts as the partner/issuer
+        description: data.description,
+        subtotal: data.amount,
+        total: data.amount,
+        status: "pending",
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        pdfUrl: data.pdfUrl,
+        invoiceType: "admin_manual"
+      });
+
+      return {
+        success: true,
+        message: "Invoice uploaded successfully",
+        data: invoice
+      };
+    } catch (error: any) {
+      console.error("Error in uploadAdminInvoice:", error);
+      return {
+        success: false,
+        message: "Failed to upload invoice",
         error: error.message
       };
     }

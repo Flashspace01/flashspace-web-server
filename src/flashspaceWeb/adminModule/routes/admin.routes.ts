@@ -407,6 +407,14 @@ adminRoutes.get(
   AdminController.getInvoices,
 );
 
+import { uploadInvoiceFile } from "../../partnerInvoiceModule/config/multer.config";
+adminRoutes.post(
+  "/invoices/upload",
+  RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),
+  uploadInvoiceFile.single("invoiceFile"),
+  AdminController.uploadAdminInvoice,
+);
+
 adminRoutes.get(
   "/affiliates/:id/stats",
   RBACMiddleware.requirePermission(Permission.MANAGE_ALL_USERS),

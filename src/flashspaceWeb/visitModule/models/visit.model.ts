@@ -5,6 +5,8 @@ export interface IVisit extends Document {
     partnerId: mongoose.Types.ObjectId;
     client: string;
     visitor: string;
+    visitorEmail?: string;
+    visitorNumber?: string;
     email: string;
     purpose: string;
     space: string;
@@ -19,6 +21,8 @@ const VisitSchema: Schema = new Schema({
     partnerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     client: { type: String, required: true },
     visitor: { type: String, required: true },
+    visitorEmail: { type: String },
+    visitorNumber: { type: String },
     email: { type: String, required: true },
     purpose: { type: String, required: true },
     space: { type: String, required: true },

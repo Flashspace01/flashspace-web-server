@@ -5546,6 +5546,8 @@ export const getUserVisits = async (req: Request, res: Response) => {
       const emailKey = v.email?.toLowerCase().trim();
       return {
         ...v,
+        visitorEmail: v.visitorEmail,
+        visitorNumber: v.visitorNumber,
         client: emailToName[emailKey] || v.client,
         visitId: v.visitId || v._id?.toString(),
       };
