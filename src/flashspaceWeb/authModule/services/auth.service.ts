@@ -57,6 +57,12 @@ export class AuthService {
       // Check if user already exists
       const existingUser = await this.userRepository.findByEmail(email);
       if (existingUser) {
+        if (existingUser.isDeleted) {
+          return {
+            success: false,
+            message: "An account with this email has been deactivated. Please contact support for restoration.",
+          };
+        }
         return {
           success: false,
           message: "User with this email already exists",
@@ -152,6 +158,14 @@ export class AuthService {
         return {
           success: false,
           message: "Invalid email or password",
+        };
+      }
+
+      // Check if account is deleted
+      if (user.isDeleted) {
+        return {
+          success: false,
+          message: "Your account has been deactivated. Please contact support if you believe this is an error.",
         };
       }
 
@@ -275,6 +289,14 @@ export class AuthService {
       let user = await this.userRepository.findByEmail(email);
 
       if (user) {
+        // Check if account is deleted
+        if (user.isDeleted) {
+          return {
+            success: false,
+            message: "Your account has been deactivated. Please contact support.",
+          };
+        }
+
         // User exists, check if Google ID matches
         if (
           user.authProvider === AuthProvider.GOOGLE &&
@@ -405,7 +427,7 @@ export class AuthService {
       const { email } = forgotPasswordData;
 
       const user = await this.userRepository.findByEmail(email);
-      if (!user) {
+      if (!user || user.isDeleted) {
         // Don't reveal if email exists for security
         return {
           success: true,
@@ -664,6 +686,29 @@ export class AuthService {
       return {
         success: false,
         message: "An error occurred during logout",
+      };
+    }
+  }
+
+  async deleteAccount(userId: string): Promise<AuthResponse> {
+    try {
+      const user = await this.userRepository.softDelete(userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found or already deleted",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Account deleted successfully",
+      };
+    } catch (error) {
+      console.error("Delete account error:", error);
+      return {
+        success: false,
+        message: "An error occurred during account deletion",
       };
     }
   }
