@@ -2211,6 +2211,28 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
       }
     );
 
+    // 5. Update global profile document status if found there
+    if (targetProfile && targetProfileModel !== 'booking' && targetDoc) {
+      try {
+        const profileIdToUpdate = targetProfile._id;
+        const Model = targetProfileModel === 'business' ? BusinessInfoModel : (targetProfileModel === 'partner' ? PartnerKYCModel : KYCDocumentModel);
+        
+        await Model.updateOne(
+          { _id: profileIdToUpdate, "documents._id": targetDoc._id },
+          { 
+            $set: { 
+              "documents.$.partnerReviewStatus": reviewStatus,
+              "documents.$.partnerReviewedAt": reviewPayload.reviewedAt,
+              "documents.$.partnerReviewedBy": partnerId,
+              "documents.$.partnerRejectionReason": reviewReason
+            } 
+          }
+        );
+      } catch (profileUpdateError) {
+        console.error("[reviewPartnerBookingKycDocument] Failed to update profile status:", profileUpdateError);
+      }
+    }
+
     // 6. RE-FETCH for status calculation (non-lean this time if needed, but updateOne is better)
     const freshBooking = await BookingModel.findById(booking._id).lean();
     if (freshBooking) {
@@ -2765,11 +2787,25 @@ export const reviewPartnerBookingDocument = async (req: Request, res: Response) 
       return res.status(404).json({ success: false, message: "Document not found" });
     }
 
-    doc.status = action === "approve" ? "approved" : "rejected";
-    doc.rejectionReason = action === "reject" ? rejectionReason || "Document rejected by partner" : undefined;
-    doc.reviewedAt = new Date();
+    doc.partnerReviewStatus = action === "approve" ? "approved" : "rejected";
+    doc.partnerRejectionReason = action === "reject" ? rejectionReason || "Document rejected by partner" : undefined;
+    doc.partnerReviewedAt = new Date();
+    doc.partnerReviewedBy = partnerId;
+    
+    // Also update general status if it was pending
+    if (doc.status === "pending") {
+      doc.status = action === "approve" ? "approved" : "pending";
+    }
+
     booking.markModified("documents");
     await booking.save();
+
+    // Also update BookingDocumentRecordModel
+    try {
+      await BookingService.syncBookingDocuments(booking._id.toString());
+    } catch (recordError) {
+      console.error("[reviewPartnerBookingDocument] Failed to sync record:", recordError);
+    }
 
     // Notify User
     try {
@@ -2878,6 +2914,9 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
         : "#";
 
     // 4. Map to frontend ClientDetails format
+    const bookingReviewLookup = buildBookingReviewLookup(mainBooking);
+
+    // 4. Map to frontend ClientDetails format
     const details = {
       bookingId: mainBooking._id,
       id: mainBooking.bookingNumber,
@@ -2898,27 +2937,21 @@ export const getPartnerClientDetails = async (req: Request, res: Response) => {
         : "N/A",
       status: mainBooking.status.toUpperCase(),
       kyc: {
-        status:
-          kycProfile?.overallStatus === "approved"
-            ? "VERIFIED"
-            : kycProfile?.overallStatus === "rejected"
-              ? "REJECTED"
-              : "PENDING",
-        documents: (kycProfile?.documents || []).map(
-          (doc: any, index: number) => ({
-            id: `DOC-${index}`,
-            type: doc.type,
-            fileUrl:
-              doc.fileUrl && doc.fileUrl !== "#"
-                ? doc.fileUrl.startsWith("http")
-                  ? doc.fileUrl
-                  : `${baseUrl}${doc.fileUrl.startsWith("/") ? "" : "/"}${doc.fileUrl}`
-                : "#",
-            uploadedAt: doc.uploadedAt
-              ? new Date(doc.uploadedAt).toISOString().split("T")[0]
-              : "N/A",
-          }),
+        status: (kycProfile?.overallStatus || "pending").toUpperCase(),
+        documents: safeNormalizeDocs(
+          req,
+          kycProfile?.documents || [],
+          bookingReviewLookup,
+          "kyc",
+          String(kycProfile?._id || "")
         ),
+        businessDocuments: businessInfo ? safeNormalizeDocs(
+          req,
+          businessInfo.documents || [],
+          bookingReviewLookup,
+          "business",
+          String(businessInfo._id)
+        ) : [],
       },
       agreement: {
         status: agreementDoc ? "SIGNED" : "PENDING",

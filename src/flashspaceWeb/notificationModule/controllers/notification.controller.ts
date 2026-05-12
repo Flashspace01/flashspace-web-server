@@ -32,6 +32,8 @@ export const getUserNotifications = async (req: Request, res: Response) => {
   try {
     // Assuming req.user is populated by authMiddleware
     const userId = (req as any).user.id || (req as any).user._id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
     const archivedQuery = String(req.query.archived || "").toLowerCase();
     const archiveFilter =
       archivedQuery === "only" || archivedQuery === "true"
@@ -39,14 +41,16 @@ export const getUserNotifications = async (req: Request, res: Response) => {
         : archivedQuery === "all"
           ? "all"
           : "active";
-    const notifications = await NotificationService.getUserNotifications(
+    const result = await NotificationService.getUserNotifications(
       userId,
-      100,
+      page,
+      limit,
       archiveFilter,
     );
     res.status(200).json({
       success: true,
-      data: notifications,
+      data: result.data,
+      pagination: result.pagination
     });
   } catch (error) {
     console.error("Error fetching user notifications:", error);

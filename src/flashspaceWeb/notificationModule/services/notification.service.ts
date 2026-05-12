@@ -235,7 +235,8 @@ export class NotificationService {
 
     static async getUserNotifications(
         userId: string,
-        limit = 100,
+        page = 1,
+        limit = 10,
         archiveFilter: "active" | "archived" | "all" = "active",
     ) {
         const query: any = { recipient: userId };
@@ -245,11 +246,22 @@ export class NotificationService {
             query.archived = true;
         }
 
-        console.log(`[NotificationService] Fetching all notifications for user ${userId}`);
-
-        return await NotificationModel.find(query)
+        const skip = (page - 1) * limit;
+        const total = await NotificationModel.countDocuments(query);
+        const data = await NotificationModel.find(query)
             .sort({ createdAt: -1 })
+            .skip(skip)
             .limit(limit);
+
+        return {
+            data,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        };
     }
 
     static async getAdminNotifications(

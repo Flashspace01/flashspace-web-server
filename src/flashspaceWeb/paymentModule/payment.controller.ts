@@ -264,67 +264,9 @@ async function createBookingAndInvoice(payment: any) {
       }
     }
 
-    // Generate invoice number
-    let invoiceNumber = "";
-    for (let i = 0; i < 5; i++) {
-      const candidate = `INV-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)
-        .toString()
-        .padStart(3, "0")}`;
-      const exists = await InvoiceModel.exists({ invoiceNumber: candidate });
-      if (!exists) {
-        invoiceNumber = candidate;
-        break;
-      }
-    }
-
-    if (!invoiceNumber) {
-      throw new Error("Unable to generate unique invoice number");
-    }
-
-    // Calculate tax (18% GST)
-    const subtotal = payment.totalAmount;
-    const taxRate = 18;
-    const taxAmount = Math.round((subtotal * taxRate) / 118);
-    const baseAmount = subtotal - taxAmount;
-
-    let createdInvoiceNumber: string | undefined = undefined;
-    try {
-      await InvoiceModel.create({
-        invoiceNumber,
-        user: payment.user,
-        partner: partnerId || payment.user,
-        booking: booking ? booking._id : undefined,
-        bookingNumber,
-        payment: payment._id,
-        description: `${payment.spaceName} - ${payment.planName} (${payment.tenure} Year${payment.tenure > 1 ? "s" : ""})`,
-        lineItems: [
-          {
-            description: `${payment.planName} - ${payment.tenure} Year${payment.tenure > 1 ? "s" : ""}`,
-            quantity: 1,
-            rate: baseAmount,
-            amount: baseAmount,
-          },
-        ],
-        subtotal: baseAmount,
-        taxRate,
-        taxAmount,
-        total: subtotal,
-        status: "paid",
-        paidAt: new Date(),
-        billingAddress: {
-          name: payment.userName,
-          company: "",
-          address: "",
-          city: spaceSnapshot.city || "",
-        },
-      });
-      createdInvoiceNumber = invoiceNumber;
-    } catch (invoiceError) {
-      console.error(
-        "Invoice generation failed, continuing with booking success:",
-        invoiceError,
-      );
-    }
+    // Auto-generation of invoices is disabled as per user request. 
+    // Invoices will now be uploaded manually by Admin.
+    const createdInvoiceNumber = undefined;
 
     // Create/update KYC record
     let kyc = await KYCDocumentModel.findOne({ user: payment.user });
