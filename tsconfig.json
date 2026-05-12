@@ -18,7 +18,12 @@
     "pretty": true
   },
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist",
+    "uploads",
+    "scratch",
+    "**/*.log",
+    "**/*.txt"
   ],
   "include": [
     "./src/**/*.tsx",
