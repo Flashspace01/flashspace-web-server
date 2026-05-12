@@ -28,6 +28,7 @@ import { PartnerInvoice } from "../../spacePartnerModule/models/partnerFinancial
 import { PartnerInvoiceModel } from "../../partnerInvoiceModule/partnerInvoice.model";
 import { LeadModel } from "../../leadModule/lead.model";
 import { BookingLeadModel } from "../../leadModule/bookingLead.model";
+import { backupUploadedFile } from "../../shared/utils/uploadedFileStore";
 
 export class AdminService {
   private getAdminVisibleKycStatus(status: any, user: any): string {
@@ -934,10 +935,8 @@ export class AdminService {
 
         const agreementReceived = docs.some((doc: any) => doc.type === 'final_agreement' && !!doc.fileUrl);
 
-        // A booking is considered partner-approved only from booking-specific
-        // partner review state, never from admin/global KYC status.
-        const hasApprovedPartnerReview = (booking.kycDocumentReviews || []).some((r: any) => r.status === 'approved');
-        const partnerKycApproved = (booking.partnerKycStatus === 'approved' || hasApprovedPartnerReview);
+        // A booking is considered partner-approved only if the overall status is approved.
+        const partnerKycApproved = booking.partnerKycStatus === 'approved';
 
         return {
           id: booking._id,
@@ -2802,7 +2801,92 @@ export class AdminService {
             ...p,
             _id: p._id,
             invoiceNumber: inv?.invoiceNumber || "N/A",
+            status: "paid",
             invoiceType: "B2C",
+          };
+        });
+
+        return { data, count };
+      })();
+
+      const adminManualPromise = (async () => {
+        if (!fetchB2C) return { data: [], count: 0 };
+
+        const manualQuery: any = {
+          isDeleted: { $ne: true },
+          invoiceType: "admin_manual",
+        };
+
+        if (filters.status && filters.status !== "all") {
+          manualQuery.status = filters.status;
+        }
+
+        if (filters.search) {
+          manualQuery.$or = [
+            { invoiceNumber: { $regex: filters.search, $options: "i" } },
+            { description: { $regex: filters.search, $options: "i" } },
+            { bookingNumber: { $regex: filters.search, $options: "i" } },
+          ];
+        }
+
+        if (Object.keys(dateFilter).length > 0) {
+          manualQuery.createdAt = dateFilter;
+        }
+
+        const [manualInvoices, count] = await Promise.all([
+          InvoiceModel.find(manualQuery)
+            .populate("user", "fullName email")
+            .populate("booking", "bookingNumber spaceSnapshot plan")
+            .sort({ createdAt: -1 })
+            .skip(fetchB2B ? 0 : skip)
+            .limit(fetchB2B ? 500 : limit)
+            .lean(),
+          InvoiceModel.countDocuments(manualQuery),
+        ]);
+
+        const bookingNumbers = manualInvoices
+          .map((inv: any) => inv.bookingNumber)
+          .filter(Boolean);
+        const fallbackBookings = bookingNumbers.length
+          ? await BookingModel.find({
+              bookingNumber: { $in: bookingNumbers },
+              isDeleted: { $ne: true },
+            })
+              .select("bookingNumber spaceSnapshot plan")
+              .lean()
+          : [];
+
+        const data = manualInvoices.map((inv: any) => {
+          const booking =
+            inv.booking && typeof inv.booking === "object"
+              ? inv.booking
+              : fallbackBookings.find(
+                  (b: any) => b.bookingNumber === inv.bookingNumber,
+                );
+          const planTenure =
+            booking?.plan?.tenure
+              ? ` (${booking.plan.tenure} ${booking.plan.tenureUnit || "months"})`
+              : "";
+
+          return {
+            _id: inv._id,
+            invoiceNumber: inv.invoiceNumber,
+            userName: inv.user?.fullName || "User",
+            userEmail: inv.user?.email || "N/A",
+            amount: inv.total,
+            totalAmount: inv.total,
+            status: "paid",
+            paidAt: inv.paidAt,
+            paymentDate: inv.paidAt,
+            paymentType: "manual_invoice",
+            spaceName: booking?.spaceSnapshot?.name || "Manual Invoice",
+            planName: booking?.plan?.name
+              ? `${booking.plan.name}${planTenure}`
+              : inv.description || "Manual Invoice",
+            createdAt: inv.createdAt,
+            razorpayOrderId: "",
+            invoiceType: "admin_manual",
+            pdfUrl: inv.pdfUrl,
           };
         });
 
@@ -2856,7 +2940,7 @@ export class AdminService {
           spaceName: inv.space,
           planName: inv.description,
           createdAt: inv.createdAt,
-          razorpayOrderId: "MANUAL",
+          razorpayOrderId: "",
           invoiceType: "B2B_MANUAL",
         }));
 
@@ -2924,16 +3008,17 @@ export class AdminService {
       })();
 
       // ── Execute and Merge ────────────────────────────────────────
-      const [b2cRes, b2bManRes, b2bUpRes] = await Promise.all([
+      const [b2cRes, adminManualRes, b2bManRes, b2bUpRes] = await Promise.all([
         b2cPromise,
+        adminManualPromise,
         b2bManualPromise,
         b2bUploadedPromise
       ]);
 
-      let combined = [...b2cRes.data, ...b2bManRes.data, ...b2bUpRes.data];
+      let combined = [...b2cRes.data, ...adminManualRes.data, ...b2bManRes.data, ...b2bUpRes.data];
       combined.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      const totalCount = b2cRes.count + b2bManRes.count + b2bUpRes.count;
+      const totalCount = b2cRes.count + adminManualRes.count + b2bManRes.count + b2bUpRes.count;
       
       // If "all" or multiple types, slice from the merged result
       const finalData = (!filters.type || filters.type === "all")
@@ -3181,34 +3266,86 @@ export class AdminService {
   async uploadAdminInvoice(
     adminUser: any,
     data: {
-      userId: string;
+      userId?: string;
+      bookingId?: string;
       invoiceNumber: string;
       amount: number;
       description: string;
-      dueDate?: string;
+      paymentDate?: string;
       pdfUrl: string;
+      localFilePath?: string;
+      originalName?: string;
+      contentType?: string;
     }
   ): Promise<ApiResponse<any>> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(data.userId)) {
+      if (data.userId && !mongoose.Types.ObjectId.isValid(data.userId)) {
         return { success: false, message: "Invalid user ID" };
       }
 
-      const user = await UserModel.findById(data.userId);
+      let booking: any = null;
+      let resolvedUserId = data.userId;
+      let resolvedPartnerId = adminUser?.id || adminUser?._id?.toString?.();
+
+      if (data.bookingId) {
+        if (!mongoose.Types.ObjectId.isValid(data.bookingId)) {
+          return { success: false, message: "Invalid booking ID" };
+        }
+
+        booking = await BookingModel.findOne({
+          _id: data.bookingId,
+          isDeleted: { $ne: true },
+        });
+
+        if (!booking) {
+          return { success: false, message: "Booking not found" };
+        }
+
+        resolvedUserId = resolvedUserId || booking.user?.toString?.();
+        resolvedPartnerId = booking.partner?.toString?.() || resolvedPartnerId;
+      }
+
+      if (!resolvedUserId || !mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+        return { success: false, message: "User is required" };
+      }
+
+      const user = await UserModel.findById(resolvedUserId);
       if (!user) {
         return { success: false, message: "User not found" };
+      }
+
+      if (!resolvedPartnerId || !mongoose.Types.ObjectId.isValid(resolvedPartnerId)) {
+        resolvedPartnerId = resolvedUserId;
+      }
+
+      if (data.localFilePath) {
+        await backupUploadedFile(data.pdfUrl, data.localFilePath, {
+          originalName: data.originalName,
+          contentType: data.contentType,
+          source: "admin-invoice",
+        });
       }
 
       // Create new invoice
       const invoice = await InvoiceModel.create({
         invoiceNumber: data.invoiceNumber,
-        user: data.userId,
-        partner: adminUser.id, // Admin who uploaded it acts as the partner/issuer
+        user: resolvedUserId,
+        partner: resolvedPartnerId,
+        booking: booking?._id,
+        bookingNumber: booking?.bookingNumber,
         description: data.description,
+        lineItems: [
+          {
+            description: data.description,
+            quantity: 1,
+            rate: data.amount,
+            amount: data.amount,
+          },
+        ],
         subtotal: data.amount,
         total: data.amount,
-        status: "pending",
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        status: "paid",
+        paidAt: data.paymentDate ? new Date(data.paymentDate) : new Date(),
         pdfUrl: data.pdfUrl,
         invoiceType: "admin_manual"
       });

@@ -110,6 +110,9 @@ export class Invoice {
 
   @prop({ default: Date.now })
   updatedAt?: Date;
+
+  @prop()
+  invoiceType?: string;
 }
 
 export const InvoiceModel = getModelForClass(Invoice);

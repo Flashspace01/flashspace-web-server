@@ -587,10 +587,10 @@ export class BookingService {
       nextDocs.push({
         ...doc,
         adminStatus: BookingService.normalizeReviewStatus(doc.adminStatus),
-        partnerStatus: BookingService.normalizeReviewStatus(existing?.partnerStatus || doc.partnerStatus),
-        partnerRejectionReason: existing?.partnerRejectionReason || doc.partnerRejectionReason,
-        partnerReviewedAt: existing?.partnerReviewedAt || doc.partnerReviewedAt,
-        partnerReviewedBy: existing?.partnerReviewedBy || doc.partnerReviewedBy,
+        partnerStatus: BookingService.normalizeReviewStatus(doc.partnerStatus),
+        partnerRejectionReason: doc.partnerRejectionReason || existing?.partnerRejectionReason,
+        partnerReviewedAt: doc.partnerReviewedAt || existing?.partnerReviewedAt,
+        partnerReviewedBy: doc.partnerReviewedBy || existing?.partnerReviewedBy,
       });
     };
 
@@ -615,6 +615,7 @@ export class BookingService {
       if (!profile?.documents?.length) return;
       profile.documents
         .filter((doc: any) => doc.fileUrl || doc.url)
+        .filter((doc: any) => doc.type !== "address_proof")
         .forEach((doc: any) => {
           pushDoc({
             id: String(doc._id || ""),
@@ -661,19 +662,46 @@ export class BookingService {
     }
 
     record.documents = nextDocs as any;
+    // Refined status calculation: only consider relevant documents for the partner.
+    // We exclude 'address_proof' and only count mandatory KYC or documents the partner has actually reviewed.
+    const partnerRelevantDocs = nextDocs.filter((doc) => {
+      if (doc.type === "address_proof") return false;
+      if (doc.category === "booking_specific") return true;
+      if (doc.partnerStatus !== "pending") return true;
+      
+      const mandatoryKycTypes = ["pan_card", "aadhaar", "gst_certificate", "coi", "video_kyc"];
+      return mandatoryKycTypes.includes(doc.type);
+    });
+
+    record.overallPartnerStatus =
+      partnerRelevantDocs.length > 0 && partnerRelevantDocs.every((doc) => doc.partnerStatus === "approved")
+        ? "approved"
+        : partnerRelevantDocs.some((doc) => doc.partnerStatus === "rejected")
+          ? "rejected"
+          : "pending";
+
     record.overallAdminStatus =
       nextDocs.length > 0 && nextDocs.every((doc) => doc.adminStatus === "approved")
         ? "approved"
         : nextDocs.some((doc) => doc.adminStatus === "rejected")
           ? "rejected"
           : "pending";
-    record.overallPartnerStatus =
-      nextDocs.length > 0 && nextDocs.every((doc) => doc.partnerStatus === "approved")
-        ? "approved"
-        : nextDocs.some((doc) => doc.partnerStatus === "rejected")
-          ? "rejected"
-          : "pending";
 
-    return record.save();
+    await record.save();
+
+    // Sync back to BookingModel if overall status is approved
+    if (record.overallPartnerStatus === "approved") {
+      await BookingModel.updateOne(
+        { _id: booking._id, status: { $in: ["pending", "pending_kyc"] } },
+        { $set: { status: "active", partnerKycStatus: "approved" } }
+      );
+    } else if (record.overallPartnerStatus === "rejected") {
+      await BookingModel.updateOne(
+        { _id: booking._id, status: { $in: ["pending", "pending_kyc"] } },
+        { $set: { partnerKycStatus: "rejected" } }
+      );
+    }
+
+    return record;
   }
 }

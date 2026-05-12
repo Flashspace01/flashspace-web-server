@@ -196,6 +196,19 @@ const findBookingReview = (
   profileId: string,
   doc: any,
 ) => {
+  if (profileModel === "booking") {
+    // For booking-specific documents (like agreements), the document itself
+    // stores the partner review status.
+    if (doc?.partnerReviewStatus) {
+      return {
+        status: doc.partnerReviewStatus,
+        rejectionReason: doc.partnerRejectionReason,
+        reviewedAt: doc.partnerReviewedAt,
+        reviewedBy: doc.partnerReviewedBy,
+      };
+    }
+  }
+
   const documentId = String(doc?._id || "");
   const documentType = doc?.type || "";
 
@@ -213,12 +226,12 @@ const findBookingReview = (
     for (const key of keysToTry) {
       const review = lookup.get(key);
       if (review) {
-                return review;
+        return review;
       }
     }
   }
 
-    return null;
+  return null;
 };
 
 const normalizeDoc = (
@@ -232,6 +245,12 @@ const normalizeDoc = (
   const bookingReview = reviewLookup
     ? findBookingReview(reviewLookup, profileModel, profileId, doc)
     : null;
+
+  const partnerStatus = bookingReview?.status || doc.partnerReviewStatus || "pending";
+  // If the document has a partner review status (either in this booking or on the profile), 
+  // we treat it as a booking-related review so the frontend doesn't revert it to 'pending'.
+  const partnerSource = (bookingReview || doc.partnerReviewStatus) ? "booking" : "none";
+
   return {
     id: String(doc._id || doc.type || doc.name || "unknown"),
     type: doc.type || "document",
@@ -239,13 +258,13 @@ const normalizeDoc = (
     profileModel,
     profileId,
     status: doc.status || "pending",
-    partnerReviewStatus: bookingReview?.status || "pending",
-    partnerReviewSource: bookingReview ? "booking" : "none",
+    partnerReviewStatus: partnerStatus,
+    partnerReviewSource: partnerSource,
     fileUrl: formatBookingDocUrl(req, doc.fileUrl || doc.url),
     uploadedAt: doc.uploadedAt || doc.generatedAt || doc.createdAt,
     rejectionReason: doc.rejectionReason || "",
-    partnerRejectionReason: bookingReview?.rejectionReason || "",
-    partnerReviewedAt: bookingReview?.reviewedAt,
+    partnerRejectionReason: bookingReview?.rejectionReason || doc.partnerRejectionReason || "",
+    partnerReviewedAt: bookingReview?.reviewedAt || doc.partnerReviewedAt,
   };
 };
 
@@ -1110,6 +1129,25 @@ export const getPartnerDashboardOverview = async (
         }
       }
 
+      // Calculate deal value (Monthly Revenue equivalent)
+      let dealValue = b.plan?.partnerPrice || b.plan?.price || 0;
+      const tenure = b.plan?.tenure || 1;
+      const tenureUnit = String(b.plan?.tenureUnit || "months").toLowerCase();
+
+      // Normalize to monthly if it's active
+      if (b.status === "active") {
+        if (tenureUnit === "months" && tenure > 0) {
+          dealValue = dealValue / tenure;
+        } else if (tenureUnit === "years" && tenure > 0) {
+          dealValue = dealValue / (tenure * 12);
+        } else if (tenureUnit === "days" || tenureUnit === "hours") {
+          // For short term bookings, the deal value is already the total for that event
+          // which effectively contributes to this month's revenue
+        }
+      } else {
+        dealValue = 0; // Inactive bookings don't contribute to current monthly revenue
+      }
+
       // Determine Plan name
       let planName = b.plan?.name || "Standard";
       if (b.type === "VirtualOffice") planName = "Virtual Office " + planName;
@@ -1117,11 +1155,13 @@ export const getPartnerDashboardOverview = async (
 
       return {
         id: b.bookingNumber || b._id.toString(),
+        bookingId: b._id.toString(),
         companyName: b.user?.company || b.user?.fullName || "N/A",
         contactName: b.user?.fullName || "N/A",
         email: b.user?.email || "N/A",
         plan: planName,
         space: b.spaceSnapshot?.name || "Unknown Space",
+        spaceId: b.spaceId?.toString(),
         startDate: b.startDate
           ? new Date(b.startDate).toISOString().split("T")[0]
           : "N/A",
@@ -1131,13 +1171,22 @@ export const getPartnerDashboardOverview = async (
         status: status,
         kycStatus: b.kycStatus === "approved" ? "VERIFIED" : "PENDING",
         profilePicture: b.user?.profilePicture,
+        dealValue: Math.round(dealValue),
       };
     });
+
+    const totalMonthlyRevenue = clients.reduce((sum, c) => sum + (c.dealValue || 0), 0);
+    const activeSpacesCount = new Set(partnerBookings.filter(b => !b.isDeleted).map(b => b.spaceId?.toString())).size;
 
     res.status(200).json({
       success: true,
       data: {
         clients,
+        stats: {
+          monthlyRevenue: totalMonthlyRevenue,
+          totalClients: clients.length,
+          activeSpaces: activeSpacesCount,
+        }
       },
     });
   } catch (error) {
@@ -2655,7 +2704,25 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
       booking.partnerRequestSubmittedAt = new Date();
     }
 
-    // Clear partner review records from documents array to allow fresh sync
+    // Capture existing approvals to preserve them
+    const existingReviews = (booking.kycDocumentReviews || []).filter((r: any) => r.status === "approved");
+    const existingReviewMap = new Map();
+    existingReviews.forEach((r: any) => {
+      const key = `${r.profileModel}:${r.profileId}:${r.documentId}:${r.documentType}`;
+      existingReviewMap.set(key, r);
+    });
+
+    // Capture existing mirrored documents that were approved
+    const existingMirroredDocs = (booking.documents || []).filter((d: any) => 
+      d.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX) && d.status === "approved"
+    );
+    const existingMirroredMap = new Map();
+    existingMirroredDocs.forEach((d: any) => {
+      existingMirroredMap.set(d.type, d);
+    });
+
+    // Clear partner review records from documents array to allow fresh sync, 
+    // but we will selectively restore them below if they were already approved.
     booking.documents = (booking.documents || []).filter(
       (doc: any) => !doc.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX)
     );
@@ -2691,19 +2758,38 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
           doc.type
         );
 
+        // Check if we have an existing approved review for this exact document
+        const reviewKey = `${model}:${profile._id}:${doc._id || ""}:${doc.type}`;
+        const prevReview = existingReviewMap.get(reviewKey);
+        const prevMirrored = existingMirroredMap.get(reviewDocType);
+
         // Check if already in documents (unlikely due to filter above, but safe)
         const exists = booking.documents.some((d: any) => d.type === reviewDocType);
         if (!exists) {
+          const isApproved = prevReview && prevMirrored;
+          
           booking.documents.push({
             name: `KYC - ${doc.type?.replace(/_/g, ' ').toUpperCase() || doc.name || doc.type}`,
             type: reviewDocType,
-            status: "pending",
-            rejectionReason: undefined,
+            status: isApproved ? "approved" : "pending",
+            rejectionReason: isApproved ? undefined : prevMirrored?.rejectionReason,
             uploadedBy: "user",
             fileUrl: doc.fileUrl,
-            reviewedAt: undefined,
-            generatedAt: new Date()
+            reviewedAt: isApproved ? prevMirrored.reviewedAt : undefined,
+            generatedAt: prevMirrored?.generatedAt || new Date()
           });
+
+          if (isApproved) {
+            booking.kycDocumentReviews.push({
+              profileModel: model,
+              profileId: String(profile._id),
+              documentId: String(doc._id || ""),
+              documentType: doc.type,
+              status: "approved",
+              reviewedAt: prevReview.reviewedAt,
+              reviewedBy: prevReview.reviewedBy,
+            });
+          }
         }
       });
     });
@@ -2712,7 +2798,14 @@ export const submitUserBookingRequest = async (req: Request, res: Response) => {
     booking.markModified("kycDocumentReviews");
     
     booking.partnerRequestStatus = "submitted";
-    booking.partnerKycStatus = "pending";
+    
+    // Recalculate partnerKycStatus based on the mirrored documents
+    const allDocsApproved = booking.documents.length > 0 && 
+      booking.documents
+        .filter((d: any) => d.type?.startsWith(KYC_BOOKING_REVIEW_DOC_PREFIX))
+        .every((d: any) => d.status === "approved");
+
+    booking.partnerKycStatus = allDocsApproved ? "approved" : "pending";
     if (String(booking.status || "").toLowerCase() !== "active") {
       booking.status = "pending_kyc";
     }
@@ -5062,6 +5155,21 @@ function calculateKYCProgress(kyc: any): number {
 
 // ============ INVOICES ============
 
+const normalizeUserInvoiceStatus = (invoice: any) => {
+  const plain = invoice?.toObject ? invoice.toObject() : { ...invoice };
+  const isBookingInvoice = !!plain.booking || !!plain.payment || !!plain.bookingNumber;
+
+  if (isBookingInvoice && plain.status === "pending") {
+    return {
+      ...plain,
+      status: "paid",
+      paidAt: plain.paidAt || plain.createdAt || new Date(),
+    };
+  }
+
+  return plain;
+};
+
 export const getAllInvoices = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -5079,7 +5187,6 @@ export const getAllInvoices = async (req: Request, res: Response) => {
     }
 
     const filter: any = { isDeleted: false, $or: invoiceAccessOr };
-    if (status) filter.status = status;
     if (fromDate || toDate) {
       filter.createdAt = {};
       if (fromDate) filter.createdAt.$gte = new Date(fromDate as string);
@@ -5090,34 +5197,65 @@ export const getAllInvoices = async (req: Request, res: Response) => {
     const _limit = Math.min(Number(limit) || 10, 100);
     const skip = (_page - 1) * _limit;
 
-    const [invoices, total, summary] = await Promise.all([
-      InvoiceModel.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(_limit),
-      InvoiceModel.countDocuments(filter),
-      InvoiceModel.aggregate([
-        { $match: filter },
-        {
-          $group: {
-            _id: null,
-            totalPaid: {
-              $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$total", 0] },
-            },
-            totalPending: {
-              $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$total", 0] },
-            },
-          },
-        },
-      ]),
-    ]);
+    const allInvoices = await InvoiceModel.find(filter)
+      .populate("booking", "bookingNumber spaceSnapshot plan")
+      .sort({ createdAt: -1 })
+      .lean();
+    const bookingNumbers = allInvoices
+      .map((invoice: any) => invoice.bookingNumber)
+      .filter(Boolean);
+    const fallbackBookings = bookingNumbers.length
+      ? await BookingModel.find({
+          bookingNumber: { $in: bookingNumbers },
+          isDeleted: { $ne: true },
+        })
+          .select("bookingNumber spaceSnapshot plan")
+          .lean()
+      : [];
+    const normalizedInvoices = allInvoices.map((invoice: any) => {
+      const normalized = normalizeUserInvoiceStatus(invoice);
+      const booking =
+        normalized.booking && typeof normalized.booking === "object"
+          ? normalized.booking
+          : fallbackBookings.find(
+              (b: any) => b.bookingNumber === normalized.bookingNumber,
+            );
+      const spaceName = booking?.spaceSnapshot?.name;
+      const planName = booking?.plan?.name;
+      const tenure = booking?.plan?.tenure;
+      const tenureUnit = booking?.plan?.tenureUnit || "months";
+      const tenureLabel = tenure ? `${tenure} ${tenureUnit}` : "";
+      const serviceDescription =
+        [spaceName, planName, tenureLabel].filter(Boolean).join(" - ") ||
+        normalized.description;
+
+      return {
+        ...normalized,
+        spaceName,
+        planName,
+        tenure,
+        tenureUnit,
+        description: serviceDescription,
+      };
+    });
+    const statusFilteredInvoices = status
+      ? normalizedInvoices.filter((invoice: any) => invoice.status === status)
+      : normalizedInvoices;
+    const invoices = statusFilteredInvoices.slice(skip, skip + _limit);
+    const total = statusFilteredInvoices.length;
+    const totalPaid = statusFilteredInvoices
+      .filter((invoice: any) => invoice.status === "paid")
+      .reduce((sum: number, invoice: any) => sum + Number(invoice.total || 0), 0);
+    const totalPending = statusFilteredInvoices
+      .filter((invoice: any) => invoice.status === "pending")
+      .reduce((sum: number, invoice: any) => sum + Number(invoice.total || 0), 0);
 
     res.status(200).json({
       success: true,
       data: {
         summary: {
-          totalPaid: summary[0]?.totalPaid || 0,
-          totalPending: summary[0]?.totalPending || 0,
+          totalPaid,
+          totalPending,
           totalInvoices: total,
         },
         invoices,
@@ -5170,7 +5308,7 @@ export const getInvoiceById = async (req: Request, res: Response) => {
         .json({ success: false, message: "Invoice not found" });
     }
 
-    res.status(200).json({ success: true, data: invoice });
+    res.status(200).json({ success: true, data: normalizeUserInvoiceStatus(invoice) });
   } catch (error) {
     console.error("Get invoice error:", error);
     res
