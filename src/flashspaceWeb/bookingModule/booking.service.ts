@@ -624,7 +624,10 @@ export class BookingService {
             category,
             profileId: String(profile._id),
             adminStatus: doc.status,
-            partnerStatus: "pending",
+            partnerStatus: doc.partnerReviewStatus || "pending",
+            partnerRejectionReason: doc.partnerRejectionReason,
+            partnerReviewedAt: doc.partnerReviewedAt,
+            partnerReviewedBy: doc.partnerReviewedBy,
             uploadedBy: "user",
           });
         });
