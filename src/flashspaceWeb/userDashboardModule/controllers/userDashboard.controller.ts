@@ -2215,7 +2215,7 @@ export const reviewPartnerBookingKycDocument = async (req: Request, res: Respons
     if (targetProfile && targetProfileModel !== 'booking' && targetDoc) {
       try {
         const profileIdToUpdate = targetProfile._id;
-        const Model = targetProfileModel === 'business' ? BusinessInfoModel : (targetProfileModel === 'partner' ? PartnerKYCModel : KYCDocumentModel);
+        const Model: any = targetProfileModel === 'business' ? BusinessInfoModel : (targetProfileModel === 'partner' ? PartnerKYCModel : KYCDocumentModel);
         
         await Model.updateOne(
           { _id: profileIdToUpdate, "documents._id": targetDoc._id },

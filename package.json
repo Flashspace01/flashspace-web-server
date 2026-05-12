@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node dist/app.js",
-    "build": "tsc -p tsconfig.json",
+    "build": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc -p tsconfig.json",
     "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/app.ts",
     "test:api": "npx ts-node src/scripts/test-api.ts",
     "test:tickets": "ts-node src/scripts/test-tickets.js",
