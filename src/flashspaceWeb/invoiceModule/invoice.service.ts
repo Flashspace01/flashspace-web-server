@@ -54,8 +54,8 @@ export class InvoiceService {
       taxRate,
       taxAmount,
       total,
-      status: "pending",
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+      status: "paid",
+      paidAt: new Date(),
       billingAddress: {
         name: booking.spaceSnapshot?.name || "Guest",
         city: booking.spaceSnapshot?.city || "",
@@ -102,9 +102,6 @@ export class InvoiceService {
       }
     }
 
-    // Additional filters
-    if (filters.status) query.status = filters.status;
-
     if (filters.fromDate || filters.toDate) {
       query.createdAt = {};
       if (filters.fromDate) query.createdAt.$gte = new Date(filters.fromDate);
@@ -113,34 +110,35 @@ export class InvoiceService {
 
     const skip = (page - 1) * limit;
 
-    const [invoices, total, summary] = await Promise.all([
-      InvoiceModel.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      InvoiceModel.countDocuments(query),
-      InvoiceModel.aggregate([
-        { $match: query },
-        {
-          $group: {
-            _id: null,
-            totalPaid: {
-              $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$total", 0] },
-            },
-            totalPending: {
-              $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$total", 0] },
-            },
-          },
-        },
-      ]),
-    ]);
+    const allInvoices = await InvoiceModel.find(query).sort({ createdAt: -1 }).lean();
+    const normalizedInvoices = allInvoices.map((invoice: any) => {
+      const isBookingInvoice = !!invoice.booking || !!invoice.payment || !!invoice.bookingNumber;
+      if (isBookingInvoice && invoice.status === "pending") {
+        return {
+          ...invoice,
+          status: "paid",
+          paidAt: invoice.paidAt || invoice.createdAt || new Date(),
+        };
+      }
+      return invoice;
+    });
+    const statusFilteredInvoices = filters.status
+      ? normalizedInvoices.filter((invoice: any) => invoice.status === filters.status)
+      : normalizedInvoices;
+    const invoices = statusFilteredInvoices.slice(skip, skip + limit);
+    const total = statusFilteredInvoices.length;
+    const totalPaid = invoices
+      .filter((invoice: any) => invoice.status === "paid")
+      .reduce((sum: number, invoice: any) => sum + Number(invoice.total || 0), 0);
+    const totalPending = invoices
+      .filter((invoice: any) => invoice.status === "pending")
+      .reduce((sum: number, invoice: any) => sum + Number(invoice.total || 0), 0);
 
     return {
       invoices,
       summary: {
-        totalPaid: summary[0]?.totalPaid || 0,
-        totalPending: summary[0]?.totalPending || 0,
+        totalPaid,
+        totalPending,
         count: total,
       },
       pagination: {
@@ -166,8 +164,16 @@ export class InvoiceService {
       }
     }
 
-    const invoice = await InvoiceModel.findOne(query);
+    const invoice = await InvoiceModel.findOne(query).lean();
     if (!invoice) throw new Error("Invoice not found or unauthorized");
+    const isBookingInvoice = !!invoice.booking || !!invoice.payment || !!invoice.bookingNumber;
+    if (isBookingInvoice && invoice.status === "pending") {
+      return {
+        ...invoice,
+        status: "paid",
+        paidAt: invoice.paidAt || invoice.createdAt || new Date(),
+      };
+    }
     return invoice;
   }
 }

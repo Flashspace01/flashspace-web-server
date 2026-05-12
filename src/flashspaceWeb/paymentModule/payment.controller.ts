@@ -540,7 +540,7 @@ export const createOrder = async (req: Request, res: Response) => {
         currency: razorpayOrder.currency,
         paymentId: payment._id,
         keyId: process.env.RAZORPAY_KEY_ID,
-        devMode: false,
+        devMode: process.env.RAZORPAY_KEY_ID === "secret-id" || !process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET,
       },
     });
   } catch (error: any) {
@@ -576,7 +576,7 @@ export const verifyPayment = async (req: Request, res: Response) => {
     } = validation.data.body;
 
     // DEV MODE: Skip signature verification for development
-    if (devMode === true) {
+    if (devMode === true && process.env.NODE_ENV !== "production") {
       const devPayment = await PaymentModel.findOneAndUpdate(
         { razorpayOrderId: razorpay_order_id },
         {

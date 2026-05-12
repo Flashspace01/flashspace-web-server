@@ -541,25 +541,37 @@ export class AdminController {
   }
   // POST /api/admin/invoices/upload
   static async uploadAdminInvoice(req: Request, res: Response) {
-    const { userId, invoiceNumber, amount, description, dueDate } = req.body;
+    const { userId, bookingId, invoiceNumber, amount, description, paymentDate, dueDate } = req.body;
     const file = req.file;
+    const parsedAmount = Number(amount);
 
-    if (!userId || !invoiceNumber || !amount || !description || !file) {
+    if ((!userId && !bookingId) || !invoiceNumber || !amount || !description || !file) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields or invoice file",
       });
     }
 
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid invoice amount",
+      });
+    }
+
     const result = await adminService.uploadAdminInvoice(req.user, {
       userId,
+      bookingId,
       invoiceNumber,
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       description,
-      dueDate,
-      pdfUrl: file.path, // Multer stores the path
+      paymentDate: paymentDate || dueDate,
+      pdfUrl: `/uploads/invoices/${file.filename}`,
+      localFilePath: file.path,
+      originalName: file.originalname,
+      contentType: file.mimetype,
     });
 
-    res.status(result.success ? 201 : 500).json(result);
+    res.status(result.success ? 201 : 400).json(result);
   }
 }
