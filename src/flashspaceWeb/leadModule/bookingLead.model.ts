@@ -35,6 +35,9 @@ export class BookingLead {
   @prop({ default: "pending" })
   public status?: string;
 
+  @prop({ default: "pending" })
+  public leadStatus?: "pending" | "paid" | "cancelled" | string;
+
   @prop({ type: () => Object })
   public utm?: any;
 }

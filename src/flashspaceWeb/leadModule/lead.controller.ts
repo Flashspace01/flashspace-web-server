@@ -3,6 +3,7 @@ import { google } from "googleapis";
 import { LeadModel } from "./lead.model";
 import { BookingLeadModel } from "./bookingLead.model";
 import { EmailUtil } from "../authModule/utils/email.util";
+import { PaymentModel, PaymentStatus } from "../paymentModule/payment.model";
 
 export const createLead = async (req: Request, res: Response) => {
   try {
@@ -36,7 +37,6 @@ export const createLead = async (req: Request, res: Response) => {
       console.log("✅ Lead saved to MongoDB:", savedLead._id);
     } catch (dbError: any) {
       console.error("❌ Failed to save lead to MongoDB:", dbError.message);
-      // We continue even if DB fails, to try Google Sheets/Email
     }
 
     // 2. Send Admin Email Notification
@@ -69,70 +69,57 @@ export const createLead = async (req: Request, res: Response) => {
       console.error("⚠️ Failed to send admin notification email:", emailError.message);
     }
 
-    // 3. Append to Google Sheets (Optional Connector)
+    // 3. Append to Google Sheets
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
     let serviceAccountPrivateKey = process.env.GOOGLE_PRIVATE_KEY || "";
 
-    if (!spreadsheetId || !serviceAccountEmail || !serviceAccountPrivateKey) {
-      console.warn("⚠️ Google Sheets credentials are not fully configured. Skipping sheet update.");
-      // Return success because DB and Email are handled
-      return res.status(201).json({ 
-        ok: true, 
-        message: "Lead submitted successfully",
-        id: savedLead?._id 
-      });
-    }
-
-    try {
-      // Private key parsing
-      if (serviceAccountPrivateKey.startsWith('"') && serviceAccountPrivateKey.endsWith('"')) {
-        serviceAccountPrivateKey = serviceAccountPrivateKey.substring(1, serviceAccountPrivateKey.length - 1);
-      }
-      serviceAccountPrivateKey = serviceAccountPrivateKey.replace(/\\n/g, "\n");
-
-      const auth = new google.auth.JWT({
-        email: serviceAccountEmail,
-        key: serviceAccountPrivateKey,
-        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-      });
-
-      const sheets = google.sheets({ version: "v4", auth });
-      const sheetName = process.env.GOOGLE_SHEET_NAME || "Leads";
-
-      // Discovery
-      let targetSheet = sheetName;
+    if (spreadsheetId && serviceAccountEmail && serviceAccountPrivateKey) {
       try {
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-        const exists = spreadsheet.data.sheets?.some(s => s.properties?.title === sheetName);
-        if (!exists) {
-          const firstSheetName = spreadsheet.data.sheets?.[0]?.properties?.title;
-          if (firstSheetName) targetSheet = firstSheetName;
+        if (serviceAccountPrivateKey.startsWith('"') && serviceAccountPrivateKey.endsWith('"')) {
+          serviceAccountPrivateKey = serviceAccountPrivateKey.substring(1, serviceAccountPrivateKey.length - 1);
         }
-      } catch (e: any) {
-        console.warn("DEBUG - Sheet discovery failed, using default name:", e.message);
+        serviceAccountPrivateKey = serviceAccountPrivateKey.replace(/\\n/g, "\n");
+
+        const auth = new google.auth.JWT({
+          email: serviceAccountEmail,
+          key: serviceAccountPrivateKey,
+          scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+        });
+
+        const sheets = google.sheets({ version: "v4", auth });
+        const sheetName = process.env.GOOGLE_SHEET_NAME || "Leads";
+
+        let targetSheet = sheetName;
+        try {
+          const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+          const exists = spreadsheet.data.sheets?.some(s => s.properties?.title === sheetName);
+          if (!exists) {
+            const firstSheetName = spreadsheet.data.sheets?.[0]?.properties?.title;
+            if (firstSheetName) targetSheet = firstSheetName;
+          }
+        } catch (e: any) {}
+
+        const row = [
+          new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+          String(name).trim(),
+          String(email).trim(),
+          String(phone).trim(),
+          page ? String(page).trim() : (source || "Website"),
+          message ? String(message).trim() : (businessType ? `Interested in ${businessType}` : ""),
+          "Received",
+        ];
+
+        await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `'${targetSheet}'!A:A`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [row] },
+        });
+        console.log("✅ Lead appended to Google Sheets");
+      } catch (sheetError: any) {
+        console.error("❌ Google Sheets append failed:", sheetError.message);
       }
-
-      const row = [
-        new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-        String(name).trim(),
-        String(email).trim(),
-        String(phone).trim(),
-        page ? String(page).trim() : (source || "Website"),
-        message ? String(message).trim() : (businessType ? `Interested in ${businessType}` : ""),
-        "Received",
-      ];
-
-      await sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: `'${targetSheet}'!A:A`,
-        valueInputOption: "USER_ENTERED",
-        requestBody: { values: [row] },
-      });
-      console.log("✅ Lead appended to Google Sheets");
-    } catch (sheetError: any) {
-      console.error("❌ Google Sheets append failed:", sheetError.message);
-      // We don't fail the request if only the sheet fails
     }
 
     return res.status(201).json({ 
@@ -149,106 +136,155 @@ export const createLead = async (req: Request, res: Response) => {
 
 export const getLeads = async (req: Request, res: Response) => {
   try {
-    // 1. Fetch General Leads
-    const generalLeads = await LeadModel.find().sort({ createdAt: -1 }).lean();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+    const search = (req.query.search as string) || "";
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
 
-    // 2. Fetch Booking Leads (Unpaid/Abandoned)
-    // Only show booking leads that are older than 2.5 minutes (150s) and still pending
-    // This provides a buffer for the user to complete their payment.
-    const delayMs = 150 * 1000; // 2.5 minutes
-    const gracePeriodThreshold = new Date(Date.now() - delayMs);
+    const query: any = {};
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
+      }
+    }
+
+    // Fetch from both models
+    const [generalLeads, bookingLeads] = await Promise.all([
+      LeadModel.find(query).sort({ createdAt: -1 }).lean(),
+      BookingLeadModel.find({
+        ...query,
+        $or: [
+          { status: "converted" },
+          { status: "cancelled" },
+          { status: "pending", createdAt: { $lt: new Date(Date.now() - 150000) } },
+        ],
+      }).sort({ createdAt: -1 }).lean()
+    ]);
+
+    const totalLeadsCount = generalLeads.length + bookingLeads.length;
+
+    // Fetch payments for booking leads
+    const bookingLeadEmails = [...new Set(bookingLeads.map((l: any) => l.email?.toLowerCase().trim()).filter(Boolean))];
+    const paidPaymentKeys = new Set<string>();
     
-    const bookingLeads = await BookingLeadModel.find({ 
-      status: "pending",
-      createdAt: { $lt: gracePeriodThreshold }
-    }).sort({ createdAt: -1 }).lean();
+    if (bookingLeadEmails.length > 0) {
+      const completedPayments = await PaymentModel.find({
+        userEmail: { $in: bookingLeadEmails },
+        status: PaymentStatus.COMPLETED,
+      }).select("userEmail space").lean();
 
-    // 3. Normalize and Combine
+      completedPayments.forEach((p: any) => {
+        paidPaymentKeys.add(`${p.userEmail?.toLowerCase().trim()}:${p.space?.toString()}`);
+      });
+    }
+
+    // Normalize and Combine
     const normalizedGeneral = generalLeads.map((l: any) => ({
       _id: l._id,
       name: l.name,
       email: l.email,
       phone: l.phone,
-      city: l.city,
-      businessType: l.businessType,
-      message: l.message,
+      interest: l.businessType || "General Inquiry",
       source: l.source || "Website Form",
       createdAt: l.createdAt,
-      type: "general"
+      type: "general",
+      paymentStatus: l.leadStatus || "pending",
+      leadStatus: l.leadStatus || "pending",
+      rawStatus: l.status || "pending",
     }));
 
-    const normalizedBooking = bookingLeads.map((l: any) => ({
-      _id: l._id,
-      name: l.name || "Booking Lead",
-      email: l.email,
-      phone: l.phone,
-      city: "N/A",
-      businessType: l.spaceName || "Space Booking",
-      message: `Abandoned booking for space: ${l.spaceName || l.spaceId}`,
-      source: "Booking Abandoned",
-      createdAt: l.createdAt,
-      type: "booking"
-    }));
+    const normalizedBooking = bookingLeads.map((l: any) => {
+      const email = l.email?.toLowerCase().trim();
+      const spaceId = l.spaceId?.toString();
+      const hasPaid = email && spaceId ? paidPaymentKeys.has(`${email}:${spaceId}`) : false;
+      const status = l.status === "cancelled" ? "cancelled" : (hasPaid || l.status === "converted" ? "paid" : "pending");
+
+      return {
+        _id: l._id,
+        name: l.name || "Booking Lead",
+        email: l.email,
+        phone: l.phone,
+        interest: l.spaceName || "Space Booking",
+        source: "Booking Lead",
+        createdAt: l.createdAt,
+        type: "booking",
+        paymentStatus: status,
+        leadStatus: status,
+        rawStatus: l.status || "pending",
+      };
+    });
 
     const allLeads = [...normalizedGeneral, ...normalizedBooking].sort(
-      (a: any, b: any) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
-        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
-        return dateB - dateA;
-      }
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    return res.status(200).json({ ok: true, data: allLeads });
+    const paginatedLeads = allLeads.slice(skip, skip + limit);
+
+    return res.status(200).json({ 
+      ok: true, 
+      data: paginatedLeads,
+      pagination: {
+        total: totalLeadsCount,
+        page,
+        limit,
+        pages: Math.ceil(totalLeadsCount / limit)
+      }
+    });
   } catch (error: any) {
-    console.error("CRITICAL - Failed to fetch leads:", error.message);
-    return res.status(500).json({ ok: false, message: "Failed to fetch leads: " + error.message });
+    return res.status(500).json({ ok: false, message: error.message });
   }
 };
+
+export const updateBookingLeadStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    const statusMap: Record<string, string> = { paid: "converted", pending: "pending", cancelled: "cancelled" };
+
+    if (!statusMap[status]) return res.status(400).json({ ok: false, message: "Invalid status" });
+
+    let updated: any = await BookingLeadModel.findByIdAndUpdate(id, { status: statusMap[status], leadStatus: status }, { new: true }).lean();
+    if (!updated) {
+      updated = await LeadModel.findByIdAndUpdate(id, { leadStatus: status }, { new: true }).lean();
+    }
+
+    if (!updated) return res.status(404).json({ ok: false, message: "Lead not found" });
+    return res.status(200).json({ ok: true, data: updated });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, message: error.message });
+  }
+};
+
 export const createBookingLead = async (req: Request, res: Response) => {
   try {
     const { userId, name, email, phone, spaceId, spaceName, utm } = req.body || {};
+    if (!email || !phone || !spaceId) return res.status(400).json({ ok: false, message: "Missing fields" });
 
-    if (!email || !phone || !spaceId) {
-      return res.status(400).json({ ok: false, message: "Missing required fields (email, phone, spaceId)" });
-    }
-
-    const bookingLead = await BookingLeadModel.create({
-      userId,
-      name,
-      email,
-      phone,
-      spaceId,
-      spaceName,
-      utm,
-    });
-
-    console.log("✅ Booking Lead saved:", bookingLead._id);
-
-    // Optional: Send email notification to admin
+    const bookingLead = await BookingLeadModel.create({ userId, name, email, phone, spaceId, spaceName, utm });
+    
+    // Admin notification
     const adminEmail = process.env.ADMIN_EMAIL || "yogeshbisht12122005@gmail.com";
-    const subject = `📅 New Booking Lead for ${spaceName || "a Space"}`;
-    const html = `
-      <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px;">
-        <h2 style="color: #2c3e50; border-bottom: 2px solid #EDB003; padding-bottom: 10px;">New Booking Lead</h2>
-        <p>A user has shown interest in booking a space.</p>
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-          <tr><td style="padding: 8px; font-weight: bold; width: 120px;">Email:</td><td style="padding: 8px;"><a href="mailto:${email}">${email}</a></td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Phone:</td><td style="padding: 8px;"><a href="tel:${phone}">${phone}</a></td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">Space:</td><td style="padding: 8px;">${spaceName || spaceId}</td></tr>
-          <tr><td style="padding: 8px; font-weight: bold;">User ID:</td><td style="padding: 8px;">${userId || "Guest"}</td></tr>
-        </table>
-      </div>
-    `;
+    EmailUtil.sendEmail({ 
+      to: adminEmail, 
+      subject: `📅 New Booking Lead: ${spaceName}`, 
+      html: `<p>New interest in ${spaceName} from ${email} (${phone})</p>` 
+    }).catch(() => {});
 
-    EmailUtil.sendEmail({ to: adminEmail, subject, html }).catch(err => console.error("⚠️ Failed to send booking lead email:", err.message));
-
-    return res.status(201).json({
-      ok: true,
-      message: "Booking lead captured",
-      id: bookingLead._id
-    });
+    return res.status(201).json({ ok: true, id: bookingLead._id });
   } catch (error: any) {
-    console.error("❌ Failed to create booking lead:", error.message);
     return res.status(500).json({ ok: false, message: error.message });
   }
 };

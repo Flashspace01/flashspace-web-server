@@ -44,6 +44,9 @@ export class Lead {
 
   @prop({ default: "pending" })
   public status?: string;
+
+  @prop({ default: "pending" })
+  public leadStatus?: "pending" | "paid" | "cancelled" | string;
 }
 
 export const LeadModel = getModelForClass(Lead);
