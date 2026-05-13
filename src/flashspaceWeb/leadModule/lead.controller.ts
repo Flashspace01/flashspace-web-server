@@ -256,7 +256,7 @@ export const updateBookingLeadStatus = async (req: Request, res: Response) => {
 
     if (!statusMap[status]) return res.status(400).json({ ok: false, message: "Invalid status" });
 
-    let updated = await BookingLeadModel.findByIdAndUpdate(id, { status: statusMap[status], leadStatus: status }, { new: true }).lean();
+    let updated: any = await BookingLeadModel.findByIdAndUpdate(id, { status: statusMap[status], leadStatus: status }, { new: true }).lean();
     if (!updated) {
       updated = await LeadModel.findByIdAndUpdate(id, { leadStatus: status }, { new: true }).lean();
     }
