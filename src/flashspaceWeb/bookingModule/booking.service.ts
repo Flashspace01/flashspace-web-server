@@ -8,6 +8,7 @@ import { PaymentModel, PaymentStatus } from "../paymentModule/payment.model";
 import { BookingDocumentRecordModel } from "./bookingDocument.model";
 import { BusinessInfoModel } from "../userDashboardModule/models/businessInfo.model";
 import { PartnerKYCModel } from "../userDashboardModule/models/partnerKYC.model";
+import { PropertyModel } from "../propertyModule/property.model";
 import mongoose from "mongoose";
 
 export class BookingService {
@@ -244,8 +245,41 @@ export class BookingService {
   }
 
   static async getPartnerDashboardOverview(partnerId: string) {
+    const partnerIdObj = new mongoose.Types.ObjectId(partnerId);
+    
+    // Fetch all spaces owned by this partner (via direct assignment or property)
+    const partnerProperties = await PropertyModel.find({
+      partner: partnerIdObj,
+      isDeleted: { $ne: true },
+    }).select("_id");
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    const [voSpaces, cwSpaces, mrSpaces] = await Promise.all([
+      VirtualOfficeModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1 }),
+      CoworkingSpaceModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1 }),
+      MeetingRoomModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1 }),
+    ]);
+
+    const allSpaceIds = [
+      ...voSpaces.map(s => s._id),
+      ...cwSpaces.map(s => s._id),
+      ...mrSpaces.map(s => s._id),
+    ];
+
     const partnerBookings = await BookingModel.find({
-      partner: partnerId,
+      $or: [
+        { partner: partnerIdObj },
+        { spaceId: { $in: allSpaceIds } }
+      ],
       isDeleted: false,
     }).populate("user", "fullName email phone company profilePicture");
 
@@ -296,11 +330,27 @@ export class BookingService {
   static async getPartnerSpaceBookingAnalytics(partnerId: string) {
     const partnerIdObj = new mongoose.Types.ObjectId(partnerId);
 
-    // 1. Fetch all spaces belonging to this partner
+    // Fetch all properties owned by this partner
+    const partnerProperties = await PropertyModel.find({
+      partner: partnerIdObj,
+      isDeleted: { $ne: true },
+    }).select("_id");
+    const propertyIds = partnerProperties.map((p) => p._id);
+
+    // 1. Fetch all spaces belonging to this partner (either directly or via property)
     const [voSpaces, cwSpaces, mrSpaces] = await Promise.all([
-      VirtualOfficeModel.find({ partner: partnerIdObj }, { _id: 1, name: 1 }),
-      CoworkingSpaceModel.find({ partner: partnerIdObj }, { _id: 1, name: 1 }),
-      MeetingRoomModel.find({ partner: partnerIdObj }, { _id: 1, name: 1 }),
+      VirtualOfficeModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1, name: 1 }),
+      CoworkingSpaceModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1, name: 1 }),
+      MeetingRoomModel.find({
+        $or: [{ partner: partnerIdObj }, { property: { $in: propertyIds } }],
+        isDeleted: { $ne: true },
+      }, { _id: 1, name: 1 }),
     ]);
 
     const voIds = voSpaces.map(s => s._id.toString());
@@ -323,12 +373,12 @@ export class BookingService {
       status: "confirmed"
     }).populate('space', 'name');
 
-    // 4. Fetch all payments for partner spaces that don't have a corresponding booking doc
-    const existingPaymentIds = partnerBookings.map(b => b.payment?.toString()).filter(Boolean);
-    const orphanPayments = await PaymentModel.find({
+    // 4. Fetch ALL completed payments for partner spaces
+    // This is the source of truth for REVENUE
+    const allPayments = await PaymentModel.find({
       space: { $in: allSpaceIds },
       status: PaymentStatus.COMPLETED,
-      _id: { $nin: existingPaymentIds }
+      isDeleted: { $ne: true }
     });
 
     const now = new Date();
@@ -336,10 +386,18 @@ export class BookingService {
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-    let totalBookings = 0;
-    let cancelledBookings = 0;
-    let pendingRequests = 0;
+    let totalBookings = partnerBookings.length + seatBookings.length;
+    let cancelledBookings = partnerBookings.filter(b => b.status === "cancelled").length + 
+                         seatBookings.filter(sb => sb.status === "cancelled").length;
+    let pendingRequests = partnerBookings.filter(b => ["pending", "pending_payment", "pending_kyc"].includes(b.status || "")).length;
+    
     const activeClientsSet = new Set();
+    partnerBookings.forEach(b => {
+      if (b.status === "active" && b.user) activeClientsSet.add(b.user.toString());
+    });
+    seatBookings.forEach(sb => {
+      if (sb.status === "confirmed" && sb.user) activeClientsSet.add(sb.user.toString());
+    });
 
     let revenueThisMonth = 0;
     let revenueLastMonth = 0;
@@ -355,74 +413,57 @@ export class BookingService {
       trendData[monthLabel] = 0;
     }
 
-    const processItem = (createdAt: Date, revenue: number, planName: string, spaceName: string, status: string, userId?: string) => {
-      totalBookings++;
-      if (status === "cancelled") cancelledBookings++;
-      if (status === "pending_payment" || status === "pending_kyc" || status === "pending")
-        pendingRequests++;
-
-      if (status === "active" || status === "confirmed") {
-        if (userId) activeClientsSet.add(userId.toString());
-      }
-
-      // Revenue compare
-      if (createdAt >= currentMonthStart) {
+    // Process Payments for Revenue and Trend
+    allPayments.forEach((p: any) => {
+      const revenue = p.amount || p.totalAmount || 0;
+      const paymentDate = new Date(p.createdAt);
+      const monthLabel = paymentDate.toLocaleString("default", { month: "short" });
+      
+      if (paymentDate >= currentMonthStart) {
         revenueThisMonth += revenue;
-      } else if (createdAt >= lastMonthStart && createdAt <= lastMonthEnd) {
+      } else if (paymentDate >= lastMonthStart && paymentDate <= lastMonthEnd) {
         revenueLastMonth += revenue;
       }
 
-      // Trend
-      const monthLabel = createdAt.toLocaleString("default", { month: "short" });
       if (trendData[monthLabel] !== undefined) {
         trendData[monthLabel] += revenue;
       }
 
-      // Plan Division
+      // Add to space division (revenue only)
+      const spaceName = p.spaceName || "Unknown Space";
+      if (!spaceData[spaceName]) spaceData[spaceName] = { bookings: 0, revenue: 0 };
+      spaceData[spaceName].revenue += revenue;
+
+      // Add to plan division (revenue only)
+      const planName = p.planName || "Standard Plan";
       if (!planData[planName]) planData[planName] = { bookings: 0, revenue: 0 };
-      planData[planName].bookings++;
       planData[planName].revenue += revenue;
 
-      // Space Division
+      // Ensure user is in active clients set if payment completed recently
+      if (p.user) activeClientsSet.add(p.user.toString());
+    });
+
+    // Process Bookings for Counts and Divisions
+    partnerBookings.forEach((b: any) => {
+      const planName = b.plan?.name || "Standard Plan";
+      const spaceName = b.spaceSnapshot?.name || "Unknown Space";
+      
+      if (!planData[planName]) planData[planName] = { bookings: 0, revenue: 0 };
+      planData[planName].bookings++;
+
       if (!spaceData[spaceName]) spaceData[spaceName] = { bookings: 0, revenue: 0 };
       spaceData[spaceName].bookings++;
-      spaceData[spaceName].revenue += revenue;
-    };
-
-    // Process Regular Bookings
-    partnerBookings.forEach((b: any) => {
-      processItem(
-        new Date(b.createdAt),
-        b.plan?.finalPrice || b.plan?.price || 0,
-        b.plan?.name || "Standard Plan",
-        b.spaceSnapshot?.name || "Unknown Space",
-        b.status,
-        b.user?.toString()
-      );
     });
 
-    // Process Seat Bookings
     seatBookings.forEach((sb: any) => {
-      processItem(
-        new Date(sb.createdAt),
-        sb.totalAmount || 0,
-        "Seat Booking",
-        (sb.space as any)?.name || "Coworking Space",
-        sb.status,
-        sb.user?.toString()
-      );
-    });
+      const planName = "Seat Booking";
+      const spaceName = (sb.space as any)?.name || "Coworking Space";
 
-    // Process Orphan Payments
-    orphanPayments.forEach((p: any) => {
-      processItem(
-        new Date(p.createdAt),
-        p.totalAmount || 0,
-        p.planName || "Direct Payment",
-        p.spaceName || "Unknown Space",
-        "active", // Assume active if payment completed but no booking doc
-        p.user?.toString()
-      );
+      if (!planData[planName]) planData[planName] = { bookings: 0, revenue: 0 };
+      planData[planName].bookings++;
+
+      if (!spaceData[spaceName]) spaceData[spaceName] = { bookings: 0, revenue: 0 };
+      spaceData[spaceName].bookings++;
     });
 
     return {
@@ -455,9 +496,9 @@ export class BookingService {
 
     // 1. Fetch all spaces belonging to this property
     const [voSpaces, cwSpaces, mrSpaces] = await Promise.all([
-      VirtualOfficeModel.find({ property: propertyIdObj, partner: partnerIdObj }, { _id: 1, name: 1 }),
-      CoworkingSpaceModel.find({ property: propertyIdObj, partner: partnerIdObj }, { _id: 1, name: 1 }),
-      MeetingRoomModel.find({ property: propertyIdObj, partner: partnerIdObj }, { _id: 1, name: 1 }),
+      VirtualOfficeModel.find({ property: propertyIdObj }, { _id: 1, name: 1 }),
+      CoworkingSpaceModel.find({ property: propertyIdObj }, { _id: 1, name: 1 }),
+      MeetingRoomModel.find({ property: propertyIdObj }, { _id: 1, name: 1 }),
     ]);
 
     const voIds = voSpaces.map(s => s._id.toString());
@@ -477,67 +518,50 @@ export class BookingService {
       status: "confirmed"
     });
 
-    // 4. Fetch all payments for these spaces that don't have a corresponding booking doc
-    const existingPaymentIds = bookings.map(b => b.payment?.toString()).filter(Boolean);
-    const orphanPayments = await PaymentModel.find({
+    // 4. Fetch ALL completed payments for these spaces
+    // Primary source for monthly revenue
+    const allPayments = await PaymentModel.find({
       space: { $in: allSpaceIds },
       status: PaymentStatus.COMPLETED,
-      _id: { $nin: existingPaymentIds }
+      isDeleted: { $ne: true }
     });
 
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    let totalBookings = 0;
+    let totalBookings = bookings.length + seatBookings.length;
     let revenueTotal = 0;
     const activeClientsSet = new Set();
     let totalRating = 0;
     let ratingCount = 0;
 
-    const processItem = (createdAt: Date, revenue: number, status: string, userId?: string, rating?: number) => {
-      totalBookings++; // Count all bookings ever made for this property/space
+    // Process Payments for Revenue
+    allPayments.forEach((p: any) => {
+      const revenue = p.amount || p.totalAmount || 0;
+      const paymentDate = new Date(p.createdAt);
       
-      // Monthly Revenue
-      if (createdAt >= currentMonthStart) {
+      if (paymentDate >= currentMonthStart) {
         revenueTotal += revenue;
       }
       
-      if (status === "active" || status === "confirmed") {
-        if (userId) activeClientsSet.add(userId.toString());
+      if (p.user) activeClientsSet.add(p.user.toString());
+    });
+
+    // Process Bookings for Status and Rating
+    bookings.forEach((b: any) => {
+      if (b.status === "active" && b.user) {
+        activeClientsSet.add(b.user.toString());
       }
-      
-      if (rating) {
-        totalRating += rating;
+      if (b.rating) {
+        totalRating += b.rating;
         ratingCount++;
       }
-    };
-
-    bookings.forEach((b: any) => {
-      processItem(
-        new Date(b.createdAt),
-        b.plan?.finalPrice || b.plan?.price || 0,
-        b.status,
-        b.user?.toString(),
-        b.rating
-      );
     });
 
     seatBookings.forEach((sb: any) => {
-      processItem(
-        new Date(sb.createdAt),
-        sb.totalAmount || 0,
-        sb.status,
-        sb.user?.toString()
-      );
-    });
-
-    orphanPayments.forEach((p: any) => {
-      processItem(
-        new Date(p.createdAt),
-        p.totalAmount || 0,
-        "active",
-        p.user?.toString()
-      );
+      if (sb.status === "confirmed" && sb.user) {
+        activeClientsSet.add(sb.user.toString());
+      }
     });
 
     return {
