@@ -3,16 +3,36 @@ import { Types } from "mongoose";
 import { ContactFormModel } from "./contactForm.model";
 import { EmailUtil } from "../authModule/utils/email.util";
 
+import { z } from "zod";
+
+const ContactFormSchema = z.object({
+  fullName: z.string().min(2, "Name is too short").max(100).trim(),
+  email: z.string().email("Invalid email address").trim().toLowerCase(),
+  phoneNumber: z.string().regex(/^[0-9]{10,15}$/, "Phone must be 10-15 digits"),
+  companyName: z.string().trim().optional(),
+  serviceInterest: z.string().trim().optional(),
+  message: z.string().trim().optional(),
+});
+
 export const createContactForm = async (req: Request, res: Response) => {
   try {
-    let {
+    const validation = ContactFormSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validation.error.format(),
+      });
+    }
+
+    const {
       fullName,
       email,
       phoneNumber,
       companyName,
       serviceInterest,
       message,
-    } = req.body;
+    } = validation.data;
     
     const createdContact = await ContactFormModel.create({
       fullName,
@@ -37,9 +57,9 @@ export const createContactForm = async (req: Request, res: Response) => {
       fullName,
       email,
       phoneNumber,
-      companyName,
-      serviceInterest,
-      message,
+      companyName: companyName || "",
+      serviceInterest: serviceInterest || "",
+      message: message || "",
     }).catch(err => console.error("Error sending contact form email:", err));
 
     res.status(201).json({
@@ -54,7 +74,7 @@ export const createContactForm = async (req: Request, res: Response) => {
       success: false,
       message: "Something went wrong !!",
       data: {},
-      error: err,
+      error: process.env.NODE_ENV === "development" ? err : "Internal Server Error",
     });
   }
 };

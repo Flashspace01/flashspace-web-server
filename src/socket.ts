@@ -70,32 +70,28 @@ export const initSocket = (httpServer: HttpServer) => {
   }
 
   io.on("connection", (socket: Socket) => {
-    console.log("New client connected", socket.id);
+
 
     // Join ticket room
     socket.on("join_ticket", (ticketId: string) => {
       socket.join(ticketId);
-      console.log(`Socket ${socket.id} joined ticket room: ${ticketId}`);
     });
 
     // Leave ticket room
     socket.on("leave_ticket", (ticketId: string) => {
       socket.leave(ticketId);
-      console.log(`Socket ${socket.id} left ticket room: ${ticketId}`);
     });
 
     // Join user specific notification feed
     socket.on("join_user_feed", (userId: string) => {
       if (userId) {
         socket.join(userId);
-        console.log(`Socket ${socket.id} joined user_feed: ${userId}`);
       }
     });
 
     // Join admin feed
     socket.on("join_admin_feed", () => {
       socket.join("admin_feed");
-      console.log(`Socket ${socket.id} joined admin_feed`);
     });
 
  // Join affiliate personal feed for notifications
@@ -103,13 +99,11 @@ export const initSocket = (httpServer: HttpServer) => {
       if (affiliateId) {
         const room = `affiliate_${affiliateId}`;
         socket.join(room);
-        console.log(`Socket ${socket.id} joined affiliate_feed: ${room}`);
       }
     });
 
 
     socket.on("disconnect", () => {
-      console.log("Client disconnected", socket.id);
     });
 
     // Handle typing events

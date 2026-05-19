@@ -170,10 +170,37 @@ export const getPartnerProperties = async (req: Request, res: Response) => {
     const partnerId = (req as any).user?.id;
     const properties = await PropertyModel.find({ partner: partnerId });
 
+    const propertiesWithRatings = await Promise.all(
+      properties.map(async (property) => {
+        const propertyObj = property.toObject() as any;
+
+        // Fetch all spaces belonging to this property
+        const [voSpaces, cwSpaces, mrSpaces] = await Promise.all([
+          VirtualOfficeModel.find({ property: property._id }, { avgRating: 1 }),
+          CoworkingSpaceModel.find({ property: property._id }, { avgRating: 1 }),
+          MeetingRoomModel.find({ property: property._id }, { avgRating: 1 }),
+        ]);
+
+        const allSpaces = [...voSpaces, ...cwSpaces, ...mrSpaces];
+        
+        // Filter spaces that have a valid avgRating > 0
+        const spacesWithRatings = allSpaces.filter((s) => s.avgRating && s.avgRating > 0);
+
+        if (spacesWithRatings.length > 0) {
+          const totalRating = spacesWithRatings.reduce((sum, s) => sum + s.avgRating, 0);
+          propertyObj.avgRating = Math.round((totalRating / spacesWithRatings.length) * 10) / 10;
+        } else {
+          propertyObj.avgRating = 0; // Fallback to 0 if no spaces have ratings
+        }
+
+        return propertyObj;
+      })
+    );
+
     res.status(200).json({
       success: true,
       message: "Properties retrieved successfully",
-      data: properties,
+      data: propertiesWithRatings,
     });
   } catch (err) {
     sendError(res, 500, "Failed to retrieve properties", err);

@@ -5,6 +5,22 @@ import { BookingLeadModel } from "./bookingLead.model";
 import { EmailUtil } from "../authModule/utils/email.util";
 import { PaymentModel, PaymentStatus } from "../paymentModule/payment.model";
 
+import { z } from "zod";
+
+// Validation Schema
+const LeadSchema = z.object({
+  name: z.string().min(2, "Name is too short").max(100).trim(),
+  email: z.string().email("Invalid email address").trim().toLowerCase(),
+  phone: z.string().regex(/^[0-9]{10,15}$/, "Phone must be 10-15 digits"),
+  city: z.string().trim().optional(),
+  businessType: z.string().trim().optional(),
+  budget: z.string().trim().optional(),
+  message: z.string().trim().optional(),
+  source: z.string().trim().optional(),
+  page: z.string().trim().optional(),
+  utm: z.any().optional(),
+});
+
 export const createLead = async (req: Request, res: Response) => {
   try {
     const configuredApiKey = process.env.LEAD_API_KEY;
@@ -13,11 +29,17 @@ export const createLead = async (req: Request, res: Response) => {
       return res.status(401).json({ ok: false, message: "Unauthorized" });
     }
 
-    const { name, email, phone, city, businessType, budget, message, source, page, utm } = req.body || {};
-
-    if (!name || !email || !phone) {
-      return res.status(400).json({ ok: false, message: "Missing required fields (name, email, phone)" });
+    // Validate Input
+    const validation = LeadSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        ok: false, 
+        message: "Validation failed", 
+        errors: validation.error.format() 
+      });
     }
+
+    const { name, email, phone, city, businessType, budget, message, source, page, utm } = validation.data;
 
     // 1. Save to MongoDB (Primary Storage)
     let savedLead: any = null;
@@ -34,7 +56,6 @@ export const createLead = async (req: Request, res: Response) => {
         page,
         utm,
       });
-      console.log("✅ Lead saved to MongoDB:", savedLead._id);
     } catch (dbError: any) {
       console.error("❌ Failed to save lead to MongoDB:", dbError.message);
     }
@@ -63,7 +84,7 @@ export const createLead = async (req: Request, res: Response) => {
       `;
       
       EmailUtil.sendEmail({ to: adminEmail, subject, html })
-        .then(() => console.log("✅ Admin notification email sent"))
+        .then(() => {})
         .catch(err => console.error("⚠️ Failed to send admin notification email:", err.message));
     } catch (emailError: any) {
       console.error("⚠️ Failed to send admin notification email:", emailError.message);
@@ -116,7 +137,6 @@ export const createLead = async (req: Request, res: Response) => {
           valueInputOption: "USER_ENTERED",
           requestBody: { values: [row] },
         });
-        console.log("✅ Lead appended to Google Sheets");
       } catch (sheetError: any) {
         console.error("❌ Google Sheets append failed:", sheetError.message);
       }
@@ -173,8 +193,6 @@ export const getLeads = async (req: Request, res: Response) => {
         ],
       }).sort({ createdAt: -1 }).lean()
     ]);
-
-    const totalLeadsCount = generalLeads.length + bookingLeads.length;
 
     // Fetch payments for booking leads
     const bookingLeadEmails = [...new Set(bookingLeads.map((l: any) => l.email?.toLowerCase().trim()).filter(Boolean))];
@@ -233,6 +251,11 @@ export const getLeads = async (req: Request, res: Response) => {
 
     const paginatedLeads = allLeads.slice(skip, skip + limit);
 
+    const totalLeadsCount = allLeads.length;
+    const paidLeadsCount = allLeads.filter((l: any) => l.paymentStatus === "paid").length;
+    const pendingLeadsCount = allLeads.filter((l: any) => l.paymentStatus === "pending").length;
+    const cancelledLeadsCount = allLeads.filter((l: any) => l.paymentStatus === "cancelled").length;
+
     return res.status(200).json({ 
       ok: true, 
       data: paginatedLeads,
@@ -241,6 +264,13 @@ export const getLeads = async (req: Request, res: Response) => {
         page,
         limit,
         pages: Math.ceil(totalLeadsCount / limit)
+      },
+      stats: {
+        total: totalLeadsCount,
+        paid: paidLeadsCount,
+        pending: pendingLeadsCount,
+        cancelled: cancelledLeadsCount,
+        conversionRate: totalLeadsCount > 0 ? parseFloat(((paidLeadsCount / totalLeadsCount) * 100).toFixed(1)) : 0
       }
     });
   } catch (error: any) {

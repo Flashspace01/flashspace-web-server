@@ -308,11 +308,13 @@ Please login and change your password immediately from your profile settings.
     `;
 
     // Non-blocking mail dispatch
-    void EmailUtil.sendEmail({
+    EmailUtil.sendEmail({
       to: normalizedEmail,
       subject: "Your FlashSpace Team Member Login Credentials",
       html,
       text,
+    }).catch((emailError) => {
+      console.error("[TeamMember] Failed to send credentials email in background:", emailError);
     });
 
     return res.status(201).json({

@@ -52,29 +52,51 @@ export const upsertSpaceUserKycBusinessInfo = async (
       panNumber,
     } = req.body;
 
-    // Find the first property to save these details
+    // Save property-level fields to the Property model
     let property = await PropertyModel.findOne({ partner: partnerId });
     
-    if (!property) {
-      return res.status(404).json({
-        success: false,
-        message: "[DEBUG-404] No property found for this user. Business details must be linked to a property. Please add a space first.",
+    if (property) {
+      if (companyName !== undefined) property.companyName = companyName;
+      if (gstNumber !== undefined) property.gstNumber = gstNumber;
+      if (panNumber !== undefined) property.panNumber = panNumber;
+      if (registeredAddress !== undefined)
+        property.registeredAddress = registeredAddress;
+      if (contactPhone !== undefined) property.contactPhone = contactPhone;
+      
+      await property.save();
+    }
+
+    // Also persist business info to SpaceUserKyc model (companyType, industry, cinRegistrationNumber, etc.)
+    let kyc = await SpaceUserKycModel.findOne({ userId: partnerId });
+    if (!kyc) {
+      // Fetch user for fallback values
+      const user = await UserModel.findById(partnerId);
+      kyc = new SpaceUserKycModel({
+        userId: partnerId,
+        fullName: user?.fullName || "Partner",
+        email: user?.email || "partner@example.com",
+        phoneNumber: user?.phoneNumber || "0000000000",
+        dateOfBirth: new Date(),
+        aadhaarNumber: "DRAFT",
+        panNumber: panNumber || "DRAFT",
       });
     }
 
-    if (companyName !== undefined) property.companyName = companyName;
-    if (gstNumber !== undefined) property.gstNumber = gstNumber;
-    if (panNumber !== undefined) property.panNumber = panNumber;
-    if (registeredAddress !== undefined)
-      property.registeredAddress = registeredAddress;
-    if (contactPhone !== undefined) property.contactPhone = contactPhone;
-    
-    await property.save();
+    if (companyName !== undefined) kyc.companyName = companyName;
+    if (companyType !== undefined) kyc.companyType = companyType;
+    if (industry !== undefined) kyc.industry = industry;
+    if (gstNumber !== undefined) kyc.gstNumber = gstNumber;
+    if (cinRegistrationNumber !== undefined) kyc.cinRegistrationNumber = cinRegistrationNumber;
+    if (registeredAddress !== undefined) kyc.registeredAddress = registeredAddress;
+    if (contactPhone !== undefined) kyc.contactPhone = contactPhone;
+    if (companyPartners !== undefined) kyc.companyPartners = companyPartners;
+
+    await kyc.save();
 
     return res.status(200).json({
       success: true,
       message: "Business information saved successfully",
-      data: property,
+      data: kyc,
     });
   } catch (error) {
     console.error("[spaceKYC] upsertSpaceUserKycBusinessInfo error:", error);
@@ -148,7 +170,29 @@ export const getAllSpacePartnerKyc = async (req: any, res: any) => {
     const kycs = await SpaceUserKycModel.find({
       overallStatus: { $ne: "not_started" },
     }).populate("userId", "fullName email phoneNumber profilePicture");
-    res.json({ success: true, data: kycs });
+
+    const mergedKycs = await Promise.all(
+      kycs.map(async (kyc) => {
+        const firstProperty = await PropertyModel.findOne({ partner: kyc.userId });
+        const kycObject = kyc.toObject() as any;
+        return {
+          ...kycObject,
+          companyName: firstProperty?.companyName || firstProperty?.name || kycObject.companyName || "",
+          gstNumber: firstProperty?.gstNumber || kycObject.gstNumber || "",
+          panNumber: firstProperty?.panNumber || kycObject.panNumber || "",
+          registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kycObject.registeredAddress || "",
+          contactPhone: firstProperty?.contactPhone || kycObject.contactPhone || "",
+          accountHolderName: firstProperty?.accountHolderName || kycObject.accountHolderName || "",
+          bankName: firstProperty?.bankName || kycObject.bankName || "",
+          accountNumber: firstProperty?.accountNumber || kycObject.accountNumber || "",
+          ifscCode: firstProperty?.ifscCode || kycObject.ifscCode || "",
+          branch: firstProperty?.branch || kycObject.branch || "",
+          accountType: firstProperty?.accountType || kycObject.accountType || "Current Account",
+        };
+      })
+    );
+
+    res.json({ success: true, data: mergedKycs });
   } catch (err: any) {
     res.status(500).json({
       success: false,
@@ -171,7 +215,25 @@ export const getSpacePartnerKycById = async (req: any, res: any) => {
         .status(404)
         .json({ success: false, message: "KYC record not found" });
     }
-    res.json({ success: true, data: kyc });
+
+    const firstProperty = await PropertyModel.findOne({ partner: kyc.userId });
+    const kycObject = kyc.toObject() as any;
+    const mergedKyc = {
+      ...kycObject,
+      companyName: firstProperty?.companyName || firstProperty?.name || kycObject.companyName || "",
+      gstNumber: firstProperty?.gstNumber || kycObject.gstNumber || "",
+      panNumber: firstProperty?.panNumber || kycObject.panNumber || "",
+      registeredAddress: firstProperty?.registeredAddress || firstProperty?.address || kycObject.registeredAddress || "",
+      contactPhone: firstProperty?.contactPhone || kycObject.contactPhone || "",
+      accountHolderName: firstProperty?.accountHolderName || kycObject.accountHolderName || "",
+      bankName: firstProperty?.bankName || kycObject.bankName || "",
+      accountNumber: firstProperty?.accountNumber || kycObject.accountNumber || "",
+      ifscCode: firstProperty?.ifscCode || kycObject.ifscCode || "",
+      branch: firstProperty?.branch || kycObject.branch || "",
+      accountType: firstProperty?.accountType || kycObject.accountType || "Current Account",
+    };
+
+    res.json({ success: true, data: mergedKyc });
   } catch (err: any) {
     res.status(500).json({
       success: false,
@@ -361,8 +423,8 @@ export const uploadSpaceUserKycFile = async (req: Request, res: Response) => {
       kyc = new SpaceUserKycModel({
         userId: partnerId,
         fullName: user?.fullName || "Partner",
-        email: user?.email || "",
-        phoneNumber: user?.phoneNumber || "",
+        email: user?.email || "partner@example.com",
+        phoneNumber: user?.phoneNumber || "0000000000",
         dateOfBirth: new Date(),
         aadhaarNumber: "DRAFT",
         panNumber: "DRAFT"

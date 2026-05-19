@@ -1388,7 +1388,12 @@ async function mapPartnerBookingRows(bookings: any[]) {
       user,
       clientUserId: userId,
       clientCompanyName:
-        kycProfile?.businessInfo?.companyName || business?.companyName || "",
+        kycProfile?.businessInfo?.companyName ||
+        business?.companyName ||
+        user?.fullName ||
+        "Client",
+      clientEmail: user?.email || "",
+      clientPhone: user?.phoneNumber || user?.phone || "",
       totalAmount:
         booking.plan?.finalPrice ||
         booking.plan?.partnerPrice ||
@@ -1408,7 +1413,7 @@ export const getPartnerClients = async (req: Request, res: Response) => {
     const bookings = await BookingModel.find({
       partner: userId,
       isDeleted: false,
-    }).populate("user", "fullName email phoneNumber profilePicture");
+    }).populate("user", "fullName email phoneNumber profilePicture kycVerified");
 
     // 2. Fetch business info for all users in these bookings to get company names
     const userIds = [
@@ -1573,7 +1578,7 @@ export const getPartnerClientBookings = async (req: Request, res: Response) => {
       $or: [{ partner: partnerObjectId }, { spaceId: { $in: ownedSpaceIds } }],
       isDeleted: false,
     })
-      .populate("user", "fullName email phoneNumber phone profilePicture")
+      .populate("user", "fullName email phoneNumber phone profilePicture kycVerified")
       .populate("kycProfile", "profileName kycType businessInfo overallStatus")
       .sort({ createdAt: -1 });
 
@@ -5638,9 +5643,21 @@ export const getUserMails = async (req: Request, res: Response) => {
       ]);
 
     const stats = {
-      pending: allUserMails.filter(m => m.status?.toLowerCase() === 'pending action').length,
-      forwarded: allUserMails.filter(m => m.status?.toLowerCase() === 'forwarded').length,
-      collected: allUserMails.filter(m => m.status?.toLowerCase() === 'collected').length
+      pending: allUserMails.filter(m => 
+        m.status === 'Pending Action' && 
+        m.clientDecision !== 'Forward Requested' && 
+        m.userCollectedStatus !== 'Collected' && 
+        (m.status as string) !== 'Collected'
+      ).length,
+      forwarded: allUserMails.filter(m => 
+        (m.status === 'Forwarded' || m.clientDecision === 'Forward Requested') && 
+        m.userCollectedStatus !== 'Collected' && 
+        (m.status as string) !== 'Collected'
+      ).length,
+      collected: allUserMails.filter(m => 
+        (m.status as string) === 'Collected' || 
+        m.userCollectedStatus === 'Collected'
+      ).length
     };
 
     // Fetch real names from UserModel based on emails
