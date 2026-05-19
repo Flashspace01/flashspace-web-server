@@ -9,6 +9,7 @@ import { BookingDocumentRecordModel } from "./bookingDocument.model";
 import { BusinessInfoModel } from "../userDashboardModule/models/businessInfo.model";
 import { PartnerKYCModel } from "../userDashboardModule/models/partnerKYC.model";
 import { PropertyModel } from "../propertyModule/property.model";
+import { ReviewModel } from "../reviewsModule/review.model";
 import mongoose from "mongoose";
 
 export class BookingService {
@@ -547,14 +548,22 @@ export class BookingService {
       if (p.user) activeClientsSet.add(p.user.toString());
     });
 
-    // Process Bookings for Status and Rating
+    // Fetch all reviews for these spaces dynamically
+    const reviews = await ReviewModel.find({
+      space: { $in: allSpaceIds },
+    });
+
+    reviews.forEach((r: any) => {
+      if (r.rating) {
+        totalRating += r.rating;
+        ratingCount++;
+      }
+    });
+
+    // Process Bookings for Status
     bookings.forEach((b: any) => {
       if (b.status === "active" && b.user) {
         activeClientsSet.add(b.user.toString());
-      }
-      if (b.rating) {
-        totalRating += b.rating;
-        ratingCount++;
       }
     });
 
@@ -568,7 +577,7 @@ export class BookingService {
       monthlyBookings: totalBookings,
       monthlyRevenue: revenueTotal,
       newClients: activeClientsSet.size,
-      avgRating: ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "4.8" // Fallback to 4.8 as seen in static UI if no ratings
+      avgRating: ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "4.8" // Fallback to 4.8 if no ratings
     };
   }
 

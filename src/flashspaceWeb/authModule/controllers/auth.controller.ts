@@ -9,6 +9,47 @@ import {
   ChangePasswordRequest,
 } from "../types/auth.types";
 
+import { z } from "zod";
+
+const PasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
+  .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character");
+
+const SignupSchema = z.object({
+  email: z.string().email("Invalid email address").trim().toLowerCase(),
+  password: PasswordSchema,
+  fullName: z.string().min(2, "Full name is too short").trim(),
+  phoneNumber: z.string().optional(),
+  role: z.string().optional(),
+});
+
+const LoginSchema = z.object({
+  email: z.string().email("Invalid email address").trim().toLowerCase(),
+  password: z.string().min(1, "Password is required"),
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  password: PasswordSchema,
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: PasswordSchema,
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 export class AuthController {
   private authService: AuthService;
 
@@ -19,19 +60,17 @@ export class AuthController {
   // Register new user
   signup = async (req: Request, res: Response): Promise<void> => {
     try {
-      const signupData: SignupRequest = req.body;
-      console.log("Signup Request Body:", JSON.stringify(signupData, null, 2)); // DEBUG LOG
-
-      // Basic validation
-      if (!signupData.email || !signupData.password || !signupData.fullName) {
+      const validation = SignupSchema.safeParse(req.body);
+      if (!validation.success) {
         res.status(400).json({
           success: false,
-          message: "Email, password, and full name are required",
-          data: {},
-          error: "Missing required fields",
+          message: "Validation failed",
+          errors: validation.error.format(),
         });
         return;
       }
+
+      const signupData: SignupRequest = validation.data as any;
 
       const result = await this.authService.signup(signupData);
 
@@ -74,21 +113,20 @@ export class AuthController {
   // Login user
   login = async (req: Request, res: Response): Promise<void> => {
     try {
-      const loginData: LoginRequest = {
-        ...req.body,
-        trustedDeviceToken: req.cookies?.twoFactorDevice,
-      };
-
-      // Basic validation
-      if (!loginData.email || !loginData.password) {
+      const validation = LoginSchema.safeParse(req.body);
+      if (!validation.success) {
         res.status(400).json({
           success: false,
-          message: "Email and password are required",
-          data: {},
-          error: "Missing required fields",
+          message: "Validation failed",
+          errors: validation.error.format(),
         });
         return;
       }
+
+      const loginData: LoginRequest = {
+        ...validation.data,
+        trustedDeviceToken: req.cookies?.twoFactorDevice,
+      };
 
       const result = await this.authService.login(loginData);
 
@@ -312,21 +350,17 @@ export class AuthController {
   // Reset password
   resetPassword = async (req: Request, res: Response): Promise<void> => {
     try {
-      const resetPasswordData: ResetPasswordRequest = req.body;
-
-      if (
-        !resetPasswordData.token ||
-        !resetPasswordData.password ||
-        !resetPasswordData.confirmPassword
-      ) {
+      const validation = ResetPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
         res.status(400).json({
           success: false,
-          message: "Token, password, and confirmPassword are required",
-          data: {},
-          error: "Missing required fields",
+          message: "Validation failed",
+          errors: validation.error.format(),
         });
         return;
       }
+
+      const resetPasswordData: ResetPasswordRequest = validation.data as any;
 
       const result = await this.authService.resetPassword(resetPasswordData);
 
@@ -369,22 +403,17 @@ export class AuthController {
         return;
       }
 
-      const changePasswordData: ChangePasswordRequest = req.body;
-
-      if (
-        !changePasswordData.currentPassword ||
-        !changePasswordData.newPassword ||
-        !changePasswordData.confirmPassword
-      ) {
+      const validation = ChangePasswordSchema.safeParse(req.body);
+      if (!validation.success) {
         res.status(400).json({
           success: false,
-          message:
-            "Current password, new password, and confirm password are required",
-          data: {},
-          error: "Missing required fields",
+          message: "Validation failed",
+          errors: validation.error.format(),
         });
         return;
       }
+
+      const changePasswordData: ChangePasswordRequest = validation.data as any;
 
       const result = await this.authService.changePassword(
         req.user.id,

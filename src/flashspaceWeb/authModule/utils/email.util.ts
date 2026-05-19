@@ -207,9 +207,7 @@ export class EmailUtil {
         console.log('   Subject:', options.subject);
       }
     } catch (error: any) {
-      console.error('Error sending email:', error?.message || error);
-
-      throw error;
+      console.error('Error sending email (gracefully caught):', error?.message || error);
     }
   }
 

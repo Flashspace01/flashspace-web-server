@@ -1,5 +1,5 @@
 import { Router } from "express";
-console.log("[DEBUG] mainRoutes.ts is being loaded...");
+
 import { contactFormRoutes } from "./flashspaceWeb/contactFormModule/contactForm.routes";
 // import { spaceProviderRoutes } from "./flashspaceWeb/spaceProviderModule/spaceProvider.routes";
 import { virtualOfficeRoutes } from "./flashspaceWeb/virtualOfficeModule/virtualOffice.routes";
@@ -9,7 +9,7 @@ import { partnerInquiryRoutes } from "./flashspaceWeb/partnerInquiryModule/partn
 import { paymentRoutes } from "./flashspaceWeb/paymentModule/payment.routes";
 import userDashboardRoutes from "./flashspaceWeb/userDashboardModule/routes/userDashboard.routes";
 import { adminRoutes } from "./flashspaceWeb/adminModule/routes/admin.routes";
-console.log("[DEBUG] adminRoutes imported successfully");
+
 import { ticketRoutes } from "./flashspaceWeb/ticketModule/routes/ticket.routes";
 import { meetingSchedulerRoutes } from "./flashspaceWeb/meetingSchedulerModule/meetingScheduler.routes";
 import { affiliateRoutes } from "./flashspaceWeb/affiliatePortalModule/routes/affiliate.routes";
@@ -70,7 +70,7 @@ mainRoutes.use("/payment", paymentRoutes);
 // /api/user (Dashboard APIs)
 mainRoutes.use("/user", userDashboardRoutes);
 // /api/spacePartner
-console.log("[DEBUG] Registering /api/spacePartner routes...");
+
 mainRoutes.use("/spacePartner", spacePartnerRoutes);
 
 mainRoutes.get("/spacePartner/direct-test", (req, res) => {
@@ -106,5 +106,4 @@ mainRoutes.use("/chat", chatRoutes);
 // /api/leads
 mainRoutes.use("/leads", leadRoutes);
 
-console.log("[DEBUG] mainRoutes.ts registration complete.");
 
