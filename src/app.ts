@@ -82,6 +82,7 @@ const allowedOrigins = [
   "https://www.flashspace.ai",
   "http://72.60.219.115:8080",
   "http://72.60.219.115",
+  "https://ui-improvement-blush.vercel.app",
 ];
 
 const corsOptions: cors.CorsOptions = {
