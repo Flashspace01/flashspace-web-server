@@ -18,17 +18,28 @@ export const couponController = {
      */
     createCoupon: async (req: Request, res: Response) => {
         try {
-            const { assignedClientId, discountValue, expiryDate, manualCode } = req.body;
+            const { assignedClientId, discountValue, expiryDate, manualCode, applicableSpace } = req.body;
             const createdBy = req.user?.id;
+            const userRole = req.user?.role;
+            let finalAssignedClientId = assignedClientId;
 
-            if (!assignedClientId || !discountValue || !expiryDate) {
+            if (userRole === "affiliate") {
+                finalAssignedClientId = req.user?.id;
+                if (discountValue < 5 || discountValue > 30) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Affiliates can only provide 5% to 30% discount.",
+                    });
+                }
+            }
+
+            if (!finalAssignedClientId || !discountValue || !expiryDate) {
                 return res.status(400).json({
                     success: false,
                     message: "Missing required fields: assignedClientId, discountValue, expiryDate",
                 });
             }
 
-            const userRole = req.user?.role;
             if (userRole === "sales" && discountValue > 15) {
                 return res.status(403).json({
                     success: false,
@@ -55,10 +66,15 @@ export const couponController = {
                 code,
                 discountType: "percentage",
                 discountValue,
-                assignedClientId,
+                assignedClientId: finalAssignedClientId,
                 expiryDate: new Date(expiryDate),
                 createdBy,
                 status: CouponStatus.ACTIVE,
+                applicableSpace,
+                ...(userRole === "affiliate" && {
+                    isAffiliateCoupon: true,
+                    affiliateId: finalAssignedClientId
+                })
             });
 
             return res.status(201).json({
@@ -85,7 +101,12 @@ export const couponController = {
             const { clientId, status } = req.query;
             const query: any = { isDeleted: { $ne: true } };
 
-            if (clientId) query.assignedClientId = clientId;
+            if (req.user?.role === "affiliate") {
+                query.assignedClientId = req.user.id;
+            } else if (clientId) {
+                query.assignedClientId = clientId;
+            }
+
             if (status) query.status = status;
 
             const coupons = await CouponModel.find(query).sort({ createdAt: -1 });
@@ -111,8 +132,13 @@ export const couponController = {
         try {
             const { id } = req.params;
 
-            const coupon = await CouponModel.findByIdAndUpdate(
-                id,
+            const query: any = { _id: id };
+            if (req.user?.role === "affiliate") {
+                query.assignedClientId = req.user.id;
+            }
+
+            const coupon = await CouponModel.findOneAndUpdate(
+                query,
                 { isDeleted: true, status: CouponStatus.DISABLED },
                 { new: true }
             );
@@ -143,7 +169,7 @@ export const couponController = {
      */
     validateCoupon: async (req: Request, res: Response) => {
         try {
-            const { code } = req.body;
+            const { code, spaceName } = req.body;
             const userId = req.user?.id;
 
             if (!code) {
@@ -219,6 +245,27 @@ export const couponController = {
                 });
             }
 
+            // 4. Check applicableSpace restriction
+            if (coupon.applicableSpace && coupon.applicableSpace.trim() !== "") {
+                if (!spaceName) {
+                    return res.status(400).json({
+                        success: false,
+                        valid: false,
+                        message: `This coupon is only valid for: ${coupon.applicableSpace}`,
+                    });
+                }
+                const couponSpace = coupon.applicableSpace.toLowerCase().trim();
+                const requestedSpace = spaceName.toLowerCase().trim();
+                // Check if the space name from the request contains or matches the coupon's space
+                if (!couponSpace.includes(requestedSpace) && !requestedSpace.includes(couponSpace)) {
+                    return res.status(400).json({
+                        success: false,
+                        valid: false,
+                        message: `This coupon is only valid for: ${coupon.applicableSpace}`,
+                    });
+                }
+            }
+
             // Valid
             return res.status(200).json({
                 success: true,
@@ -228,6 +275,7 @@ export const couponController = {
                     code: coupon.code,
                     discountType: coupon.discountType,
                     discountValue: coupon.discountValue,
+                    applicableSpace: coupon.applicableSpace || null,
                     // Affiliate attribution fields — passed through to payment & booking
                     isAffiliateCoupon: coupon.isAffiliateCoupon || false,
                     affiliateId: coupon.affiliateId?.toString() || null,

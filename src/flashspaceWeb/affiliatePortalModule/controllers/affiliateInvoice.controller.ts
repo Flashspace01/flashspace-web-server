@@ -3,8 +3,7 @@ import { BookingModel } from "../../bookingModule/booking.model";
 import { InvoiceModel } from "../../invoiceModule/invoice.model";
 import { UserModel } from "../../authModule/models/user.model";
 import mongoose from "mongoose";
-
-const COMMISSION_RATE = 0.15; // 15% commission as defined in affiliate dashboard
+import { calculateAffiliateCommission } from "../utils/affiliateCommission";
 
 /**
  * GET /api/affiliate/invoices
@@ -74,9 +73,7 @@ export const getInvoices = async (req: Request, res: Response) => {
 
       if (inv) {
         const paidAmount = inv.total || 0;
-        const commission = parseFloat(
-          (paidAmount * COMMISSION_RATE).toFixed(2),
-        );
+        const commission = calculateAffiliateCommission(b);
         return {
           ...inv,
           client:
@@ -103,9 +100,7 @@ export const getInvoices = async (req: Request, res: Response) => {
       } else {
         // Generate fallback invoice from booking
         const paidAmount = b.plan?.price || 0;
-        const commission = parseFloat(
-          (paidAmount * COMMISSION_RATE).toFixed(2),
-        );
+        const commission = calculateAffiliateCommission(b);
         const mockInvNum = b.bookingNumber
           ? b.bookingNumber.replace("FS-", "INV-")
           : `INV-MOCK-${b._id.toString().slice(-6).toUpperCase()}`;
@@ -196,7 +191,7 @@ export const getInvoiceById = async (req: Request, res: Response) => {
       // Generate fallback invoice details
       const user = (booking.user as any) || {};
       const paidAmount = booking.plan?.price || 0;
-      const commission = parseFloat((paidAmount * COMMISSION_RATE).toFixed(2));
+      const commission = calculateAffiliateCommission(booking);
       const mockInvNum = booking.bookingNumber
         ? booking.bookingNumber.replace("FS-", "INV-")
         : `INV-MOCK-${booking._id.toString().slice(-6).toUpperCase()}`;
@@ -240,7 +235,7 @@ export const getInvoiceById = async (req: Request, res: Response) => {
     }
 
     const paidAmount = invoice.total || 0;
-    const commission = parseFloat((paidAmount * COMMISSION_RATE).toFixed(2));
+    const commission = calculateAffiliateCommission(booking);
 
     const mappedInvoice = {
       ...invoice,

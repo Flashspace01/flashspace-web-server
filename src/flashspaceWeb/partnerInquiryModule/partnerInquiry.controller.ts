@@ -4,41 +4,41 @@ import { PartnerInquiryModel } from "./partnerInquiry.model";
 import { EmailUtil } from "../authModule/utils/email.util";
 
 export const createPartnerInquiry = async (req: Request, res: Response) => {
-  try {
-    const { name, email, phone, company, partnershipType, message } = req.body;
+    try {
+        const { name, email, phone, company, partnershipType, message } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !phone || !partnershipType) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please provide all required fields (name, email, phone, partnershipType)",
-        data: {},
-        error: "Missing required fields",
-      });
-    }
+        // Validate required fields
+        if (!name || !email || !phone || !partnershipType) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Please provide all required fields (name, email, phone, partnershipType)",
+                data: {},
+                error: "Missing required fields",
+            });
+        }
 
-    const inquiry = await PartnerInquiryModel.create({
-      name,
-      email,
-      phone,
-      company,
-      partnershipType,
-      message,
-      status: "pending",
-    });
+        const inquiry = await PartnerInquiryModel.create({
+            name,
+            email,
+            phone,
+            company,
+            partnershipType,
+            message,
+            status: "pending",
+        });
 
-    if (!inquiry) {
-      return res.status(400).json({
-        success: false,
-        message: "Failed to save inquiry",
-        data: {},
-        error: "Database error",
-      });
-    }
+        if (!inquiry) {
+            return res.status(400).json({
+                success: false,
+                message: "Failed to save inquiry",
+                data: {},
+                error: "Database error",
+            });
+        }
 
-    // Admin Email
-    const adminEmailContent = `
+        // Admin Email
+        const adminEmailContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -53,14 +53,14 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                         <h1 style="color: #EDB003; margin: 0; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3); letter-spacing: 1px;">
                             NEW PARTNERSHIP INQUIRY
                         </h1>
-                        <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 14px; opacity: 0.95; font-weight: 600; letter-spacing: 1px;">
+                        <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 14px; opacity: 0.95; font-weight: 500; letter-spacing: 1px;">
                             ACTION REQUIRED WITHIN 24 HOURS
                         </p>
                     </div>
 
                     <!-- Main Alert Box -->
                     <div style="background: linear-gradient(to right, #FFF9E6, #FFF3CD); border-left: 5px solid #EDB003; padding: 20px; margin: 0;">
-                        <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 600; text-align: center;">
+                        <p style="margin: 0; color: #000000; font-size: 16px; font-weight: 500; text-align: center;">
                             A new partner inquiry from <strong style="color: #EDB003;">${company || name}</strong> is waiting for your review!
                         </p>
                     </div>
@@ -73,50 +73,50 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                             <h2 style="color: #000000; margin: 0; font-size: 24px; font-weight: 700;">
                                 ${company || "Individual Partner"}
                             </h2>
-                            <p style="color: #000000; margin: 10px 0 0 0; font-size: 14px; opacity: 0.8; font-weight: 600;">
+                            <p style="color: #000000; margin: 10px 0 0 0; font-size: 14px; opacity: 0.8; font-weight: 500;">
                                 ${partnershipType}
                             </p>
                         </div>
 
                         <!-- Contact Details Card -->
                         <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #EDB003;">
-                            <h3 style="color: #000000; margin: 0 0 20px 0; font-size: 18px; font-weight: 600; border-bottom: 2px solid #EDB003; padding-bottom: 10px;">
+                            <h3 style="color: #000000; margin: 0 0 20px 0; font-size: 18px; font-weight: 500; border-bottom: 2px solid #EDB003; padding-bottom: 10px;">
                                 Contact Information
                             </h3>
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
-                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; width: 30%; color: #6c757d; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; width: 30%; color: #6c757d; font-size: 14px; font-weight: 500;">
                                         Name:
                                     </td>
-                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #212529; font-size: 15px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #212529; font-size: 15px; font-weight: 500;">
                                         ${name}
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #6c757d; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #6c757d; font-size: 14px; font-weight: 500;">
                                         Email:
                                     </td>
                                     <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6;">
-                                        <a href="mailto:${email}" style="color: #007bff; text-decoration: none; font-weight: 600; font-size: 15px;">
+                                        <a href="mailto:${email}" style="color: #007bff; text-decoration: none; font-weight: 500; font-size: 15px;">
                                             ${email}
                                         </a>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #6c757d; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6; color: #6c757d; font-size: 14px; font-weight: 500;">
                                         Phone:
                                     </td>
                                     <td style="padding: 12px 10px; border-bottom: 1px solid #dee2e6;">
-                                        <a href="tel:${phone}" style="color: #28a745; text-decoration: none; font-weight: 600; font-size: 15px;">
+                                        <a href="tel:${phone}" style="color: #28a745; text-decoration: none; font-weight: 500; font-size: 15px;">
                                             ${phone}
                                         </a>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 12px 10px; color: #6c757d; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; color: #6c757d; font-size: 14px; font-weight: 500;">
                                         Company:
                                     </td>
-                                    <td style="padding: 12px 10px; color: #212529; font-size: 15px; font-weight: 600;">
+                                    <td style="padding: 12px 10px; color: #212529; font-size: 15px; font-weight: 500;">
                                         ${company || "Not Provided"}
                                     </td>
                                 </tr>
@@ -125,7 +125,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
 
                         <!-- Partnership Details Card -->
                         <div style="background-color: #FFFBF0; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid #EDB003;">
-                            <h3 style="color: #000000; margin: 0 0 15px 0; font-size: 18px; font-weight: 600;">
+                            <h3 style="color: #000000; margin: 0 0 15px 0; font-size: 18px; font-weight: 500;">
                                 Partnership Type
                             </h3>
                             <p style="margin: 0; color: #000000; font-size: 18px; font-weight: 700; background-color: #ffffff; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #EDB003;">
@@ -134,11 +134,10 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                         </div>
 
                         <!-- Message Card -->
-                        ${
-                          message
-                            ? `
+                        ${message
+                ? `
                         <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin-bottom: 25px; border-left: 5px solid #000000;">
-                            <h3 style="color: #000000; margin: 0 0 15px 0; font-size: 18px; font-weight: 600;">
+                            <h3 style="color: #000000; margin: 0 0 15px 0; font-size: 18px; font-weight: 500;">
                                 Partner's Message
                             </h3>
                             <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; border: 2px solid #FFB74D;">
@@ -148,26 +147,26 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                             </div>
                         </div>
                         `
-                            : ""
-                        }
+                : ""
+            }
 
                         <!-- Submission Details -->
                         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #dee2e6;">
                             <table style="width: 100%;">
                                 <tr>
-                                    <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 500;">
                                         Submitted On:
                                     </td>
                                     <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 700; text-align: right;">
                                         ${new Date().toLocaleString("en-IN", {
-                                          timeZone: "Asia/Kolkata",
-                                          dateStyle: "full",
-                                          timeStyle: "medium",
-                                        })}
+                timeZone: "Asia/Kolkata",
+                dateStyle: "full",
+                timeStyle: "medium",
+            })}
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 600;">
+                                    <td style="padding: 8px 0; color: #000000; font-size: 14px; font-weight: 500;">
                                         Inquiry ID:
                                     </td>
                                     <td style="padding: 8px 0; color: #EDB003; font-size: 13px; font-weight: 700; text-align: right; font-family: monospace;">
@@ -191,7 +190,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
 
                         <!-- Priority Notice -->
                         <div style="background-color: #FFF9E6; border: 2px dashed #EDB003; padding: 20px; border-radius: 12px; text-align: center; margin-top: 25px;">
-                            <p style="margin: 0; color: #000000; font-size: 15px; font-weight: 600;">
+                            <p style="margin: 0; color: #000000; font-size: 15px; font-weight: 500;">
                                 <strong>PRIORITY:</strong> Please respond within 24 hours to maintain partner satisfaction
                             </p>
                         </div>
@@ -213,8 +212,8 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
             </html>
         `;
 
-    // Partner Confirmation Email
-    const partnerEmailContent = `
+        // Partner Confirmation Email
+        const partnerEmailContent = `
             <!DOCTYPE html>
             <html>
             <head>
@@ -229,7 +228,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                         <h1 style="color: #000000; margin: 0; font-size: 24px; font-weight: 700;">
                             Welcome to FlashSpace
                         </h1>
-                        <p style="color: #000000; margin: 8px 0 0 0; font-size: 14px; font-weight: 600; opacity: 0.85;">
+                        <p style="color: #000000; margin: 8px 0 0 0; font-size: 14px; font-weight: 500; opacity: 0.85;">
                             Thank You for Your Partnership Interest
                         </p>
                     </div>
@@ -288,13 +287,13 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                 <tr style="border-bottom: 1px solid #e0e0e0;">
                                     <td style="padding: 15px 0; color: #666; font-size: 15px;">Submitted:</td>
                                     <td style="padding: 15px 0; color: #000; font-size: 15px; font-weight: 700;">${new Date().toLocaleString(
-                                      "en-IN",
-                                      {
-                                        timeZone: "Asia/Kolkata",
-                                        dateStyle: "long",
-                                        timeStyle: "short",
-                                      },
-                                    )}</td>
+            "en-IN",
+            {
+                timeZone: "Asia/Kolkata",
+                dateStyle: "long",
+                timeStyle: "short",
+            },
+        )}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 15px 0; color: #666; font-size: 15px;">Reference ID:</td>
@@ -373,113 +372,113 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
 </html>
         `;
 
-    // Send emails (non-blocking)
-    Promise.all([
-      EmailUtil.sendEmail({
-        to: process.env.ADMIN_EMAIL || "admin@flashspace.com",
-        subject: `🤝 New Partnership Inquiry - ${partnershipType} from ${name}`,
-        html: adminEmailContent,
-      }),
-      EmailUtil.sendEmail({
-        to: email,
-        subject: "🎉 Partnership Inquiry Received - FlashSpace",
-        html: partnerEmailContent,
-      }),
-    ]).catch((emailError) => {
-      console.error("Error sending emails:", emailError);
-    });
+        // Send emails (non-blocking)
+        Promise.all([
+            EmailUtil.sendEmail({
+                to: process.env.ADMIN_EMAIL || "admin@flashspace.com",
+                subject: `🤝 New Partnership Inquiry - ${partnershipType} from ${name}`,
+                html: adminEmailContent,
+            }),
+            EmailUtil.sendEmail({
+                to: email,
+                subject: "🎉 Partnership Inquiry Received - FlashSpace",
+                html: partnerEmailContent,
+            }),
+        ]).catch((emailError) => {
+            console.error("Error sending emails:", emailError);
+        });
 
-    res.status(201).json({
-      success: true,
-      message:
-        "Thank you for your interest! Our partnership team will contact you within 24 hours.",
-      data: inquiry,
-      error: {},
-    });
-  } catch (err: any) {
-    console.error("Partner inquiry error:", err);
-    res.status(500).json({
-      success: false,
-      message: "Something went wrong. Please try again.",
-      data: {},
-      error: err,
-    });
-  }
+        res.status(201).json({
+            success: true,
+            message:
+                "Thank you for your interest! Our partnership team will contact you within 24 hours.",
+            data: inquiry,
+            error: {},
+        });
+    } catch (err: any) {
+        console.error("Partner inquiry error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Something went wrong. Please try again.",
+            data: {},
+            error: err,
+        });
+    }
 };
 
 export const getAllPartnerInquiries = async (req: Request, res: Response) => {
-  try {
-    const { status } = req.query;
-    let query: any = { isDeleted: false };
+    try {
+        const { status } = req.query;
+        let query: any = { isDeleted: false };
 
-    if (status) {
-      query.status = status;
+        if (status) {
+            query.status = status;
+        }
+
+        const inquiries = await PartnerInquiryModel.find(query).sort({
+            createdAt: -1,
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Inquiries retrieved successfully",
+            data: inquiries,
+            error: {},
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to retrieve inquiries",
+            data: {},
+            error: err,
+        });
     }
-
-    const inquiries = await PartnerInquiryModel.find(query).sort({
-      createdAt: -1,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Inquiries retrieved successfully",
-      data: inquiries,
-      error: {},
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve inquiries",
-      data: {},
-      error: err,
-    });
-  }
 };
 
 export const updatePartnerInquiryStatus = async (
-  req: Request,
-  res: Response,
+    req: Request,
+    res: Response,
 ) => {
-  try {
-    const inquiryId = req.params.inquiryId as string;
-    const { status } = req.body;
+    try {
+        const inquiryId = req.params.inquiryId as string;
+        const { status } = req.body;
 
-    if (!Types.ObjectId.isValid(inquiryId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid inquiry ID",
-        data: {},
-        error: "Invalid ObjectId",
-      });
+        if (!Types.ObjectId.isValid(inquiryId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid inquiry ID",
+                data: {},
+                error: "Invalid ObjectId",
+            });
+        }
+
+        const updatedInquiry = await PartnerInquiryModel.findByIdAndUpdate(
+            inquiryId,
+            { status },
+            { new: true },
+        );
+
+        if (!updatedInquiry) {
+            return res.status(404).json({
+                success: false,
+                message: "Inquiry not found",
+                data: {},
+                error: "Not found",
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Inquiry status updated",
+            data: updatedInquiry,
+            error: {},
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to update inquiry",
+            data: {},
+            error: err,
+        });
     }
-
-    const updatedInquiry = await PartnerInquiryModel.findByIdAndUpdate(
-      inquiryId,
-      { status },
-      { new: true },
-    );
-
-    if (!updatedInquiry) {
-      return res.status(404).json({
-        success: false,
-        message: "Inquiry not found",
-        data: {},
-        error: "Not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Inquiry status updated",
-      data: updatedInquiry,
-      error: {},
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to update inquiry",
-      data: {},
-      error: err,
-    });
-  }
 };

@@ -3,8 +3,7 @@ import { UserModel, UserRole } from "../../authModule/models/user.model";
 import { BookingModel } from "../../bookingModule/booking.model";
 import { CouponModel } from "../../couponModule/coupon.model";
 import mongoose from "mongoose";
-
-const COMMISSION_RATE = 0.15;
+import { calculateAffiliateCommission } from "../../affiliatePortalModule/utils/affiliateCommission";
 
 /**
  * GET /api/admin/affiliates
@@ -18,7 +17,7 @@ export const getAllAffiliates = async (req: Request, res: Response) => {
         role: UserRole.AFFILIATE,
         isDeleted: { $ne: true },
       })
-      .select("fullName email phoneNumber createdAt isActive")
+      .select("fullName email phoneNumber createdAt isActive kycVerified")
       .lean();
 
     // Build ObjectId array for aggregation
@@ -43,6 +42,25 @@ export const getAllAffiliates = async (req: Request, res: Response) => {
           _id: "$affiliateId",
           totalBookings: { $sum: 1 },
           totalRevenue: { $sum: "$plan.price" },
+          totalCommission: {
+            $sum: {
+              $cond: [
+                { $gt: [{ $ifNull: ["$plan.partnerPrice", 0] }, 0] },
+                {
+                  $max: [
+                    0,
+                    {
+                      $subtract: [
+                        { $ifNull: ["$plan.price", "$plan.finalPrice"] },
+                        "$plan.partnerPrice",
+                      ],
+                    },
+                  ],
+                },
+                { $multiply: [{ $ifNull: ["$plan.price", 0] }, 0.15] },
+              ],
+            },
+          },
         },
       },
     ]);
@@ -69,11 +87,9 @@ export const getAllAffiliates = async (req: Request, res: Response) => {
 
     const result = affiliates.map((affiliate: any) => {
       const id = affiliate._id.toString();
-      const stats = statsMap[id] || { totalBookings: 0, totalRevenue: 0 };
+      const stats = statsMap[id] || { totalBookings: 0, totalRevenue: 0, totalCommission: 0 };
       const coupon = couponMap[id];
-      const commission = parseFloat(
-        (stats.totalRevenue * COMMISSION_RATE).toFixed(2),
-      );
+      const commission = parseFloat((stats.totalCommission || 0).toFixed(2));
 
       return {
         _id: affiliate._id,
@@ -82,6 +98,8 @@ export const getAllAffiliates = async (req: Request, res: Response) => {
         phone: affiliate.phoneNumber || "—",
         createdAt: affiliate.createdAt,
         isActive: affiliate.isActive,
+        verifiedStatus: affiliate.kycVerified ? "verified" : "pending",
+        kycVerified: affiliate.kycVerified === true,
         totalClients: stats.totalBookings,
         totalRevenue: stats.totalRevenue,
         totalCommission: commission,
@@ -177,9 +195,7 @@ export const getAffiliateClients = async (req: Request, res: Response) => {
     const clients = (bookings as any[]).map((b: any) => {
       const user = userMap[b.user?.toString() || ""] || {};
       const paidAmount: number = b.plan?.price || 0;
-      const commissionAmount = parseFloat(
-        (paidAmount * COMMISSION_RATE).toFixed(2),
-      );
+      const commissionAmount = calculateAffiliateCommission(b);
 
       return {
         bookingId: b._id,
@@ -195,6 +211,7 @@ export const getAffiliateClients = async (req: Request, res: Response) => {
         plan: b.plan?.name || "—",
         tenure: b.plan?.tenure ? `${b.plan.tenure} months` : "—",
         amount: paidAmount,
+        spaceCost: b.plan?.partnerPrice || 0,
         commissionAmount,
         couponCode: b.couponCode || "—",
         status: b.status,

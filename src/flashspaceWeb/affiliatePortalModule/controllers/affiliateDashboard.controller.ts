@@ -7,7 +7,7 @@ import {
 import { BookingModel } from "../../bookingModule/booking.model";
 import mongoose from "mongoose";
 
-const COMMISSION_RATE = 0.15;
+import { calculateAffiliateCommission } from "../utils/affiliateCommission";
 
 // Helper: get start of Nth months ago (UTC)
 const monthsAgo = (n: number): Date => {
@@ -50,12 +50,12 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         $in: ["pending_kyc", "pending_documents", "active", "completed"],
       },
     })
-      .select("plan.price createdAt status")
+      .select("plan.price plan.finalPrice plan.originalPrice plan.discount plan.partnerPrice plan.tenure plan.tenureUnit tenure createdAt status type")
       .lean();
 
     const totalClients = allBookings.length;
     const totalEarnings = allBookings.reduce(
-      (sum, b) => sum + (b.plan?.price || 0) * COMMISSION_RATE,
+      (sum, b) => sum + calculateAffiliateCommission(b),
       0,
     );
 
@@ -93,7 +93,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       const d = new Date(b.createdAt as Date);
       const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
       if (monthMap[key]) {
-        monthMap[key].earnings += (b.plan?.price || 0) * COMMISSION_RATE;
+        monthMap[key].earnings += calculateAffiliateCommission(b);
         monthMap[key].clients += 1;
       }
     }
@@ -151,7 +151,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     const revenueByProductMap: Record<string, number> = {};
     for (const b of allBookings) {
       const type = b.type || "Other";
-      const earnings = (b.plan?.price || 0) * COMMISSION_RATE;
+      const earnings = calculateAffiliateCommission(b);
       revenueByProductMap[type] = (revenueByProductMap[type] || 0) + earnings;
     }
 
@@ -168,7 +168,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       convertedClients: totalClients,
       pendingPayout: parseFloat(pendingPayout.toFixed(2)),
       totalLeads: leads.length,
-      commissionRate: COMMISSION_RATE * 100, // → 15
+      commissionRate: 15, // Display fallback, actual rate varies per booking
       monthlyEarnings,
       leadsByStatus,
       momGrowth,

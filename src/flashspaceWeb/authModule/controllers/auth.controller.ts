@@ -22,9 +22,13 @@ const PasswordSchema = z
 const SignupSchema = z.object({
   email: z.string().email("Invalid email address").trim().toLowerCase(),
   password: PasswordSchema,
+  confirmPassword: z.string(),
   fullName: z.string().min(2, "Full name is too short").trim(),
   phoneNumber: z.string().optional(),
   role: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 const LoginSchema = z.object({

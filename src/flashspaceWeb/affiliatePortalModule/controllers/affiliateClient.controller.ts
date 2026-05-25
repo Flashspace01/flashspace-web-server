@@ -2,13 +2,15 @@ import { Request, Response } from "express";
 import { BookingModel } from "../../bookingModule/booking.model";
 import { UserModel } from "../../authModule/models/user.model";
 import mongoose from "mongoose";
-
-const COMMISSION_RATE = 0.15; // 15% commission on (paidAmount - discountAmount)
+import {
+  calculateAffiliateCommission,
+  getPartnerBaseAmount,
+} from "../utils/affiliateCommission";
 
 /**
  * GET /api/affiliate/clients
  * Returns all bookings attributed to the logged-in affiliate, with per-booking commission.
- * Commission = (paidAmount - discountAmount) * 15%
+ * Commission = customer paid amount - actual/base space cost
  */
 export const getMyClients = async (req: Request, res: Response) => {
   try {
@@ -44,11 +46,7 @@ export const getMyClients = async (req: Request, res: Response) => {
       const user = userMap[b.user?.toString() || ""] || {};
 
       const paidAmount: number = b.plan?.price || 0;
-      // plan.price is already the net amount (original - discount)
-      // so Commission = paidAmount * 15%
-      const commissionAmount = parseFloat(
-        (paidAmount * COMMISSION_RATE).toFixed(2),
-      );
+      const commissionAmount = calculateAffiliateCommission(b);
 
       return {
         bookingId: b._id,
@@ -64,6 +62,7 @@ export const getMyClients = async (req: Request, res: Response) => {
         plan: b.plan?.name || "—",
         tenure: b.plan?.tenure ? `${b.plan.tenure} months` : "—",
         amount: paidAmount,
+        spaceCost: getPartnerBaseAmount(b),
         discountAmount: b.discountAmount || 0, // Keep discountAmount for display if needed
         commissionAmount,
         couponCode: b.couponCode || "—",
@@ -92,7 +91,7 @@ export const getMyClients = async (req: Request, res: Response) => {
           totalCommission,
           activeBookings,
           successfulBookings,
-          commissionRate: COMMISSION_RATE * 100,
+          commissionRate: 0,
         },
       },
     });

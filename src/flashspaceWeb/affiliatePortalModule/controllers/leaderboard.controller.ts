@@ -3,7 +3,7 @@ import { BookingModel } from "../../bookingModule/booking.model";
 import { UserModel } from "../../authModule/models/user.model";
 import mongoose from "mongoose";
 
-const COMMISSION_RATE = 0.15; // 15%
+import { calculateAffiliateCommission } from "../utils/affiliateCommission";
 
 /**
  * GET /api/affiliate/leaderboard?page=1&limit=10
@@ -23,79 +23,90 @@ export const getLeaderboard = async (
     );
     const skip = (page - 1) * limit;
 
-    // 1. Aggregate bookings by affiliateId — count & commission
-    const stats = await BookingModel.aggregate([
-      {
-        $match: {
-          affiliateId: { $exists: true, $ne: null },
-          isDeleted: false,
-          // Count all paid bookings: pending_kyc = payment received (most common after simulate)
-          status: {
-            $in: ["pending_kyc", "pending_documents", "active", "completed"],
-          },
-        },
+    // 1. Fetch all active affiliates
+    const allAffiliates = await UserModel.find({ 
+      role: "affiliate", 
+      isDeleted: false, 
+      isActive: true 
+    }).select("fullName").lean();
+
+    // 2. Fetch all matching bookings
+    const bookings = await BookingModel.find({
+      affiliateId: { $exists: true, $ne: null },
+      isDeleted: false,
+      status: {
+        $in: ["pending_kyc", "pending_documents", "active", "completed"],
       },
-      {
-        $group: {
-          _id: "$affiliateId",
-          successfulBookings: { $sum: 1 },
-          // Commission per booking: plan.price (paid amount) * 15%
-          totalCommission: {
-            $sum: {
-              $multiply: [{ $ifNull: ["$plan.price", 0] }, COMMISSION_RATE],
-            },
-          },
-        },
-      },
-      { $sort: { successfulBookings: -1, totalCommission: -1 } },
-    ]);
+    }).lean();
 
-    // 2. Total count before pagination
-    const totalEntries = stats.length;
-    const totalPages = Math.ceil(totalEntries / limit);
-    const paginated = stats.slice(skip, skip + limit);
+    const statsMap = new Map();
+    for (const b of bookings) {
+      const affId = b.affiliateId?.toString();
+      if (!affId) continue;
+      
+      const commission = calculateAffiliateCommission(b as any);
+      
+      if (!statsMap.has(affId)) {
+        statsMap.set(affId, { successfulBookings: 0, totalCommission: 0 });
+      }
+      
+      const current = statsMap.get(affId);
+      current.successfulBookings += 1;
+      current.totalCommission += commission;
+    }
 
-    // 3. Fetch user details for paginated slice
-    const affiliateIds = paginated.map((s) => s._id);
-    const users = await UserModel.find({ _id: { $in: affiliateIds } })
-      .select("fullName")
-      .lean();
-
-    const userMap: Record<string, any> = {};
-    users.forEach((u: any) => {
-      userMap[u._id.toString()] = u;
+    // 3. Combine stats with all affiliates
+    const combined = allAffiliates.map(user => {
+      const userStats = statsMap.get(user._id.toString()) || { successfulBookings: 0, totalCommission: 0 };
+      return {
+        _id: user._id,
+        fullName: user.fullName || "Affiliate",
+        successfulBookings: userStats.successfulBookings,
+        totalCommission: userStats.totalCommission
+      };
     });
 
-    // 4. Build leaderboard entries (global rank = skip + index + 1)
-    const leaderboard = paginated.map((stat, index) => {
-      const userId = stat._id.toString();
-      const user = userMap[userId] || {};
-      const name = user.fullName || "Affiliate";
-      const names = name.split(" ");
+    // 4. Sort by totalCommission DESC, then successfulBookings DESC
+    combined.sort((a, b) => {
+      if (b.totalCommission !== a.totalCommission) {
+        return b.totalCommission - a.totalCommission;
+      }
+      return b.successfulBookings - a.successfulBookings;
+    });
+
+    // 5. Pagination
+    const totalEntries = combined.length;
+    const totalPages = Math.ceil(totalEntries / limit);
+    const paginated = combined.slice(skip, skip + limit);
+
+    // 6. Build leaderboard entries
+    const leaderboard = paginated.map((user, index) => {
+      const userId = user._id.toString();
+      const names = user.fullName.split(" ");
       const initials =
         names.length >= 2
           ? `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
-          : name.substring(0, 2).toUpperCase();
+          : user.fullName.substring(0, 2).toUpperCase();
 
       return {
         rank: skip + index + 1,
         affiliateId: userId,
-        name,
+        name: user.fullName,
         initials,
-        successfulBookings: stat.successfulBookings,
-        totalCommission: parseFloat(stat.totalCommission.toFixed(2)),
+        successfulBookings: user.successfulBookings,
+        totalCommission: parseFloat(user.totalCommission.toFixed(2)),
         isUser: userId === currentUserId,
       };
     });
 
-    // 5. Find current user's rank across all entries (not just current page)
-    const currentUserStatIndex = stats.findIndex(
+    // 7. Find current user's rank across all entries (not just current page)
+    const currentUserStatIndex = combined.findIndex(
       (s) => s._id.toString() === currentUserId,
     );
     const currentUserRank =
       currentUserStatIndex >= 0 ? currentUserStatIndex + 1 : null;
     const currentUserStat =
-      currentUserStatIndex >= 0 ? stats[currentUserStatIndex] : null;
+      currentUserStatIndex >= 0 ? combined[currentUserStatIndex] : null;
 
     res.status(200).json({
       success: true,
