@@ -55,6 +55,9 @@ export class Coupon {
 
   @prop({ type: () => [String], default: [] })
   public usedBy?: string[];
+
+  @prop()
+  public applicableSpace?: string;
 }
 
 export const CouponModel = getModelForClass(Coupon);

@@ -6,10 +6,12 @@ import * as supportController from "../controllers/support.controller";
 import { getLeaderboard } from "../controllers/leaderboard.controller";
 import { getDashboardStats, getAIInsights } from "../controllers/affiliateDashboard.controller";
 import { getMyClients } from "../controllers/affiliateClient.controller";
+import { getBookings } from "../controllers/affiliateBooking.controller";
 import * as invoiceController from "../controllers/affiliateInvoice.controller";
 import { AuthMiddleware } from "../../authModule/middleware/auth.middleware";
 import { UserRole } from "../../authModule/models/user.model";
 import { couponController } from "../../couponModule/coupon.controller";
+import { getCalculatorSpaces } from "../controllers/calculator.controller";
 
 const router = express.Router();
 
@@ -60,6 +62,12 @@ router.get("/dashboard/insights", getAIInsights);
 
 // Client Management Routes
 router.get("/clients", getMyClients);
+
+// Calculator Route
+router.get("/calculator-spaces", getCalculatorSpaces);
+
+// Booking Management Routes
+router.get("/bookings", getBookings);
 
 // Invoice Routes
 router.get("/invoices", invoiceController.getInvoices);

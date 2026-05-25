@@ -627,7 +627,7 @@ export class AdminService {
         .select(
           "user profileName linkedBookings personalInfo businessInfo kycType isPartner documents overallStatus kycStatus progress submittedAt partnerCount businessInfoCount createdAt updatedAt",
         )
-        .populate("user", "fullName email phoneNumber profilePicture kycVerified")
+        .populate("user", "fullName email phoneNumber profilePicture kycVerified role")
         .sort({ updatedAt: -1 })
         .lean();
 

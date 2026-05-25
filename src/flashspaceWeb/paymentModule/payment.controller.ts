@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { Types } from "mongoose";
 import { PaymentModel, PaymentStatus, PaymentType } from "./payment.model";
 import { BookingModel } from "../bookingModule/booking.model";
 import { InvoiceModel } from "../invoiceModule/invoice.model";
@@ -93,6 +94,38 @@ async function resolveApprovedBookingProfile(userId: any) {
   }).select("_id linkedBookings");
 }
 
+function resolvePartnerPrice(payment: any, spaceData: any): number {
+  const tenure = Number(payment.tenure || 1);
+  const planKey = String(payment.planKey || "").toLowerCase();
+  const planName = String(payment.planName || "").toLowerCase();
+
+  if (payment.paymentType === PaymentType.VIRTUAL_OFFICE) {
+    if (planKey.includes("gst") || planName.includes("gst")) {
+      return Number(spaceData?.partnerGstPricePerYear || 0) * tenure;
+    }
+    if (
+      planKey.includes("mail") ||
+      planName.includes("mail")
+    ) {
+      return Number(spaceData?.partnerMailingPricePerYear || 0) * tenure;
+    }
+    return Number(spaceData?.partnerBrPricePerYear || 0) * tenure;
+  }
+
+  if (payment.paymentType === PaymentType.COWORKING_SPACE) {
+    return Number(spaceData?.partnerPricePerMonth || 0) * tenure * 12;
+  }
+
+  if (payment.paymentType === PaymentType.MEETING_ROOM) {
+    if (planKey.includes("day") || planName.includes("day")) {
+      return Number(spaceData?.partnerPricePerDay || 0) * tenure;
+    }
+    return Number(spaceData?.partnerPricePerHour || 0) * tenure;
+  }
+
+  return 0;
+}
+
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
   try {
@@ -179,6 +212,8 @@ async function createBookingAndInvoice(payment: any) {
       };
     }
 
+    const partnerPrice = resolvePartnerPrice(payment, spaceData);
+
     // Fallback: If no partner is assigned to the space, find the first admin to assign as partner
     if (!partnerId) {
       console.warn(`Partner ID not found for space ${payment.space}. Falling back to first admin.`);
@@ -226,9 +261,13 @@ async function createBookingAndInvoice(payment: any) {
           price: payment.totalAmount,
           originalPrice: (payment.yearlyPrice || payment.totalAmount) * (payment.tenure || 1),
           discount: payment.discountAmount || 0,
+          partnerPrice: partnerPrice || undefined,
+          finalPrice: payment.totalAmount,
           tenure: (payment.tenure || 1) * 12,
           tenureUnit: "months",
         },
+        couponCode: payment.couponCode || undefined,
+        affiliateId: payment.affiliateId ? new Types.ObjectId(payment.affiliateId) : undefined,
         payment: payment._id,
         razorpayOrderId: payment.razorpayOrderId,
         razorpayPaymentId: payment.razorpayPaymentId,

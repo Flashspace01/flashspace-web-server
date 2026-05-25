@@ -29,6 +29,8 @@ export const createOrderSchema = z.object({
       .datetime()
       .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
       .optional(),
+    couponCode: z.string().trim().min(1).optional(),
+    affiliateId: objectIdSchema.optional(),
     holdId: objectIdSchema.optional(),
     creditsToUse: z.number().int().nonnegative().optional().default(0),
   }),
