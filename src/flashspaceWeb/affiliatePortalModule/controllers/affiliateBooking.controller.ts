@@ -68,6 +68,8 @@ export const getBookings = async (req: Request, res: Response) => {
         amount: Number(booking.plan?.price || booking.plan?.finalPrice || 0),
         commission,
         status: booking.status,
+        partnerKycStatus: booking.partnerKycStatus || "not_started",
+        partnerReviewStatus: booking.partnerReviewStatus || "pending",
         couponCode: booking.couponCode || "—",
         startDate: booking.startDate,
         endDate: booking.endDate,

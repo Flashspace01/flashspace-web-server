@@ -3270,6 +3270,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
     if (type === "virtual_office") normalizedType = "VirtualOffice";
     else if (type === "coworking_space") normalizedType = "CoworkingSpace";
     else if (type === "meeting_room") normalizedType = "MeetingRoom";
+    else if (type === "business_setup") normalizedType = "BusinessSetup";
 
     const extraFilter: any = {};
     if (normalizedType) extraFilter.type = normalizedType;
@@ -3295,6 +3296,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
     if (normalizedType === "VirtualOffice") paymentTypeFilter = PaymentType.VIRTUAL_OFFICE;
     else if (normalizedType === "CoworkingSpace") paymentTypeFilter = PaymentType.COWORKING_SPACE;
     else if (normalizedType === "MeetingRoom") paymentTypeFilter = PaymentType.MEETING_ROOM;
+    else if (normalizedType === "BusinessSetup") paymentTypeFilter = PaymentType.BUSINESS_SETUP;
 
     const shouldIncludePaymentFallback =
       !status || status === "pending_kyc" || status === "active";
@@ -3392,7 +3394,9 @@ export const getAllBookings = async (req: Request, res: Response) => {
         _id: `payment-${p._id}`,
         bookingNumber: `P-${String(p.razorpayOrderId || p._id).slice(-8).toUpperCase()}`,
         type:
-          p.paymentType === PaymentType.VIRTUAL_OFFICE
+          p.paymentType === PaymentType.BUSINESS_SETUP
+            ? "BusinessSetup"
+            : p.paymentType === PaymentType.VIRTUAL_OFFICE
             ? "VirtualOffice"
             : p.paymentType === PaymentType.MEETING_ROOM
               ? "MeetingRoom"
@@ -3412,7 +3416,7 @@ export const getAllBookings = async (req: Request, res: Response) => {
           tenure: p.tenure || 1,
           tenureUnit: "months",
         },
-        status: "pending_kyc",
+        status: p.paymentType === PaymentType.BUSINESS_SETUP ? "active" : "pending_kyc",
         startDate: p.startDate || p.createdAt,
         endDate: p.startDate || p.createdAt,
         createdAt: p.createdAt,

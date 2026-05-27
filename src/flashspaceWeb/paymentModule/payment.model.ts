@@ -22,6 +22,7 @@ export enum PaymentType {
   COWORKING_SPACE = "coworking_space",
   MEETING_ROOM = "meeting_room",
   SEAT_BOOKING = "seat_booking",
+  BUSINESS_SETUP = "business_setup",
 }
 
 @modelOptions({

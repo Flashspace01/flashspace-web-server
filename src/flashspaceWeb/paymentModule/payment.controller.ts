@@ -129,6 +129,10 @@ function resolvePartnerPrice(payment: any, spaceData: any): number {
 // Helper function to create booking and invoice after payment
 async function createBookingAndInvoice(payment: any) {
   try {
+    if (payment.paymentType === PaymentType.BUSINESS_SETUP) {
+      return { booking: null, invoiceNumber: undefined };
+    }
+
     // Idempotency: if booking already exists for this payment, reuse it.
     const existingBooking = await BookingModel.findOne({
       payment: payment._id,
@@ -470,7 +474,12 @@ export const createOrder = async (req: Request, res: Response) => {
 
     // Verify Space isActive Status before proceeding
     let spaceData: any = null;
-    if (paymentType === PaymentType.VIRTUAL_OFFICE) {
+    if (paymentType === PaymentType.BUSINESS_SETUP) {
+      spaceData = {
+        _id: resolvedUserId,
+        isActive: true,
+      };
+    } else if (paymentType === PaymentType.VIRTUAL_OFFICE) {
       spaceData = await VirtualOfficeModel.findById(spaceId).lean();
     } else if (
       paymentType === PaymentType.COWORKING_SPACE ||
@@ -549,12 +558,14 @@ export const createOrder = async (req: Request, res: Response) => {
       status: PaymentStatus.PENDING,
       paymentType,
       spaceModel:
-        paymentType === PaymentType.VIRTUAL_OFFICE
-          ? "VirtualOffice"
-          : paymentType === PaymentType.MEETING_ROOM
-            ? "MeetingRoom"
-            : "CoworkingSpace",
-      space: spaceId,
+        paymentType === PaymentType.BUSINESS_SETUP
+          ? "User"
+          : paymentType === PaymentType.VIRTUAL_OFFICE
+            ? "VirtualOffice"
+            : paymentType === PaymentType.MEETING_ROOM
+              ? "MeetingRoom"
+              : "CoworkingSpace",
+      space: paymentType === PaymentType.BUSINESS_SETUP ? resolvedUserId : spaceId,
       spaceName,
       planName,
       planKey,

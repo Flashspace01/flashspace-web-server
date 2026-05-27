@@ -67,6 +67,8 @@ export const getMyClients = async (req: Request, res: Response) => {
         commissionAmount,
         couponCode: b.couponCode || "—",
         status: b.status,
+        partnerKycStatus: b.partnerKycStatus || "not_started",
+        partnerReviewStatus: b.partnerReviewStatus || "pending",
         startDate: b.startDate,
         endDate: b.endDate,
         createdAt: b.createdAt,
