@@ -136,7 +136,7 @@ export class VirtualOfficeService {
         select:
           "spaceId name address city area location images features isActive isDeleted status",
       })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .limit(limit)
       .skip((page - 1) * limit);
 

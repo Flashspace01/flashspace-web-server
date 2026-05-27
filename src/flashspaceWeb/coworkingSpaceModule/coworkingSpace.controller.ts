@@ -288,6 +288,7 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
     const { city } = req.params;
     const limitRaw = (req.query as any).limit;
     const pageRaw = (req.query as any).page;
+    const search = (req.query as any).search;
     const parsedLimit = Number(limitRaw);
     const parsedPage = Number(pageRaw);
     const _limit =
@@ -299,13 +300,19 @@ export const getCoworkingSpacesByCity = async (req: Request, res: Response) => {
         ? parsedPage
         : 1;
 
+    const filter: any = {
+      city: new RegExp(`^${city}$`, "i"),
+      isActive: true,
+      isDeleted: false,
+      approvalStatus: SpaceApprovalStatus.ACTIVE,
+    };
+
+    if (search) {
+      filter.name = new RegExp(search, "i");
+    }
+
     const result = await CoworkingSpaceService.getSpaces(
-      {
-        city: new RegExp(`^${city}$`, "i"),
-        isActive: true,
-        isDeleted: false,
-        approvalStatus: SpaceApprovalStatus.ACTIVE,
-      },
+      filter,
       { limit: _limit, page: _page },
     );
 
