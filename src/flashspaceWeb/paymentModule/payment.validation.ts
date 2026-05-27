@@ -14,7 +14,7 @@ export const createOrderSchema = z.object({
     userEmail: z.string().email(),
     userName: z.string().min(1, "Name is required"),
     userPhone: z.string().optional(),
-    spaceId: objectIdSchema,
+    spaceId: objectIdSchema.optional(),
     spaceName: z.string().min(1, "Space Name is required"),
     planName: z.string().min(1, "Plan Name is required"),
     planKey: z.string().min(1, "Plan Key is required"),
@@ -33,6 +33,14 @@ export const createOrderSchema = z.object({
     affiliateId: objectIdSchema.optional(),
     holdId: objectIdSchema.optional(),
     creditsToUse: z.number().int().nonnegative().optional().default(0),
+  }).superRefine((body, ctx) => {
+    if (body.paymentType !== PaymentType.BUSINESS_SETUP && !body.spaceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["spaceId"],
+        message: "Space ID is required",
+      });
+    }
   }),
 });
 
