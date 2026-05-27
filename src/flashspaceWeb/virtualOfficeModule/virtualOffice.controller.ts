@@ -240,16 +240,23 @@ export const getVirtualOfficesByCity = async (req: Request, res: Response) => {
 
     const { city } = validation.data.params;
     const { limit, page } = validation.data.query;
+    const search = (req.query as any).search;
     const _limit = limit ? Math.min(limit, 100) : 12;
     const _page = page ? Math.max(page, 1) : 1;
 
+    const filter: any = {
+      city: new RegExp(`^${city}$`, "i"),
+      isActive: true,
+      isDeleted: false,
+      approvalStatus: SpaceApprovalStatus.ACTIVE,
+    };
+
+    if (search) {
+      filter.name = new RegExp(search, "i");
+    }
+
     const result = await VirtualOfficeService.getOffices(
-      {
-        city: new RegExp(`^${city}$`, "i"),
-        isActive: true,
-        isDeleted: false,
-        approvalStatus: SpaceApprovalStatus.ACTIVE,
-      },
+      filter,
       _limit,
       _page,
     );

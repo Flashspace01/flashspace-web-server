@@ -182,7 +182,7 @@ export class CoworkingSpaceService {
         select:
           "spaceId name address city area location images features isActive isDeleted status",
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
     if (limit && limit > 0) {
       const total = await CoworkingSpaceModel.countDocuments(finalQuery);
