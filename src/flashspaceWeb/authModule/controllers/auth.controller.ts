@@ -1110,7 +1110,7 @@ export class AuthController {
       }
 
       const { UserModel } = await import("../models/user.model");
-      const imageUrl = `/uploads/profile-pictures/${req.file.filename}`;
+      const imageUrl = req.file.path; // Cloudinary URL
 
       const updatedUser = await UserModel.findByIdAndUpdate(
         req.user.id,
@@ -1171,7 +1171,7 @@ export class AuthController {
       }
 
       const { UserModel } = await import("../models/user.model");
-      const imageUrl = `/uploads/profile-pictures/${req.file.filename}`; // Using same directory for simplicity
+      const imageUrl = req.file.path; // Cloudinary URL
 
       const updatedUser = await UserModel.findByIdAndUpdate(
         req.user.id,
