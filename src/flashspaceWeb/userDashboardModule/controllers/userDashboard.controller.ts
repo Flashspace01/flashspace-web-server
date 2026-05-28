@@ -607,87 +607,90 @@ async function getSharedBookingInvoiceAccess(userId?: string) {
 export const getDashboardOverview = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const activeBookingFilter = await buildSharedBookingFilter(userId, {
-      status: "active",
-    });
-    const allBookingFilter = await buildSharedBookingFilter(userId);
-    const invoiceAccess = await getSharedBookingInvoiceAccess(userId);
-    const invoiceAccessOr: any[] = invoiceAccess.accessibleUserIds?.length
-      ? [{ user: { $in: invoiceAccess.accessibleUserIds } }]
+    
+    // 1. Fetch the user context ONCE (saves ~4 duplicate DB round-trips)
+    const context = await getAccessibleBookingContext(userId);
+    const accessOr = context.userIds.length
+      ? [{ user: { $in: context.userIds } }]
       : [{ user: userId }];
-    if (invoiceAccess.bookingIds.length > 0) {
-      invoiceAccessOr.push({ booking: { $in: invoiceAccess.bookingIds } });
-    }
-    if (invoiceAccess.bookingNumbers.length > 0) {
-      invoiceAccessOr.push({ bookingNumber: { $in: invoiceAccess.bookingNumbers } });
+    if (context.profileIds.length > 0) {
+      accessOr.push({ kycProfile: { $in: context.profileIds } });
     }
 
-    // Get active bookings count from both models
-    const [activeBookingsMain, activeSeatBookings] = await Promise.all([
+    const activeBookingFilter = { status: "active", isDeleted: { $ne: true }, $or: accessOr };
+    const allBookingFilter = { isDeleted: { $ne: true }, $or: accessOr };
+
+    // 2. Fetch invoice access booking IDs concurrently with other preliminary data
+    const bookingsForInvoices = await BookingModel.find({
+      $or: accessOr,
+      isDeleted: { $ne: true },
+    }).select("_id bookingNumber");
+
+    const invoiceAccessOr: any[] = [...accessOr];
+    const bookingIds = bookingsForInvoices.map((b) => b._id);
+    const bookingNumbers = bookingsForInvoices.map((b) => b.bookingNumber).filter(Boolean);
+    
+    if (bookingIds.length > 0) invoiceAccessOr.push({ booking: { $in: bookingIds } });
+    if (bookingNumbers.length > 0) invoiceAccessOr.push({ bookingNumber: { $in: bookingNumbers } });
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    // 3. Fire all main dashboard aggregations and queries in ONE massive Promise.all
+    // This reduces the waterfall effect significantly.
+    const [
+      activeBookingsMain,
+      activeSeatBookings,
+      pendingInvoices,
+      nextBookingMain,
+      nextSeatBooking,
+      kyc,
+      user,
+      recentBookingsMain,
+      recentSeatBookings,
+      usageBreakdownMain,
+      usageBreakdownSeats,
+      monthlyBookingsMain,
+      monthlyBookingsSeats,
+    ] = await Promise.all([
       BookingModel.countDocuments(activeBookingFilter),
-      SeatBookingModel.countDocuments({
-        user: userId,
-        status: "confirmed",
-      }),
+      SeatBookingModel.countDocuments({ user: userId, status: "confirmed" }),
+      InvoiceModel.aggregate([
+        { $match: { status: "pending", isDeleted: false, $or: invoiceAccessOr } },
+        { $group: { _id: null, total: { $sum: "$total" } } },
+      ]),
+      BookingModel.findOne(activeBookingFilter).sort({ endDate: 1 }).select("endDate"),
+      SeatBookingModel.findOne({ user: userId, status: "confirmed" }).sort({ endTime: 1 }).select("endTime"),
+      KYCDocumentModel.findOne({ user: userId }),
+      UserModel.findById(userId).select("kycVerified"),
+      BookingModel.find(allBookingFilter).sort({ createdAt: -1 }).limit(3).select("bookingNumber status createdAt spaceSnapshot.name"),
+      SeatBookingModel.find({ user: userId }).populate("space").sort({ createdAt: -1 }).limit(3),
+      BookingModel.aggregate([{ $match: allBookingFilter }, { $group: { _id: "$type", count: { $sum: 1 } } }]),
+      SeatBookingModel.countDocuments({ user: userId }),
+      BookingModel.aggregate([
+        { $match: { ...allBookingFilter, createdAt: { $gte: sixMonthsAgo } } },
+        { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      ]),
+      SeatBookingModel.aggregate([
+        { $match: { user: userId, createdAt: { $gte: sixMonthsAgo } } },
+        { $group: { _id: { $month: "$createdAt" }, count: { $sum: 1 } } },
+      ]),
     ]);
 
+    // 4. Process results
     const activeBookings = activeBookingsMain + activeSeatBookings;
-
-    // Get pending invoices total
-    const pendingInvoices = await InvoiceModel.aggregate([
-      { $match: { status: "pending", isDeleted: false, $or: invoiceAccessOr } },
-      { $group: { _id: null, total: { $sum: "$total" } } },
-    ]);
-
-    // Get next booking (upcoming expiry) from both models
-    const [nextBookingMain, nextSeatBooking] = await Promise.all([
-      BookingModel.findOne(activeBookingFilter)
-        .sort({ endDate: 1 })
-        .select("endDate"),
-      SeatBookingModel.findOne({
-        user: userId,
-        status: "confirmed",
-      })
-        .sort({ endTime: 1 })
-        .select("endTime"),
-    ]);
 
     let nextBookingDate = nextBookingMain?.endDate || null;
     if (nextSeatBooking?.endTime) {
-      if (
-        !nextBookingDate ||
-        nextSeatBooking.endTime.getTime() < nextBookingDate.getTime()
-      ) {
+      if (!nextBookingDate || nextSeatBooking.endTime.getTime() < nextBookingDate.getTime()) {
         nextBookingDate = nextSeatBooking.endTime;
       }
     }
 
-    // Get KYC status. User dashboard should trust admin/global verification only,
-    // not booking-specific partner approval.
-    const [kyc, user] = await Promise.all([
-      KYCDocumentModel.findOne({ user: userId }),
-      UserModel.findById(userId).select("kycVerified"),
-    ]);
     const dashboardKycStatus = getAdminVisibleKycStatus(
       kyc?.overallStatus || "not_started",
       Boolean(user?.kycVerified),
     );
-
-    // Get recent activity (last 5 bookings/invoices) from both models
-    const [recentBookingsMain, recentSeatBookings] = await Promise.all([
-      BookingModel.find({
-        ...allBookingFilter,
-      })
-        .sort({ createdAt: -1 })
-        .limit(3)
-        .select("bookingNumber status createdAt spaceSnapshot.name"),
-      SeatBookingModel.find({
-        user: userId,
-      })
-        .populate("space")
-        .sort({ createdAt: -1 })
-        .limit(3),
-    ]);
 
     const recentActivityMain = recentBookingsMain.map((b) => ({
       type: "booking",
@@ -708,64 +711,12 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       .sort((a: any, b: any) => b.date.getTime() - a.date.getTime())
       .slice(0, 5);
 
-    // Usage breakdown
-    const usageBreakdownMain = await BookingModel.aggregate([
-      { $match: allBookingFilter },
-      { $group: { _id: "$type", count: { $sum: 1 } } },
-    ]);
-
-    const usageBreakdownSeats = await SeatBookingModel.countDocuments({
-      user: userId,
-    });
-
-    const totalBookingsMain = usageBreakdownMain.reduce(
-      (sum, u) => sum + u.count,
-      0,
-    );
+    const totalBookingsMain = usageBreakdownMain.reduce((sum, u) => sum + u.count, 0);
     const totalBookings = totalBookingsMain + usageBreakdownSeats;
 
-    const virtualOfficeCount =
-      usageBreakdownMain.find((u) => u._id === "VirtualOffice")?.count || 0;
-    const coworkingCount =
-      (usageBreakdownMain.find((u) => u._id === "CoworkingSpace")?.count || 0) +
-      usageBreakdownSeats;
-    const meetingRoomCount =
-      usageBreakdownMain.find((u) => u._id === "MeetingRoom")?.count || 0;
-
-    // Monthly bookings (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const [monthlyBookingsMain, monthlyBookingsSeats] = await Promise.all([
-      BookingModel.aggregate([
-        {
-          $match: {
-            ...allBookingFilter,
-            createdAt: { $gte: sixMonthsAgo },
-          },
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-      SeatBookingModel.aggregate([
-        {
-          $match: {
-            user: userId,
-            createdAt: { $gte: sixMonthsAgo },
-          },
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-    ]);
+    const virtualOfficeCount = usageBreakdownMain.find((u) => u._id === "VirtualOffice")?.count || 0;
+    const coworkingCount = (usageBreakdownMain.find((u) => u._id === "CoworkingSpace")?.count || 0) + usageBreakdownSeats;
+    const meetingRoomCount = usageBreakdownMain.find((u) => u._id === "MeetingRoom")?.count || 0;
 
     const combinedMonthly = new Map();
     [...monthlyBookingsMain, ...monthlyBookingsSeats].forEach((m) => {
@@ -776,20 +727,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
       .map(([_id, count]) => ({ _id, count }))
       .sort((a, b) => a._id - b._id);
 
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const formattedMonthly = monthlyData.map((m) => ({
       month: months[m._id - 1],
       count: m.count,
@@ -804,27 +742,16 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
         kycStatus: dashboardKycStatus,
         recentActivity,
         usageBreakdown: {
-          virtualOffice:
-            totalBookings > 0
-              ? Math.round((virtualOfficeCount / totalBookings) * 100)
-              : 0,
-          coworkingSpace:
-            totalBookings > 0
-              ? Math.round((coworkingCount / totalBookings) * 100)
-              : 0,
-          meetingRoom:
-            totalBookings > 0
-              ? Math.round((meetingRoomCount / totalBookings) * 100)
-              : 0,
+          virtualOffice: totalBookings > 0 ? Math.round((virtualOfficeCount / totalBookings) * 100) : 0,
+          coworkingSpace: totalBookings > 0 ? Math.round((coworkingCount / totalBookings) * 100) : 0,
+          meetingRoom: totalBookings > 0 ? Math.round((meetingRoomCount / totalBookings) * 100) : 0,
         },
         monthlyBookings: formattedMonthly,
       },
     });
   } catch (error) {
     console.error("Dashboard error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch dashboard data" });
+    res.status(500).json({ success: false, message: "Failed to fetch dashboard data" });
   }
 };
 
