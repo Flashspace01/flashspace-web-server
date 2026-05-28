@@ -610,7 +610,7 @@ export const getDashboardOverview = async (req: Request, res: Response) => {
     
     // 1. Fetch the user context ONCE (saves ~4 duplicate DB round-trips)
     const context = await getAccessibleBookingContext(userId);
-    const accessOr = context.userIds.length
+    const accessOr: any[] = context.userIds.length
       ? [{ user: { $in: context.userIds } }]
       : [{ user: userId }];
     if (context.profileIds.length > 0) {
