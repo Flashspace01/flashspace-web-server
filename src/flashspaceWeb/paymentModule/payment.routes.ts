@@ -15,11 +15,16 @@ export const paymentRoutes = Router();
 paymentRoutes.post(
   "/create-order",
   AuthMiddleware.authenticate,
+  AuthMiddleware.rateLimit(10, 60 * 60 * 1000), // 10 attempts per hour
   createOrder,
 );
 
 // Verify payment (Razorpay callback)
-paymentRoutes.post("/verify", verifyPayment);
+paymentRoutes.post(
+  "/verify",
+  AuthMiddleware.rateLimit(20, 60 * 60 * 1000), // 20 attempts per hour
+  verifyPayment
+);
 
 // Handle payment failure
 paymentRoutes.post("/failed", handlePaymentFailure);
