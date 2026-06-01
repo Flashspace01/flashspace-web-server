@@ -8,7 +8,7 @@ async function run() {
     try {
         await mongoose.connect(process.env.DB_URI || '');
         const res = await mongoose.connection.db!.collection('users').updateOne(
-            { email: 'testpartner@flashspace.co' },
+            { email: 'testpartner@flashspace.ai' },
             { $set: { role: 'user' } }
         );
         console.log('Update result:', res.modifiedCount);

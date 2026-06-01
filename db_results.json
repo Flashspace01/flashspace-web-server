@@ -33,7 +33,7 @@
     "usersCount": 7,
     "latestUsers": [
       {
-        "email": "partner_test@flashspace.com",
+        "email": "partner_test@flashspace.aim",
         "isEmailVerified": true,
         "hasPassword": true,
         "role": "partner",
@@ -42,7 +42,7 @@
         "isActive": true
       },
       {
-        "email": "partner@flashspace.co",
+        "email": "partner@flashspace.ai",
         "isEmailVerified": true,
         "hasPassword": false,
         "role": "partner",
@@ -51,7 +51,7 @@
         "isActive": true
       },
       {
-        "email": "affiliate@flashspace.co",
+        "email": "affiliate@flashspace.ai",
         "isEmailVerified": true,
         "hasPassword": true,
         "role": "affiliate",
@@ -68,7 +68,7 @@
         "isActive": true
       },
       {
-        "email": "partner@flashspace.com",
+        "email": "partner@flashspace.aim",
         "isEmailVerified": true,
         "hasPassword": true,
         "role": "partner",
@@ -86,7 +86,7 @@
         "isActive": true
       },
       {
-        "email": "admin@flashspace.co",
+        "email": "admin@flashspace.ai",
         "isEmailVerified": true,
         "hasPassword": true,
         "role": "partner",

@@ -453,137 +453,137 @@ const LEGACY_PARTNERS = [
 ];
 
 async function seed() {
-    try {
-        await mongoose.connect(process.env.DB_URI || 'mongodb://127.0.0.1:27017/flash');
-        console.log('Connected to DB...');
-        
-        const defaultPasswordHash = await bcrypt.hash('Flash@2026', 12);
-        
-        // Combine both lists
-        const allPartners = [...NEW_PARTNERS];
-        
-        // Add legacy partners if not already in list (by email)
-        for (const lp of LEGACY_PARTNERS) {
-            if (!allPartners.find(p => p.email.toLowerCase() === lp.email.toLowerCase())) {
-                allPartners.push(lp);
-            }
-        }
+  try {
+    await mongoose.connect(process.env.DB_URI || 'mongodb://127.0.0.1:27017/flash');
+    console.log('Connected to DB...');
 
-        console.log(`Total partners to process: ${allPartners.length}`);
+    const defaultPasswordHash = await bcrypt.hash('Flash@2026', 12);
 
-        for (const p of allPartners) {
-            let cleanEmail = p.email.toLowerCase().trim();
-            // Handle missing emails by generating a unique one based on space name
-            if (cleanEmail === 'na') {
-                cleanEmail = `${p.space_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@flashspace.co`;
-            }
-            console.log(`\nProcessing: ${p.space_name} (${cleanEmail})`);
-            
-            const emailPasswordHash = await bcrypt.hash(cleanEmail, 12);
-            
-            // 1. Find or Create User
-            let user = await mongoose.connection.db!.collection('users').findOne({ email: cleanEmail });
-            
-            if (!user) {
-                const newUser = {
-                    email: cleanEmail,
-                    password: emailPasswordHash,
-                    fullName: p.partner_name === 'NA' ? p.space_name : p.partner_name,
-                    phoneNumber: p.mobile_number === 'NA' || !p.mobile_number ? '' : p.mobile_number.split('/')[0].split(',')[0].trim(),
-                    role: 'partner',
-                    isEmailVerified: true,
-                    kycVerified: true,
-                    isActive: true,
-                    authProvider: 'local',
-                    isDeleted: false,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                };
-                const res = await mongoose.connection.db!.collection('users').insertOne(newUser);
-                user = { ...newUser, _id: res.insertedId };
-                console.log(`- Created User: ${user._id}`);
-            } else {
-                // Update existing user to ensure they are partner role, password is email, and authProvider is local
-                await mongoose.connection.db!.collection('users').updateOne(
-                    { _id: user._id },
-                    { 
-                        $set: { 
-                            role: 'partner', 
-                            isEmailVerified: true, 
-                            kycVerified: true, 
-                            isActive: true,
-                            authProvider: 'local',
-                            isDeleted: false,
-                            password: emailPasswordHash 
-                        } 
-                    }
-                );
-                console.log(`- User updated strictly: ${user._id}`);
-            }
+    // Combine both lists
+    const allPartners = [...NEW_PARTNERS];
 
-            // 2. Find Property and Link
-            // Multi-stage matching: exact name -> regex name -> address regex
-            const property = await mongoose.connection.db!.collection('properties').findOne({ 
-                $or: [
-                    { name: p.space_name },
-                    { name: new RegExp(p.space_name.split(' - ')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
-                    { address: new RegExp(p.address.slice(0, 30).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
-                ]
-            });
-
-            if (property) {
-                await mongoose.connection.db!.collection('properties').updateOne(
-                    { _id: property._id },
-                    { $set: { partner: user._id } }
-                );
-                console.log(`- Linked to Property: ${property.name} (${property._id})`);
-                
-                // 3. Link Spaces belonging to this property
-                await mongoose.connection.db!.collection('coworkingspaces').updateMany(
-                    { property: property._id },
-                    { $set: { partner: user._id } }
-                );
-                await mongoose.connection.db!.collection('virtualoffices').updateMany(
-                    { property: property._id },
-                    { $set: { partner: user._id } }
-                );
-                await mongoose.connection.db!.collection('meetingrooms').updateMany(
-                    { property: property._id },
-                    { $set: { partner: user._id } }
-                );
-                
-                // 4. Link Bookings belonging to these spaces
-                // We find bookings where the spaceId is in any of the spaces we just updated
-                // Or more simply, where the property matches the snapshot property (if available) 
-                // OR where the partner was the previous owner of these spaces.
-                // Best way: Update bookings where spaceId matches any space from this property.
-                const spaceIds = (await mongoose.connection.db!.collection('coworkingspaces').find({ property: property._id }).toArray()).map(s => s._id);
-                const voIds = (await mongoose.connection.db!.collection('virtualoffices').find({ property: property._id }).toArray()).map(s => s._id);
-                const mrIds = (await mongoose.connection.db!.collection('meetingrooms').find({ property: property._id }).toArray()).map(s => s._id);
-                
-                const allSpaceIds = [...spaceIds, ...voIds, ...mrIds];
-                
-                if (allSpaceIds.length > 0) {
-                    const bookingUpdateResult = await mongoose.connection.db!.collection('bookings').updateMany(
-                        { spaceId: { $in: allSpaceIds } },
-                        { $set: { partner: user._id } }
-                    );
-                    console.log(`- Updated ${bookingUpdateResult.modifiedCount} associated bookings`);
-                }
-
-                console.log(`- Updated all associated spaces and bookings`);
-
-            } else {
-                console.warn(`- !!! NO PROPERTY FOUND for ${p.space_name}`);
-            }
-        }
-
-        console.log('\nMaster seed completed successfully.');
-        process.exit(0);
-    } catch (err) {
-        console.error('Seed failed:', err);
-        process.exit(1);
+    // Add legacy partners if not already in list (by email)
+    for (const lp of LEGACY_PARTNERS) {
+      if (!allPartners.find(p => p.email.toLowerCase() === lp.email.toLowerCase())) {
+        allPartners.push(lp);
+      }
     }
+
+    console.log(`Total partners to process: ${allPartners.length}`);
+
+    for (const p of allPartners) {
+      let cleanEmail = p.email.toLowerCase().trim();
+      // Handle missing emails by generating a unique one based on space name
+      if (cleanEmail === 'na') {
+        cleanEmail = `${p.space_name.toLowerCase().replace(/[^a-z0-9]/g, '')}@flashspace.ai`;
+      }
+      console.log(`\nProcessing: ${p.space_name} (${cleanEmail})`);
+
+      const emailPasswordHash = await bcrypt.hash(cleanEmail, 12);
+
+      // 1. Find or Create User
+      let user = await mongoose.connection.db!.collection('users').findOne({ email: cleanEmail });
+
+      if (!user) {
+        const newUser = {
+          email: cleanEmail,
+          password: emailPasswordHash,
+          fullName: p.partner_name === 'NA' ? p.space_name : p.partner_name,
+          phoneNumber: p.mobile_number === 'NA' || !p.mobile_number ? '' : p.mobile_number.split('/')[0].split(',')[0].trim(),
+          role: 'partner',
+          isEmailVerified: true,
+          kycVerified: true,
+          isActive: true,
+          authProvider: 'local',
+          isDeleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        const res = await mongoose.connection.db!.collection('users').insertOne(newUser);
+        user = { ...newUser, _id: res.insertedId };
+        console.log(`- Created User: ${user._id}`);
+      } else {
+        // Update existing user to ensure they are partner role, password is email, and authProvider is local
+        await mongoose.connection.db!.collection('users').updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              role: 'partner',
+              isEmailVerified: true,
+              kycVerified: true,
+              isActive: true,
+              authProvider: 'local',
+              isDeleted: false,
+              password: emailPasswordHash
+            }
+          }
+        );
+        console.log(`- User updated strictly: ${user._id}`);
+      }
+
+      // 2. Find Property and Link
+      // Multi-stage matching: exact name -> regex name -> address regex
+      const property = await mongoose.connection.db!.collection('properties').findOne({
+        $or: [
+          { name: p.space_name },
+          { name: new RegExp(p.space_name.split(' - ')[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+          { address: new RegExp(p.address.slice(0, 30).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }
+        ]
+      });
+
+      if (property) {
+        await mongoose.connection.db!.collection('properties').updateOne(
+          { _id: property._id },
+          { $set: { partner: user._id } }
+        );
+        console.log(`- Linked to Property: ${property.name} (${property._id})`);
+
+        // 3. Link Spaces belonging to this property
+        await mongoose.connection.db!.collection('coworkingspaces').updateMany(
+          { property: property._id },
+          { $set: { partner: user._id } }
+        );
+        await mongoose.connection.db!.collection('virtualoffices').updateMany(
+          { property: property._id },
+          { $set: { partner: user._id } }
+        );
+        await mongoose.connection.db!.collection('meetingrooms').updateMany(
+          { property: property._id },
+          { $set: { partner: user._id } }
+        );
+
+        // 4. Link Bookings belonging to these spaces
+        // We find bookings where the spaceId is in any of the spaces we just updated
+        // Or more simply, where the property matches the snapshot property (if available) 
+        // OR where the partner was the previous owner of these spaces.
+        // Best way: Update bookings where spaceId matches any space from this property.
+        const spaceIds = (await mongoose.connection.db!.collection('coworkingspaces').find({ property: property._id }).toArray()).map(s => s._id);
+        const voIds = (await mongoose.connection.db!.collection('virtualoffices').find({ property: property._id }).toArray()).map(s => s._id);
+        const mrIds = (await mongoose.connection.db!.collection('meetingrooms').find({ property: property._id }).toArray()).map(s => s._id);
+
+        const allSpaceIds = [...spaceIds, ...voIds, ...mrIds];
+
+        if (allSpaceIds.length > 0) {
+          const bookingUpdateResult = await mongoose.connection.db!.collection('bookings').updateMany(
+            { spaceId: { $in: allSpaceIds } },
+            { $set: { partner: user._id } }
+          );
+          console.log(`- Updated ${bookingUpdateResult.modifiedCount} associated bookings`);
+        }
+
+        console.log(`- Updated all associated spaces and bookings`);
+
+      } else {
+        console.warn(`- !!! NO PROPERTY FOUND for ${p.space_name}`);
+      }
+    }
+
+    console.log('\nMaster seed completed successfully.');
+    process.exit(0);
+  } catch (err) {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  }
 }
 
 seed();

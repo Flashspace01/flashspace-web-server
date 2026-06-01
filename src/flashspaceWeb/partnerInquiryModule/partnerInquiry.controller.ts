@@ -311,7 +311,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
                                 Our team is here to help! Feel free to reach out anytime:
                             </p>
                             <div style="margin-top: 20px;">
-                                <a href="mailto:partners@flashspace.co" style="display: inline-block; background: linear-gradient(135deg, #EDB003 0%, #FFD700 100%); color: #000000; text-decoration: none; padding: 14px 35px; border-radius: 30px; font-weight: 700; margin: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(237,176,3,0.4); transition: transform 0.2s;">
+                                <a href="mailto:team@flashspace.ai" style="display: inline-block; background: linear-gradient(135deg, #EDB003 0%, #FFD700 100%); color: #000000; text-decoration: none; padding: 14px 35px; border-radius: 30px; font-weight: 700; margin: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(237,176,3,0.4); transition: transform 0.2s;">
                                     📧 Email Us
                                 </a>
                                 <a href="tel:+918100888777" style="display: inline-block; background: linear-gradient(135deg, #2c3e50 0%, #000000 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; border-radius: 30px; font-weight: 700; margin: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); transition: transform 0.2s;">
@@ -375,7 +375,7 @@ export const createPartnerInquiry = async (req: Request, res: Response) => {
         // Send emails (non-blocking)
         Promise.all([
             EmailUtil.sendEmail({
-                to: process.env.ADMIN_EMAIL || "admin@flashspace.com",
+                to: process.env.ADMIN_EMAIL || "admin@flashspace.aim",
                 subject: `🤝 New Partnership Inquiry - ${partnershipType} from ${name}`,
                 html: adminEmailContent,
             }),

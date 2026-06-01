@@ -4,7 +4,7 @@ import axios from "axios";
 
 // ✅ FIXED: correct base URL (NO trailing /chat/guest here)
 const AI_BASE_URL =
-  process.env.AI_BACKEND_URL || "https://ai.flashspace.co";
+  process.env.AI_BACKEND_URL || "https://ai.flashspace.ai";
 
 // ================= SEND MESSAGE (AUTH + OPTIONAL) =================
 export const sendMessage = async (req: Request, res: Response) => {
@@ -97,7 +97,7 @@ export const sendGuestMessage = async (req: Request, res: Response) => {
     // ✅ SMART URL CLEANER (prevents duplicate /chat/guest paths)
     const base = AI_BASE_URL.replace(/\/chat\/guest\/?$/, "").replace(/\/chat\/?$/, "").replace(/\/$/, "");
     const targetUrl = `${base}/chat/guest`;
-    
+
     console.log(`[CHAT-GUEST] Final Target URL: ${targetUrl}`);
 
     const response = await axios.post(

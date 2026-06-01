@@ -27,10 +27,10 @@ const run = async () => {
     console.log("Dropped collections.");
 
     // Find or create partner
-    let partner = await UserModel.findOne({ email: "partner@flashspace.com" });
+    let partner = await UserModel.findOne({ email: "partner@flashspace.aim" });
     if (!partner) {
       partner = await UserModel.create({
-        email: "partner@flashspace.com",
+        email: "partner@flashspace.aim",
         fullName: "Test Partner",
         password: "password123",
         role: UserRole.PARTNER,

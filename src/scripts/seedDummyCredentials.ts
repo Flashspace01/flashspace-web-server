@@ -7,25 +7,25 @@ dotenv.config();
 
 const dummyUsers = [
   {
-    email: "dummy.user@flashspace.co",
+    email: "dummy.user@flashspace.ai",
     fullName: "Dummy User",
     role: UserRole.USER,
     password: "Password@123",
   },
   {
-    email: "dummy.admin@flashspace.co",
+    email: "dummy.admin@flashspace.ai",
     fullName: "Dummy Admin",
     role: UserRole.ADMIN,
     password: "Password@123",
   },
   {
-    email: "dummy.partner@flashspace.co",
+    email: "dummy.partner@flashspace.ai",
     fullName: "Dummy Partner",
     role: UserRole.PARTNER,
     password: "Password@123",
   },
   {
-    email: "dummy.affiliate@flashspace.co",
+    email: "dummy.affiliate@flashspace.ai",
     fullName: "Dummy Affiliate",
     role: UserRole.AFFILIATE,
     password: "Password@123",
