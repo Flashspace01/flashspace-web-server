@@ -11,8 +11,8 @@ async function run() {
 
     const user = await db
       .collection("users")
-      .findOne({ email: "admin@flashspace.co" });
-    console.log("admin@flashspace.co password in DB:", user?.password);
+      .findOne({ email: "admin@flashspace.ai" });
+    console.log("admin@flashspace.ai password in DB:", user?.password);
 
     const testUser = await db
       .collection("users")

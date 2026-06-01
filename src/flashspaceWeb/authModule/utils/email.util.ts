@@ -47,7 +47,7 @@ export class EmailUtil {
         ? `"FlashSpace" <${process.env.SMTP_USER}>`
         : process.env.EMAIL_USER
           ? `"FlashSpace" <${process.env.EMAIL_USER}>`
-          : "FlashSpace <noreply@flashspace.co>")
+          : "FlashSpace <noreply@flashspace.ai>")
     );
   }
 
@@ -650,8 +650,8 @@ export class EmailUtil {
     serviceInterest?: string;
     message: string;
   }): Promise<void> {
-    const receiverEmail = process.env.CONTACT_RECEIVER_EMAIL || 'team@flashspace.co';
-    
+    const receiverEmail = process.env.CONTACT_RECEIVER_EMAIL || 'team@flashspace.ai';
+
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
         <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; text-align: center;">

@@ -7,37 +7,37 @@ dotenv.config();
 
 const internalUsers = [
     {
-        email: 'superadmin@flashspace.co',
+        email: 'superadmin@flashspace.ai',
         fullName: 'Super Admin',
         role: UserRole.SUPER_ADMIN,
         password: 'Password@123',
     },
     {
-        email: 'admin@flashspace.co',
+        email: 'admin@flashspace.ai',
         fullName: 'Admin',
         role: UserRole.ADMIN,
         password: 'Password@123',
     },
     {
-        email: 'support.agent@flashspace.co',
+        email: 'support.agent@flashspace.ai',
         fullName: 'Test Support',
         role: UserRole.SUPPORT,
         password: 'Password@123',
     },
     {
-        email: 'sales.exec@flashspace.co',
+        email: 'sales.exec@flashspace.ai',
         fullName: 'Test Sales',
         role: UserRole.SALES,
         password: 'Password@123',
     },
     {
-        email: 'partner.manager@flashspace.co',
+        email: 'partner.manager@flashspace.ai',
         fullName: 'Test Space Partner Manager',
         role: UserRole.SPACE_PARTNER_MANAGER,
         password: 'Password@123',
     },
     {
-        email: 'affiliate.manager@flashspace.co',
+        email: 'affiliate.manager@flashspace.ai',
         fullName: 'Test Affiliate Manager',
         role: UserRole.AFFILIATE_MANAGER,
         password: 'Password@123',

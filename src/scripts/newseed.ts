@@ -625,7 +625,7 @@ const testUsers = [
     kycVerified: false,
   },
   {
-    email: "admin@flashspace.co",
+    email: "admin@flashspace.ai",
     fullName: "Admin User",
     password: "Admin@123",
     phoneNumber: "+91-9876543211",
@@ -670,7 +670,7 @@ async function seedDatabase() {
     const insertedUsers = await UserModel.insertMany(hashedUsers);
     const partnerUser = insertedUsers.find((u) => u.role === UserRole.PARTNER);
     const regularUser = insertedUsers.find((u) => u.email === "test@example.com");
-    const adminUser = insertedUsers.find((u) => u.email === "admin@flashspace.co");
+    const adminUser = insertedUsers.find((u) => u.email === "admin@flashspace.ai");
 
     // Unified Maps
     const coworkingMap: Record<string, any> = {};

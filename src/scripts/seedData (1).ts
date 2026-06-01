@@ -56,7 +56,7 @@ const testUsers = [
     isTwoFactorEnabled: false,
   },
   {
-    email: "admin@flashspace.co",
+    email: "admin@flashspace.ai",
     fullName: "Admin User",
     password: "Admin@123",
     phoneNumber: "+91-9876543211",
@@ -652,7 +652,7 @@ const virtualOffices = [
       "Wellness Programs",
     ],
     area: "Koramangala",
-    availability: "Available Now",  
+    availability: "Available Now",
     popular: false,
     image: "https://shorturl.at/Fyr6o",
   },
@@ -1237,7 +1237,7 @@ const bookings = [
         status: "active",
         date: getRandomPastDate(14),
         note: "Booking activated",
-        by: "admin@flashspace.co",
+        by: "admin@flashspace.ai",
       },
     ],
     documents: [
@@ -1415,7 +1415,7 @@ const bookings = [
         status: "active",
         date: getRandomPastDate(115),
         note: "Booking activated",
-        by: "admin@flashspace.co",
+        by: "admin@flashspace.ai",
       },
       {
         _id: generateObjectId(),
@@ -1513,7 +1513,7 @@ async function seedDatabase() {
     console.log("   Password: Test@123");
     console.log("   Verified: YES (no OTP needed)");
     console.log("\n2. Admin User:");
-    console.log("   Email: admin@flashspace.co");
+    console.log("   Email: admin@flashspace.ai");
     console.log("   Password: Admin@123");
     console.log("   Verified: YES (no OTP needed)");
 
@@ -1612,7 +1612,7 @@ async function seedDatabase() {
       (u) => u.email === "test@example.com",
     );
     const adminUser = insertedUsers.find(
-      (u) => u.email === "admin@flashspace.co",
+      (u) => u.email === "admin@flashspace.ai",
     );
 
     // Assign user references to bookings and fix spaceSnapshot._id
@@ -1640,7 +1640,7 @@ async function seedDatabase() {
     console.log("=".repeat(40));
     insertedBookings.forEach((booking, index) => {
       const userEmail =
-        index % 2 === 0 ? "test@example.com" : "admin@flashspace.co";
+        index % 2 === 0 ? "test@example.com" : "admin@flashspace.ai";
       console.log(
         `${index + 1}. ${booking.bookingNumber}: ${booking.type} - ${booking.status} (${userEmail})`,
       );

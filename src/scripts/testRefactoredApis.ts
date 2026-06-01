@@ -19,7 +19,7 @@ const testApis = async () => {
     console.log("✅ Connected to Database.");
 
     // 1. Get/Create Partner
-    const targetEmail = "partner_test@flashspace.com";
+    const targetEmail = "partner_test@flashspace.aim";
     let partner = await UserModel.findOne({ email: targetEmail });
 
     if (!partner) {

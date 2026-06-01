@@ -2,7 +2,7 @@
   "baseUrl": "http://localhost:5000",
   "users": {
     "admin": {
-      "email": "admin@flashspace.co",
+      "email": "admin@flashspace.ai",
       "password": "CHANGE_ME",
       "role": "admin"
     },

@@ -107,7 +107,7 @@ const runSeed = async () => {
     // Admin
     await UserModel.create({
       fullName: "Super Admin",
-      email: "admin@flashspace.com",
+      email: "admin@flashspace.aim",
       password: passwordHash,
       role: "admin",
       isEmailVerified: true,
@@ -444,7 +444,7 @@ const runSeed = async () => {
 
     if (reviewDocs.length > 0) {
       await ReviewModel.insertMany(reviewDocs, { ordered: false }).catch(
-        () => {},
+        () => { },
       );
     }
 

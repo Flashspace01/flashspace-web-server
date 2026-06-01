@@ -12,7 +12,7 @@ async function run() {
             { email: 'alpineabhishek@gmail.com' },
             { $set: { fullName: 'Abhishek Bhatt', password: hp } }
         );
-        await mongoose.connection.db!.collection('users').deleteOne({ email: 'testpartner@flashspace.co' });
+        await mongoose.connection.db!.collection('users').deleteOne({ email: 'testpartner@flashspace.ai' });
         console.log('Undo successful. alpineabhishek@gmail.com restored.');
         process.exit(0);
     } catch (err) {

@@ -16,8 +16,8 @@ const seedData = async () => {
     await mongoose.connect(dbUri);
     console.log("✅ Connected to Database.");
 
-    // 1. Ensure/Find Partner User: partner@flashspace.com
-    const targetEmail = "partner@flashspace.com";
+    // 1. Ensure/Find Partner User: partner@flashspace.aim
+    const targetEmail = "partner@flashspace.aim";
     let partner = await UserModel.findOne({ email: targetEmail });
 
     if (!partner) {
@@ -92,7 +92,7 @@ const seedData = async () => {
     };
 
     // 4. Seed Data
-    console.log("🚜 Seeding data via API for partner@flashspace.com...");
+    console.log("🚜 Seeding data via API for partner@flashspace.aim...");
 
     // Space Partner - Space
     await callApi("POST", "/spacePartner/spaces", {
@@ -262,7 +262,7 @@ const seedData = async () => {
       originalPrice: "₹2,800/month",
     });
 
-    console.log("🏁 Data seeding completed for partner@flashspace.com!");
+    console.log("🏁 Data seeding completed for partner@flashspace.aim!");
     process.exit(0);
   } catch (error) {
     console.error("❌ Seeding failed:", error);

@@ -8,7 +8,7 @@ const run = async () => {
   console.log('Testing Meeting Email Service (Nodemailer)...');
 
   const options = {
-    to: process.env.TEST_EMAIL_TO || process.env.EMAIL_USER || 'sumit@flashspace.co',
+    to: process.env.TEST_EMAIL_TO || process.env.EMAIL_USER || 'sumit@flashspace.ai',
     fullName: 'Test User',
     meetingDate: new Date(),
     meetLink: 'https://meet.google.com/abc-defg-hij',

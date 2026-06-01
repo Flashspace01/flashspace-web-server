@@ -97,7 +97,7 @@ const runSeed = async () => {
     for (let i = 1; i <= 5; i++) {
       const partner = await UserModel.create({
         fullName: `Partner ${firstNames[i]} ${lastNames[i]}`,
-        email: `partner${i}@flashspace.com`,
+        email: `partner${i}@flashspace.aim`,
         password: passwordHash,
         role: "partner",
         isEmailVerified: true,
@@ -115,7 +115,7 @@ const runSeed = async () => {
       const credits = getRandomInt(0, 50000);
       const user = await UserModel.create({
         fullName: `${getRandomItem(firstNames)} ${getRandomItem(lastNames)} (User ${i})`,
-        email: `user${i}@flashspace.com`,
+        email: `user${i}@flashspace.aim`,
         password: passwordHash,
         role: "user",
         isEmailVerified: true,
@@ -139,7 +139,7 @@ const runSeed = async () => {
     // Admin
     await UserModel.create({
       fullName: "Super Admin",
-      email: "admin@flashspace.com",
+      email: "admin@flashspace.aim",
       password: passwordHash,
       role: "admin",
       isEmailVerified: true,

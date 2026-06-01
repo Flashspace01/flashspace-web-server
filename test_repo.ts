@@ -11,7 +11,7 @@ async function run() {
     console.log("Connected to DB:", dbUri);
 
     const repo = new UserRepository();
-    const user = await repo.findByEmailForAuth("admin@flashspace.co");
+    const user = await repo.findByEmailForAuth("admin@flashspace.ai");
 
     console.log("User found via findByEmailForAuth:", user ? "Yes" : "No");
     if (user) {
