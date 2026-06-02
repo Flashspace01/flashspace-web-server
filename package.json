@@ -34,6 +34,7 @@
   },
   "homepage": "https://github.com/adarshXpal/flashspace-server#readme",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "@typegoose/typegoose": "^12.19.0",
     "@types/bcryptjs": "^2.4.6",
@@ -70,7 +71,8 @@
     "socket.io": "^4.8.3",
     "tesseract.js": "^7.0.0",
     "ts-node-dev": "^2.0.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",

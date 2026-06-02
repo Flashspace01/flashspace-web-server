@@ -121,6 +121,9 @@ console.log(
 );
 
 // Middleware
+import { mcpRoutes } from "./mcp/mcpRoutes";
+app.use("/api/mcp", mcpRoutes);
+
 app.use(express.json({ limit: '10kb' })); // Limit body size to prevent DoS
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
