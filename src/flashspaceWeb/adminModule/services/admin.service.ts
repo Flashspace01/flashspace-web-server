@@ -591,11 +591,14 @@ export class AdminService {
     includeApproved: boolean = false,
   ): Promise<ApiResponse<any>> {
     try {
+      console.log("[DEBUG] getPendingKYC called with user:", user);
+      console.log("[DEBUG] STAFF_ROLES:", STAFF_ROLES);
       const isAdminOrStaff = STAFF_ROLES.includes(user.role);
       let bookingIds: string[] = [];
 
       // If partner, first find all bookings related to their spaces
       if (!isAdminOrStaff) {
+        return { success: false, message: "Debug Info", error: `User role is ${user.role}, STAFF_ROLES includes it? ${isAdminOrStaff}` } as any;
         const spaceIds = await this.getManagedSpaceIds(user.id);
         // Optimization: If no spaces, empty result
         if (spaceIds.length === 0) {
