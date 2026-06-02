@@ -2,11 +2,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
 async function main() {
-  const url = new URL("http://localhost:5001/api/mcp/sse");
+  const SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:5001";
+  const url = new URL(`${SERVER_URL}/api/mcp/sse`);
   const transport = new SSEClientTransport(url, {
     requestInit: {
       headers: {
-        "x-mcp-api-key": "emily-flashspace-admin-key",
+        "x-mcp-api-key": process.env.MCP_API_KEY,
         "x-flashspace-csrf": "true"
       }
     }

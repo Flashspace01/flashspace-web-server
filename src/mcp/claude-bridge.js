@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 
 const http = require('http');
+const https = require('https');
 
-const API_KEY = "emily-flashspace-admin-key";
-const SSE_URL = "http://127.0.0.1:5001/api/mcp/sse";
+const API_KEY = process.env.MCP_API_KEY;
+if (!API_KEY) {
+  console.error("Missing MCP_API_KEY in environment variables.");
+  process.exit(1);
+}
+const SERVER_URL = process.env.MCP_SERVER_URL || "http://127.0.0.1:5001";
+const SSE_URL = `${SERVER_URL}/api/mcp/sse`;
 let POST_URL = null;
 const pendingMessages = [];
 
 // 1. Connect to SSE
-const req = http.request(SSE_URL, {
+const sseProtocol = SSE_URL.startsWith('https') ? https : http;
+const req = sseProtocol.request(SSE_URL, {
   method: 'GET',
   headers: {
     "x-mcp-api-key": API_KEY,
@@ -35,7 +42,7 @@ const req = http.request(SSE_URL, {
         if (currentEvent === 'endpoint') {
           // The endpoint URL might be relative or absolute
           const urlStr = currentData.trim();
-          POST_URL = urlStr.startsWith('http') ? urlStr : `http://127.0.0.1:5001${urlStr}`;
+          POST_URL = urlStr.startsWith('http') ? urlStr : `${SERVER_URL}${urlStr}`;
           
           // Send any pending messages that arrived before endpoint
           while(pendingMessages.length > 0) {
@@ -65,7 +72,8 @@ function postMessage(line) {
     return;
   }
   
-  const postReq = http.request(POST_URL, {
+  const postProtocol = POST_URL.startsWith('https') ? https : http;
+  const postReq = postProtocol.request(POST_URL, {
     method: 'POST',
     headers: {
       "Content-Type": "application/json",

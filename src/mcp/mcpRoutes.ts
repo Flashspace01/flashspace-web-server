@@ -10,7 +10,7 @@ const transports = new Map<string, SSEServerTransport>();
 // Middleware to secure the MCP endpoints (Basic API Key Auth)
 const mcpAuth = (req: any, res: any, next: any) => {
   const apiKey = req.headers["x-mcp-api-key"];
-  const expectedKey = process.env.MCP_API_KEY || "emily-flashspace-admin-key";
+  const expectedKey = process.env.MCP_API_KEY;
   
   if (apiKey !== expectedKey) {
     return res.status(401).json({ error: "Unauthorized. Invalid MCP API Key." });
