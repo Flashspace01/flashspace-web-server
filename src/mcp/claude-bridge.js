@@ -3,6 +3,26 @@
 const http = require('http');
 const https = require('https');
 
+const path = require('path');
+const fs = require('fs');
+
+const envPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      const key = match[1];
+      let value = match[2] || '';
+      if (value.length > 0 && value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
+        value = value.replace(/\\n/gm, '\n');
+      }
+      value = value.replace(/(^['"]|['"]$)/g, '').trim();
+      process.env[key] = value;
+    }
+  });
+}
+
 const API_KEY = process.env.MCP_API_KEY;
 if (!API_KEY) {
   console.error("Missing MCP_API_KEY in environment variables.");

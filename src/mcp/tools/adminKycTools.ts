@@ -101,11 +101,12 @@ export function registerAdminKycTools(mcpServer: McpServer) {
     "Activate or deactivate a space partner.",
     {
       partnerId: z.string(),
-      status: z.enum(["active", "inactive"]),
+      action: z.enum(["approve", "reject"]),
+      rejectionReason: z.string().optional(),
     },
-    async ({ partnerId, status }) => {
+    async ({ partnerId, action, rejectionReason }) => {
       try {
-        const response = await adminService.updatePartnerStatus(partnerId, status);
+        const response = await adminService.updatePartnerStatus(partnerId, action, rejectionReason);
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error updating partner status: ${error.message}` }], isError: true };

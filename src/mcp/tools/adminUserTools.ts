@@ -69,7 +69,7 @@ export function registerAdminUserTools(mcpServer: McpServer) {
     "Update an existing user's details.",
     {
       id: z.string().describe("The user ID to update"),
-      updates: z.record(z.any()).describe("A JSON object containing fields to update"),
+      updates: z.record(z.string(), z.any()).describe("A JSON object containing fields to update"),
     },
     async ({ id, updates }) => {
       try {

@@ -40,7 +40,7 @@ export function registerAdminBookingTools(mcpServer: McpServer) {
     },
     async ({ bookingId, status, reason }) => {
       try {
-        const response = await adminService.updateBookingStatus(mockAdminUser, bookingId, status, reason);
+        const response = await adminService.updateBookingStatus(mockAdminUser, bookingId, status);
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error updating booking status: ${error.message}` }], isError: true };

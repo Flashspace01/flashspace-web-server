@@ -47,7 +47,7 @@ export function registerAdminSpaceTools(mcpServer: McpServer) {
     {
       spaceType: z.enum(["coworking", "virtual", "meeting"]),
       id: z.string().describe("The ID of the space"),
-      adminMarkups: z.record(z.any()).optional().describe("Optional markups to apply during approval"),
+      adminMarkups: z.record(z.string(), z.any()).optional().describe("Optional markups to apply during approval"),
     },
     async ({ spaceType, id, adminMarkups }) => {
       try {
@@ -64,11 +64,13 @@ export function registerAdminSpaceTools(mcpServer: McpServer) {
     "Admin tool to list a space on behalf of a partner.",
     {
       partnerId: z.string(),
-      spaceData: z.record(z.any()),
+      spaceType: z.enum(["coworking", "meeting_room", "virtual_office"]),
+      propertyData: z.record(z.string(), z.any()),
+      spaceData: z.record(z.string(), z.any()),
     },
-    async ({ partnerId, spaceData }) => {
+    async ({ partnerId, spaceType, propertyData, spaceData }) => {
       try {
-        const response = await adminService.listSpaceOnBehalf(partnerId, spaceData);
+        const response = await adminService.listSpaceOnBehalf(partnerId, spaceType, propertyData, spaceData);
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error listing space on behalf: ${error.message}` }], isError: true };

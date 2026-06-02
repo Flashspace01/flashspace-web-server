@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { LeadModel } from "../../flashspaceWeb/leadModule/lead.model";
-import { VisitModel } from "../../flashspaceWeb/visitModule/models/visit.model";
+import VisitModel from "../../flashspaceWeb/visitModule/models/visit.model";
 
 export function registerLeadTools(mcpServer: McpServer) {
   // 1. get_new_leads

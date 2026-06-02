@@ -61,8 +61,9 @@ export function registerInventoryTools(mcpServer: McpServer) {
     },
     async ({ spaceId, spaceType, partnerPricePerMonth, adminMarkupPerMonth }) => {
       try {
-        const Model = spaceType === "coworking" ? CoworkingSpaceModel : MeetingRoomModel;
-        const space = await Model.findById(spaceId);
+        const space: any = spaceType === "coworking" 
+          ? await CoworkingSpaceModel.findById(spaceId) 
+          : await MeetingRoomModel.findById(spaceId);
         
         if (!space) {
           return { content: [{ type: "text", text: `No space found with ID: ${spaceId}` }], isError: true };
@@ -94,13 +95,17 @@ export function registerInventoryTools(mcpServer: McpServer) {
     },
     async ({ spaceId, spaceType, imageUrls }) => {
       try {
-        const Model = spaceType === "coworking" ? CoworkingSpaceModel : MeetingRoomModel;
-        
-        const space = await Model.findByIdAndUpdate(
-          spaceId,
-          { $push: { images: { $each: imageUrls } } },
-          { new: true }
-        ).lean();
+        const space = spaceType === "coworking"
+          ? await CoworkingSpaceModel.findByIdAndUpdate(
+              spaceId,
+              { $push: { images: { $each: imageUrls } } },
+              { new: true }
+            ).lean()
+          : await MeetingRoomModel.findByIdAndUpdate(
+              spaceId,
+              { $push: { images: { $each: imageUrls } } },
+              { new: true }
+            ).lean();
 
         if (!space) {
           return { content: [{ type: "text", text: `No space found with ID: ${spaceId}` }], isError: true };
@@ -124,13 +129,17 @@ export function registerInventoryTools(mcpServer: McpServer) {
     },
     async ({ spaceId, spaceType, amenities }) => {
       try {
-        const Model = spaceType === "coworking" ? CoworkingSpaceModel : MeetingRoomModel;
-        
-        const space = await Model.findByIdAndUpdate(
-          spaceId,
-          { $addToSet: { amenities: { $each: amenities } } },
-          { new: true }
-        ).lean();
+        const space = spaceType === "coworking"
+          ? await CoworkingSpaceModel.findByIdAndUpdate(
+              spaceId,
+              { $addToSet: { amenities: { $each: amenities } } },
+              { new: true }
+            ).lean()
+          : await MeetingRoomModel.findByIdAndUpdate(
+              spaceId,
+              { $addToSet: { amenities: { $each: amenities } } },
+              { new: true }
+            ).lean();
 
         if (!space) {
           return { content: [{ type: "text", text: `No space found with ID: ${spaceId}` }], isError: true };

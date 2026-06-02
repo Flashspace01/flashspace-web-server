@@ -1,5 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 async function main() {
   const SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:5001";
@@ -7,7 +9,7 @@ async function main() {
   const transport = new SSEClientTransport(url, {
     requestInit: {
       headers: {
-        "x-mcp-api-key": process.env.MCP_API_KEY,
+        "x-mcp-api-key": process.env.MCP_API_KEY || "",
         "x-flashspace-csrf": "true"
       }
     }
